@@ -56,11 +56,11 @@ const Icon = ({ name, size = 18 }: { name: IconName; size?: number }) => {
 
 const artItems = [
   { id: 1, title: "Golden Hour", type: "Semi-Realistic", desc: "A study in soft light, quiet confidence, and warm summer color.", art: "sunset", size: "tall", tags: ["portrait", "warm light", "digital"] },
-  { id: 2, title: "Tea Break", type: "Chibi", desc: "A tiny afternoon ritual with an oversized cup and extra joy.", art: "tea", size: "tall", tags: ["chibi", "character", "cozy"] },
+  { id: 2, title: "Tea Break", type: "Chibi", desc: "A tiny afternoon ritual with an oversized cup and extra joy.", art: "tea", size: "short", tags: ["chibi", "character", "cozy"] },
   { id: 3, title: "Koi Dreams", type: "Semi-Realistic", desc: "Dreamlike currents inspired by koi ponds and silk.", art: "koi", size: "medium", tags: ["fantasy", "water", "editorial"] },
   { id: 4, title: "Lucky Scout", type: "Chibi", desc: "A pocket-sized adventurer ready for the next quest.", art: "scout", size: "medium", tags: ["chibi", "game art", "cute"] },
   { id: 5, title: "Flora", type: "Semi-Realistic", desc: "Botanical shapes meet expressive portraiture.", art: "flora", size: "short", tags: ["nature", "portrait", "green"] },
-  { id: 6, title: "Orange Club", type: "Chibi", desc: "A playful character set made for stickers.", art: "orange", size: "short", tags: ["sticker", "chibi", "collection"] },
+  { id: 6, title: "Orange Club", type: "Chibi", desc: "A playful character set made for stickers.", art: "orange", size: "tall", tags: ["sticker", "chibi", "collection"] },
 ];
 
 const Btn = ({ children, kind = "primary", onClick, type = "button", className = "" }: { children: React.ReactNode; kind?: "primary" | "outline" | "ghost"; onClick?: () => void; type?: "button" | "submit"; className?: string }) => (
@@ -139,6 +139,7 @@ function Home({ go, openPromo }: { go: (page: Page) => void; openPromo: () => vo
               <Btn onClick={() => go("gallery")}>Explore my work <Icon name="arrow" /></Btn>
               <Btn kind="ghost" onClick={() => go("commission")}>Commission me</Btn>
             </div>
+            <div className="hero-note"><div className="avatars"><span>A</span><span>K</span><span>M</span></div><p><strong>40+ happy clients</strong><br />Drawing joy since 2019</p></div>
           </div>
           <div className="hero-canvas">
             <div className="canvas-label">Featured piece · 06/24</div>
@@ -252,7 +253,7 @@ function Gallery() {
     <main className="page-main">
       <section className="page-hero wrap"><p className="kicker">Selected works · 2023—2025</p><h1>Gallery of <em>little worlds.</em></h1><p>A collection of character-led illustrations, warm studies, and playful experiments.</p></section>
       <div className="filter-bar"><div className="filter-toggle" aria-label="Filter artwork">{(["Chibi", "Semi-Realistic"] as const).map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}<span>{allItems.filter((art) => art.type === item).length}</span></button>)}</div></div>
-      <section key={filter} className="wrap gallery-grid">
+      <section className="wrap gallery-grid">
         {visible.map((item) => <button className={`gallery-card gallery-image-only ${item.size}`} key={item.id} onClick={() => setSelected(item)} aria-label={`View ${item.title} details`}>{visual(item)}<span className="gallery-hover">View artwork <Icon name="arrow" /></span></button>)}
       </section>
       {selected && <div className="modal-backdrop" onMouseDown={() => setSelected(null)}><div className="project-modal" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}><button className="modal-close" onClick={() => setSelected(null)}><Icon name="close" /></button><div className="project-image">{visual(selected)}</div><div className="project-copy"><p className="kicker">{selected.type} · Featured project</p><h2>{selected.title}</h2><p>{selected.desc}</p><div className="tags">{selected.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="project-meta"><span>Published<strong>{"publishedAt" in selected ? selected.publishedAt : "2025"}</strong></span><span>Tools<strong>Procreate</strong></span><span>Format<strong>Digital art</strong></span></div></div></div></div>}
@@ -322,7 +323,8 @@ function Commission({ currency }: { currency: Currency }) {
 
 function Shop({ go, currency }: { go: (page: Page) => void; currency: Currency }) {
   const products = loadStored<PublishedItem[]>("inkyuu_products", []);
-  return <main className="page-main"><section className="page-hero wrap"><p className="kicker">The tiny shop</p><h1>Art made to <em>hold.</em></h1><p>Stickers, prints, and little pieces of joy from the Inkyuu studio.</p></section>{products.length > 0 ? <section className="wrap product-grid">{products.map((product) => <article key={product.id}><img src={product.image || placeholder} alt={product.title} /><div><span>{product.category}</span><h2>{product.title}</h2><p>{product.description}</p><strong>{money(product.price || 0, currency)}</strong><small>Published {product.publishedAt}</small></div></article>)}</section> : <section className="empty-shop wrap"><div className="shop-art"><span className="shop-sun" /><img src={placeholder} alt="Artwork placeholder" /></div><div className="shop-copy"><span className="status-pill"><i /> Restocking in progress</span><h2>Shop is still unavailable</h2><p>I'm putting the finishing touches on a cheerful collection of stickers, posters, photocards, portraits, and sticker sets.</p><div className="notify-row"><input aria-label="Email for shop updates" placeholder="Email for first dibs" /><Btn>Notify me</Btn></div><button className="text-link" onClick={() => go("gallery")}>Browse the gallery while you wait <Icon name="arrow" /></button></div></section>}</main>;
+  return <main className="page-main">
+    <section className="page-hero wrap"><p className="kicker">The tiny shop</p><h1>Art made to <em>hold.</em></h1><p>Stickers, prints, and little pieces of joy from the Inkyuu studio.</p></section>{products.length > 0 ? <section className="wrap product-grid">{products.map((product) => <article key={product.id}><img src={product.image || placeholder} alt={product.title} /><div><span>{product.category}</span><h2>{product.title}</h2><p>{product.description}</p><strong>{money(product.price || 0, currency)}</strong><small>Published {product.publishedAt}</small></div></article>)}</section> : <section className="empty-shop wrap"><div className="shop-art"><span className="shop-sun" /><img src={placeholder} alt="Artwork placeholder" /></div><div className="shop-copy"><span className="status-pill"><i /> Restocking in progress</span><h2>Shop is still unavailable</h2><p>I'm putting the finishing touches on a cheerful collection of stickers, posters, photocards, portraits, and sticker sets.</p><button className="text-link" onClick={() => go("gallery")}>Browse the gallery while you wait <Icon name="arrow" /></button></div></section>}</main>;
 }
 
 function Guide({ go }: { go: (page: Page) => void }) {
