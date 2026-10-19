@@ -478,7 +478,7 @@ function Commission() {
           {/* Progress Indicator */}
           <div style={{ background: "white", border: "1px solid var(--line)", padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
             <div>
-              <span style={{ fontSize: "10px", fontWeight: "bold", color: "var(--orange)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Section {step} of 5</span>
+              <span style={{ fontSize: "12px", fontWeight: "bold", color: "var(--orange)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Section {step} of 5</span>
               <h3 style={{ margin: "2px 0 0", fontFamily: "DM Serif Display", fontSize: "20px" }}>
                 {step === 1 && "Terms of Service Agreement & Confirmation"}
                 {step === 2 && "General Information"}
@@ -498,7 +498,7 @@ function Commission() {
               <div className="form-number">01</div>
               <div>
                 <h2>Terms of Service Agreement & Confirmation <span style={{ color: "red" }}>*</span></h2>
-                <p style={{ fontSize: "11px", color: "var(--muted)", lineHeight: "1.6", marginTop: "6px" }}>
+                <p style={{ fontSize: "14px", color: "var(--muted)", lineHeight: "1.6", marginTop: "6px" }}>
                   Please review and check each box below to proceed with your application. By checking these requirements, you acknowledge that you have read the official Commission Guide and explicitly agree to follow these operational boundaries throughout our project.
                 </p>
               </div>
@@ -600,7 +600,7 @@ function Commission() {
                         </button>
                       ))
                     ) : (
-                      <p style={{ color: "var(--muted)", fontSize: "11px" }}>Please go back and select an Art Style first.</p>
+                      <p style={{ color: "var(--muted)", fontSize: "14px" }}>Please go back and select an Art Style first.</p>
                     )}
                   </div>
                 </div>
@@ -723,7 +723,7 @@ function Commission() {
               <div className="form-number">05</div>
               <div>
                 <h2>Review & Checkout</h2>
-                <p style={{ fontSize: "11px", color: "var(--muted)", lineHeight: "1.6", marginTop: "6px" }}>
+                <p style={{ fontSize: "14px", color: "var(--muted)", lineHeight: "1.6", marginTop: "6px" }}>
                   Review your total, select applicable active discounts, and submit your request.
                 </p>
               </div>
@@ -732,7 +732,7 @@ function Commission() {
                 <span className="kicker">Final Calculated Total</span>
                 <div style={{ fontSize: "42px", fontFamily: "DM Serif Display", color: "var(--ink)", margin: "8px 0" }}>{money(total)}</div>
                 {discountAmount > 0 && (
-                  <p style={{ fontSize: "12px", color: "var(--orange)", fontWeight: "bold" }}>
+                  <p style={{ fontSize: "14px", color: "var(--orange)", fontWeight: "bold" }}>
                     Discount applied: -{money(discountAmount)} ({selectedDiscount?.title})
                   </p>
                 )}
