@@ -1536,8 +1536,10 @@ function Login({ onLogin, go }: { onLogin: () => void; go: (page: Page) => void 
         <Icon name="arrow" /> Back to website
       </button>
       <div className="login-card">
-        <img src={logo} alt="" />
-        <img className="login-wordmark" src={brandName} alt="Inkyuu" />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
+          <img src={logo} alt="" style={{ width: "72px", height: "auto", display: "block", margin: "0 auto" }} />          
+          <img className="login-wordmark" src={brandName} alt="Inkyuu" style={{ display: "block", margin: "-7px auto 0" }} />
+        </div>
         <p>Studio Admin Access</p>
         <form onSubmit={handleLogin}>
           <Field label="Username">
