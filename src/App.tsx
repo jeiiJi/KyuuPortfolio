@@ -34,7 +34,8 @@ type IconName =
   | "plus"
   | "spark"
   | "trash"
-  | "user";
+  | "user"
+  | "clock";
 
 const Icon = ({ name, size = 18 }: { name: IconName; size?: number }) => {
   const paths: Record<IconName, React.ReactNode> = {
@@ -53,6 +54,7 @@ const Icon = ({ name, size = 18 }: { name: IconName; size?: number }) => {
     spark: <><path d="m12 3 1.3 4.2L17 9l-3.7 1.8L12 15l-1.3-4.2L7 9l3.7-1.8L12 3Z" /><path d="m19 15 .7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7L19 15Z" /></>,
     trash: <><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14" /><path d="M10 11v6M14 11v6" /></>,
     user: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></>
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 };
@@ -66,8 +68,8 @@ const artItems = [
   { id: 6, title: "Orange Club", type: "Chibi", desc: "A playful character set made for stickers.", art: "orange", size: "tall", tags: ["sticker", "chibi", "collection"] },
 ];
 
-const Btn = ({ children, kind = "primary", onClick, type = "button", className = "" }: { children: React.ReactNode; kind?: "primary" | "outline" | "ghost"; onClick?: () => void; type?: "button" | "submit"; className?: string }) => (
-  <button type={type} className={`btn btn-${kind} ${className}`} onClick={onClick}>{children}</button>
+const Btn = ({ children, kind = "primary", onClick, type = "button", className = "", style }: { children: React.ReactNode; kind?: "primary" | "outline" | "ghost"; onClick?: () => void; type?: "button" | "submit"; className?: string; style?: React.CSSProperties }) => (
+  <button type={type} className={`btn btn-${kind} ${className}`} onClick={onClick} style={style}>{children}</button>
 );
 
 const loadStored = <T,>(key: string, fallback: T): T => {
@@ -232,48 +234,82 @@ type GalleryItem =
 function Gallery() {
   const [filter, setFilter] = useState<"Chibi" | "Semi-Realistic">("Chibi");
   const published = loadStored<PublishedItem[]>("inkyuu_gallery", []);
-  const allItems: GalleryItem[] = [
-    ...artItems.map((item) => ({
-      id: item.id,
-      title: item.title,
-      type: item.type,
-      desc: item.desc,
-      art: item.art,
-      size: item.size,
-      tags: item.tags,
-    })),
-    ...published.map((item) => ({
-      id: item.id,
-      title: item.title,
-      type: item.category || "Chibi",
-      desc: item.description,
-      image: item.image,
-      size: "medium",
-      tags: ["published", item.category || "Chibi"],
-      publishedAt: item.publishedAt,
-    })),
-  ];
+  
+  // Only published items appear in the gallery now (placeholders removed)
+  const allItems: GalleryItem[] = published.map((item) => ({
+    id: item.id,
+    title: item.title,
+    type: item.category || "Chibi",
+    desc: item.description,
+    image: item.image,
+    size: "medium",
+    tags: ["published", item.category || "Chibi"],
+    publishedAt: item.publishedAt,
+  }));
+
   const [selected, setSelected] = useState<GalleryItem | null>(null);
   const visible = allItems.filter((item) => item.type === filter);
+  
   const visual = (item: GalleryItem) => {
     if ("image" in item && item.image) {
       return <img className="gallery-real-image" src={item.image} alt={item.title} />;
     }
-
-    if ("art" in item) {
-      return <ArtVisual art={item.art} label={item.title} />;
-    }
-
     return <ArtVisual art="placeholder" label={item.title} />;
   };
+
   return (
     <main className="page-main">
-      <section className="page-hero wrap"><p className="kicker">Selected works · 2023—2025</p><h1>Gallery of <em>little worlds.</em></h1><p>A collection of character-led illustrations, warm studies, and playful experiments.</p></section>
-      <div className="filter-bar"><div className="filter-toggle" aria-label="Filter artwork">{(["Chibi", "Semi-Realistic"] as const).map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}<span>{allItems.filter((art) => art.type === item).length}</span></button>)}</div></div>
-      <section className="wrap gallery-grid">
-        {visible.map((item) => <button className={`gallery-card gallery-image-only ${item.size}`} key={item.id} onClick={() => setSelected(item)} aria-label={`View ${item.title} details`}>{visual(item)}<span className="gallery-hover">View artwork <Icon name="arrow" /></span></button>)}
+      <section className="page-hero wrap">
+        <p className="kicker">Selected works · 2023—2025</p>
+        <h1>Gallery of <em>little worlds.</em></h1>
+        <p>A collection of character-led illustrations, warm studies, and playful experiments.</p>
       </section>
-      {selected && <div className="modal-backdrop" onMouseDown={() => setSelected(null)}><div className="project-modal" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}><button className="modal-close" onClick={() => setSelected(null)}><Icon name="close" /></button><div className="project-image">{visual(selected)}</div><div className="project-copy"><p className="kicker">{selected.type} · Featured project</p><h2>{selected.title}</h2><p>{selected.desc}</p><div className="tags">{selected.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><div className="project-meta"><span>Published<strong>{"publishedAt" in selected ? selected.publishedAt : "2025"}</strong></span><span>Tools<strong>Procreate</strong></span><span>Format<strong>Digital art</strong></span></div></div></div></div>}
+      
+      {/* Sliding Filter Toggle Bar */}
+      <div className="filter-bar">
+        <div className="filter-toggle sliding-filter" aria-label="Filter artwork">
+          <div className={`filter-slider-indicator ${filter === "Semi-Realistic" ? "slide-right" : ""}`} />
+          {(["Chibi", "Semi-Realistic"] as const).map((item) => (
+            <button key={item} className={`filter-btn ${filter === item ? "active" : ""}`} onClick={() => setFilter(item)}>
+              {item}<span>{allItems.filter((art) => art.type === item).length}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <section className="wrap gallery-grid">
+        {visible.map((item) => (
+          <button className={`gallery-card gallery-image-only ${item.size}`} key={item.id} onClick={() => setSelected(item)} aria-label={`View ${item.title} details`}>
+            {visual(item)}
+            <span className="gallery-hover">View artwork <Icon name="arrow" /></span>
+          </button>
+        ))}
+        {visible.length === 0 && (
+          <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "60px 0", color: "var(--muted)" }}>
+            <p>No {filter} artwork has been added yet.</p>
+          </div>
+        )}
+      </section>
+
+      {selected && (
+        <div className="modal-backdrop" onMouseDown={() => setSelected(null)}>
+          <div className="project-modal" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setSelected(null)}><Icon name="close" /></button>
+            <div className="project-image">{visual(selected)}</div>
+            <div className="project-copy">
+              <p className="kicker">{selected.type} · Featured project</p>
+              <h2>{selected.title}</h2>
+              <p>{selected.desc}</p>
+              <div className="tags">{selected.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+              <div className="project-meta">
+                <span>Published<strong>{"publishedAt" in selected ? selected.publishedAt : "2025"}</strong></span>
+                <span>Tools<strong>Procreate</strong></span>
+                <span>Format<strong>Digital art</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -939,28 +975,395 @@ function DiscountManager() {
   );
 }
 
+type CommissionRequestWithHistory = CommissionRequest & {
+  historyType?: "Finished" | "Cancelled";
+  submittedToHistoryAt?: string;
+};
+
+function HistoryManager({ onRestore }: { onRestore: (request: CommissionRequest) => void }) {
+  const storageKey = "inkyuu_history";
+  const requestsStorageKey = "inkyuu_requests";
+  const [historyItems, setHistoryItems] = useState<CommissionRequestWithHistory[]>(() => loadStored(storageKey, []));
+  const [itemToDelete, setItemToDelete] = useState<CommissionRequestWithHistory | null>(null);
+
+  const handleUndo = (id: number) => {
+    const itemToRestore = historyItems.find(item => item.id === id);
+    if (!itemToRestore) return;
+
+    if (itemToRestore.historyType !== "Cancelled" && itemToRestore.submittedToHistoryAt) {
+      const elapsed = Date.now() - new Date(itemToRestore.submittedToHistoryAt).getTime();
+      const hours24 = 24 * 60 * 60 * 1000;
+      if (elapsed > hours24) {
+        alert("The 24-hour window to undo has expired. This work is now permanently saved in history.");
+        return;
+      }
+    }
+
+    const activeRequests = loadStored<CommissionRequest[]>(requestsStorageKey, []);
+    if (activeRequests.some((request) => request.id === id)) return;
+
+    const nextHistory = historyItems.filter(item => item.id !== id);
+    const { historyType: _historyType, submittedToHistoryAt: _archivedAt, ...requestData } = itemToRestore;
+    const restoredItem: CommissionRequest = {
+      ...requestData,
+      stage: itemToRestore.historyType === "Finished" ? 4 : itemToRestore.stage,
+    };
+    const nextRequests = [restoredItem, ...activeRequests];
+
+    localStorage.setItem(storageKey, JSON.stringify(nextHistory));
+    localStorage.setItem(requestsStorageKey, JSON.stringify(nextRequests));
+    setHistoryItems(nextHistory);
+    onRestore(restoredItem);
+  };
+
+  const confirmPermanentDelete = () => {
+    if (!itemToDelete) return;
+    const nextHistory = historyItems.filter(item => item.id !== itemToDelete.id);
+    setHistoryItems(nextHistory);
+    localStorage.setItem(storageKey, JSON.stringify(nextHistory));
+    setItemToDelete(null);
+  };
+
+  const isWithin24Hours = (dateString?: string) => {
+    if (!dateString) return false;
+    const elapsed = Date.now() - new Date(dateString).getTime();
+    return elapsed < 24 * 60 * 60 * 1000;
+  };
+
+  return (
+    <div className="admin-panel media-manager">
+      <div className="panel-head">
+        <div><p>COMPLETED ARCHIVE</p><h2>History</h2></div>
+        <span>{historyItems.length} total records</span>
+      </div>
+      <div className="media-list" style={{ gridTemplateColumns: "1fr" }}>
+        {historyItems.map((item) => {
+          const isFinished = item.historyType !== "Cancelled";
+          const canUndo = isFinished && isWithin24Hours(item.submittedToHistoryAt);
+          const canRestore = item.historyType === "Cancelled" || canUndo;
+          return (
+            <article key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px" }}>
+              <div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "4px" }}>
+                  <span style={{ color: isFinished ? "var(--orange)" : "#d9534f", fontWeight: "bold" }}>{item.historyType || "Finished"}</span>
+                  <span>· {item.type} · {money(item.totalPhp)}</span>
+                </div>
+                <h3>{item.name}</h3>
+                <p>Recorded on: {new Date(item.submittedToHistoryAt || item.submittedAt).toLocaleString()}</p>
+                <small>{isFinished && canUndo ? "Undo available (within 24h)" : "Permanently saved in history"}</small>
+              </div>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                {canRestore && (
+                  <button 
+                    onClick={() => handleUndo(item.id)} 
+                    title={isFinished ? "Restore finished request to submissions" : "Restore cancelled request to submissions"}
+                    style={{ border: "1px solid var(--line)", background: "white", width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer", display: "grid", placeItems: "center", fontWeight: "bold" }}
+                  >
+                    <Icon name="arrow" size={14} />
+                  </button>
+                )}
+                <button 
+                  onClick={() => setItemToDelete(item)} 
+                  title="Permanently delete record"
+                  style={{ border: "1px solid #d9534f", background: "#fff5f5", color: "#d9534f", width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer", display: "grid", placeItems: "center" }}
+                >
+                  <Icon name="trash" size={14} />
+                </button>
+              </div>
+            </article>
+          );
+        })}
+        {historyItems.length === 0 && <div className="empty-row">No history records yet. Finished or cancelled requests will appear here.</div>}
+      </div>
+
+      {itemToDelete && (
+        <div className="modal-backdrop" onMouseDown={() => setItemToDelete(null)}>
+          <div className="promo-modal" style={{ maxWidth: "420px", padding: "30px", textAlign: "center" }} onMouseDown={(e) => e.stopPropagation()}>
+            <h3 style={{ fontFamily: "DM Serif Display", fontSize: "24px", marginBottom: "12px" }}>Permanently Delete Record?</h3>
+            <p style={{ color: "var(--muted)", fontSize: "14px", marginBottom: "24px" }}>
+              Are you sure you want to permanently delete <strong>{itemToDelete.name}</strong>'s history record? This action cannot be undone.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <Btn type="button" kind="outline" onClick={() => setItemToDelete(null)}>Cancel</Btn>
+              <Btn type="button" onClick={confirmPermanentDelete} style={{ background: "#d9534f", borderColor: "#d9534f" }}>OK</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RequestDetail({ request, close }: { request: CommissionRequest; close: () => void }) {
-  return <div className="modal-backdrop" onMouseDown={close}><div className="request-modal" onMouseDown={(e) => e.stopPropagation()}><button className="modal-close" onClick={close}><Icon name="close" /></button><p className="kicker">Submitted {new Date(request.submittedAt).toLocaleString()}</p><h2>{request.name}’s request</h2><div className="request-answers">{[["Email", request.email], ["Social handle", request.social || "Not provided"], ["Scope", request.type], ["Finish", request.finish], ["Characters", String(request.characters)], ["Background", request.background], ["Commercial use", request.commercial ? "Yes" : "No"], ["Priority", request.priority ? "Yes" : "No"], ["Due date", request.dueDate], ["Discount Applied", request.discountName ? `${request.discountName} (-₱${request.discountAmount?.toLocaleString()})` : "None"], ["Estimate", `₱${request.totalPhp.toLocaleString()}`], ["Project notes", request.notes]].map(([label, answer]) => <div key={label}><span>{label}</span><p>{answer}</p></div>)}</div>{request.references.length > 0 && <div className="request-references"><h3>Reference images</h3>{request.references.map((image, i) => <img src={image} alt={`Client reference ${i + 1}`} key={i} />)}</div>}</div></div>;
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [zoomScale, setZoomScale] = useState<number>(1);
+
+  const handleZoomIn = () => setZoomScale((prev) => Math.min(prev + 0.25, 3));
+  const handleZoomOut = () => setZoomScale((prev) => Math.max(prev - 0.25, 0.5));
+  const openZoom = (image: string) => {
+    setZoomedImage(image);
+    setZoomScale(1);
+  };
+
+  return (
+    <div className="modal-backdrop" onMouseDown={close}>
+      <div className="request-modal" onMouseDown={(e) => e.stopPropagation()}>
+        <button className="modal-close" onClick={close}><Icon name="close" /></button>
+        <p className="kicker">Submitted {new Date(request.submittedAt).toLocaleString()}</p>
+        <h2>{request.name}’s request</h2>
+        <div className="request-answers">
+          {[
+            ["Email", request.email], 
+            ["Social handle", request.social || "Not provided"], 
+            ["Scope", request.type], 
+            ["Finish", request.finish], 
+            ["Characters", String(request.characters)], 
+            ["Background", request.background], 
+            ["Commercial use", request.commercial ? "Yes" : "No"], 
+            ["Priority", request.priority ? "Yes" : "No"], 
+            ["Due date", request.dueDate], 
+            ["Discount Applied", request.discountName ? `${request.discountName} (-₱${request.discountAmount?.toLocaleString()})` : "None"], 
+            ["Estimate", `₱${request.totalPhp.toLocaleString()}`], 
+            ["Project notes", request.notes]
+          ].map(([label, answer]) => (
+            <div key={label}><span>{label}</span><p>{answer}</p></div>
+          ))}
+        </div>
+        
+        {request.references.length > 0 && (
+          <div className="request-references">
+            <h3>Reference images (Click to view larger)</h3>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "10px" }}>
+              {request.references.map((image, i) => (
+                <img 
+                  src={image} 
+                  alt={`Client reference ${i + 1}`} 
+                  key={i} 
+                  onClick={() => openZoom(image)}
+                  style={{ width: "120px", height: "120px", objectFit: "cover", cursor: "pointer", border: "1px solid var(--line)", transition: "transform 0.2s ease" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {zoomedImage && (
+        <div className="modal-backdrop" style={{ zIndex: 110, background: "rgba(0,0,0,0.85)" }} onMouseDown={() => setZoomedImage(null)}>
+          <div 
+            style={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column", alignItems: "center" }} 
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {/* Top Bar with Controls and X Close Button */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: "12px", background: "rgba(255,255,255,0.1)", padding: "8px 16px", borderRadius: "8px" }}>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button type="button" onClick={handleZoomIn} style={{ background: "white", border: "none", padding: "6px 12px", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>Zoom +</button>
+                <button type="button" onClick={handleZoomOut} style={{ background: "white", border: "none", padding: "6px 12px", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>Zoom -</button>
+                <button type="button" onClick={() => setZoomScale(1)} style={{ background: "white", border: "none", padding: "6px 12px", borderRadius: "4px", cursor: "pointer", fontSize: "12px" }}>Reset</button>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setZoomedImage(null)} 
+                style={{ background: "white", border: "none", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", display: "grid", placeItems: "center", fontWeight: "bold", fontSize: "16px" }}
+                aria-label="Close zoomed image"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Largened Image Container */}
+            <div style={{ overflow: "auto", maxWidth: "100%", maxHeight: "80vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
+              <img 
+                src={zoomedImage} 
+                alt="Enlarged reference view" 
+                style={{ transform: `scale(${zoomScale})`, transition: "transform 0.2s ease", transformOrigin: "center center", maxWidth: "100%", maxHeight: "75vh", objectFit: "contain" }} 
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Admin({ go }: { go: (page: Page) => void }) {
   const [tab, setTab] = useState("overview");
   const [requests, setRequests] = useState<CommissionRequest[]>(() => loadStored("inkyuu_requests", []));
   const [selected, setSelected] = useState<CommissionRequest | null>(null);
-  const stages = ["Review", "Sketch", "Lineart", "Color", "Render"];
-  const adminLinks = [["overview", "grid", "Overview"], ["submissions", "user", "Submissions"], ["schedule", "calendar", "Schedule"], ["requests", "mail", "Client requests"], ["artworks", "brush", "Gallery images"], ["products", "spark", "Shop merchandise"], ["discounts", "spark", "Discounts"]];
-  const updateStage = (id: number, stage: number) => { const next = requests.map((request) => request.id === id ? { ...request, stage } : request); setRequests(next); localStorage.setItem("inkyuu_requests", JSON.stringify(next)); };
-  const removeRequest = (id: number) => { const next = requests.filter((request) => request.id !== id); setRequests(next); localStorage.setItem("inkyuu_requests", JSON.stringify(next)); };
+  
+  const stages = ["Review", "Sketch", "Lineart", "Color", "Render", "Approved"];
+  
+  const adminLinks = [
+    ["overview", "grid", "Overview"], 
+    ["submissions", "user", "Submissions"], 
+    ["schedule", "calendar", "Schedule"], 
+    ["requests", "mail", "Client requests"], 
+    ["artworks", "brush", "Gallery images"], 
+    ["products", "spark", "Shop merchandise"], 
+    ["discounts", "spark", "Discounts"],
+    ["history", "clock", "History"]
+  ];
+
+  const updateStage = (id: number, stageIndex: number) => {
+    const next = requests.map((request) => Number(request.id) === Number(id) ? { ...request, stage: stageIndex } : request);
+    setRequests(next);
+    localStorage.setItem("inkyuu_requests", JSON.stringify(next));
+  };
+
+  const moveToHistoryAsFinished = (id: number) => {
+    const activeRequests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
+    const targetRequest = activeRequests.find((request) => Number(request.id) === Number(id));
+    if (!targetRequest) {
+      setRequests(activeRequests);
+      return;
+    }
+
+    const historyKey = "inkyuu_history";
+    const historyItems = loadStored<CommissionRequestWithHistory[]>(historyKey, []);
+    const archivedItem: CommissionRequestWithHistory = {
+      ...targetRequest,
+      stage: 5,
+      historyType: "Finished",
+      submittedToHistoryAt: new Date().toISOString(),
+    };
+
+    localStorage.setItem(historyKey, JSON.stringify([archivedItem, ...historyItems]));
+
+    const nextRequests = activeRequests.filter((request) => Number(request.id) !== Number(id));
+    localStorage.setItem("inkyuu_requests", JSON.stringify(nextRequests));
+    setRequests(nextRequests);
+    setTab("history");
+  };
+
+  const removeRequest = (id: number) => {
+    const targetRequest = requests.find(r => Number(r.id) === Number(id));
+    if (targetRequest) {
+      const historyKey = "inkyuu_history";
+      const historyItems = loadStored<any[]>(historyKey, []);
+      const cancelledItem = { ...targetRequest, historyType: "Cancelled", submittedToHistoryAt: new Date().toISOString() };
+      localStorage.setItem(historyKey, JSON.stringify([cancelledItem, ...historyItems]));
+    }
+
+    const nextRequests = requests.filter((request) => Number(request.id) !== Number(id));
+    setRequests(nextRequests);
+    localStorage.setItem("inkyuu_requests", JSON.stringify(nextRequests));
+  };
+
   const upcoming = [...requests].filter((r) => r.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-  return <main className="admin-shell"><aside className="admin-nav"><button className="admin-brand" onClick={() => go("home")}><img src={logo} alt="" /><img src={brandName} alt="Inkyuu" /></button><nav>{adminLinks.map(([id, icon, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}><Icon name={icon as IconName} />{label}</button>)}</nav><button className="back-site" onClick={() => go("home")}><Icon name="arrow" /> Back to website</button></aside><section className="admin-main"><header><div><p>STUDIO DASHBOARD</p><h1>{adminLinks.find(([id]) => id === tab)?.[2]}</h1></div></header>
-    {tab === "overview" && <div className="notification-grid"><section className="admin-panel"><div className="panel-head"><div><p>INBOX</p><h2>New requests</h2></div><span>{requests.filter((r) => r.stage === 0).length} new</span></div><div className="notification-list">{requests.filter((r) => r.stage === 0).slice(0, 5).map((request) => <button key={request.id} onClick={() => setSelected(request)}><span><Icon name="mail" /></span><div><strong>{request.name} submitted a commission</strong><small>{request.type} · {new Date(request.submittedAt).toLocaleDateString()}</small></div><Icon name="arrow" /></button>)}{requests.length === 0 && <p className="empty-row">New commission requests will appear here.</p>}</div></section><section className="admin-panel"><div className="panel-head"><div><p>CALENDAR</p><h2>Upcoming deadlines</h2></div></div><div className="deadline-list">{upcoming.slice(0, 5).map((request) => <button key={request.id} onClick={() => setSelected(request)}><time>{new Date(`${request.dueDate}T00:00`).toLocaleDateString("en-US", { month: "short", day: "2-digit" })}</time><span><strong>{request.name}</strong><small>{request.type} · {stages[request.stage]}</small></span></button>)}{upcoming.length === 0 && <p className="empty-row">No client deadlines scheduled.</p>}</div></section><section className="admin-panel shop-notice"><div><span className="status-pill"><i /> Shop status</span><h2>{loadStored<PublishedItem[]>("inkyuu_products", []).length ? "Published and visible" : "Still unavailable"}</h2><p>{loadStored<PublishedItem[]>("inkyuu_products", []).length} products are currently live. Publish merchandise to automatically open the public shop.</p></div><Icon name="spark" size={34} /></section></div>}
-    {tab === "submissions" && <div className="admin-panel database-panel"><div className="panel-head"><div><p>PROJECT DATABASE</p><h2>Submission tracker</h2></div><span>Saved automatically · {requests.length} records</span></div><div className="database-table"><div className="database-row database-head"><span>Client</span><span>Project</span><span>Due</span><span>Finish level</span><span>Progress</span><span /></div>{requests.map((request) => <div className="database-row" key={request.id}><button className="client-cell" onClick={() => setSelected(request)}><strong>{request.name}</strong><small>{request.email}</small></button><span>{request.type} · {request.characters} char.</span><time>{request.dueDate}</time><select value={request.stage} onChange={(e) => updateStage(request.id, Number(e.target.value))}>{stages.map((stage, index) => <option value={index} key={stage}>{stage}</option>)}</select><div className="progress-cell"><span><i style={{ width: `${request.stage * 25}%` }} /></span><b>{request.stage * 25}%</b></div><button onClick={() => removeRequest(request.id)}><Icon name="trash" /></button></div>)}{requests.length === 0 && <p className="empty-row">No submissions yet. Public form responses are retained here.</p>}</div></div>}
-    {tab === "schedule" && <div className="admin-panel schedule-panel"><div className="panel-head"><div><p>CLIENT DUE DATES</p><h2>Schedule</h2></div><span>{upcoming.length} planned</span></div><div className="schedule-list">{upcoming.map((request) => <button key={request.id} onClick={() => setSelected(request)}><time><strong>{new Date(`${request.dueDate}T00:00`).toLocaleDateString("en-US", { day: "2-digit" })}</strong><span>{new Date(`${request.dueDate}T00:00`).toLocaleDateString("en-US", { month: "short" })}</span></time><div><h3>{request.name}</h3><p>{request.type} · {request.finish} · {request.characters} character{request.characters > 1 ? "s" : ""}</p></div><span className="admin-status">{stages[request.stage]}</span><Icon name="arrow" /></button>)}{upcoming.length === 0 && <p className="empty-row">Requested client due dates will appear automatically.</p>}</div></div>}
-    {tab === "requests" && <div className="admin-panel"><div className="panel-head"><div><p>AUTOMATIC INBOX</p><h2>Client requests</h2></div><span>{requests.length} total</span></div><div className="request-list">{requests.map((request) => <button key={request.id} onClick={() => setSelected(request)}><span className="request-avatar">{request.name.slice(0, 2).toUpperCase()}</span><div><strong>{request.name}</strong><small>{request.type} · {request.finish} · submitted {new Date(request.submittedAt).toLocaleDateString()}</small></div><span>{request.dueDate}</span><Icon name="arrow" /></button>)}{requests.length === 0 && <p className="empty-row">Completed commission forms will be added here automatically.</p>}</div></div>}
-    {tab === "artworks" && <PublishManager mode="gallery" />}
-    {tab === "products" && <PublishManager mode="products" />}
-    {tab === "discounts" && <DiscountManager />}
-  </section>{selected && <RequestDetail request={selected} close={() => setSelected(null)} />}</main>;
+
+  return (
+    <main className="admin-shell">
+      <aside className="admin-nav">
+        <button className="admin-brand" onClick={() => go("home")}><img src={logo} alt="" /><img src={brandName} alt="Inkyuu" /></button>
+        <nav>{adminLinks.map(([id, icon, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}><Icon name={icon as IconName} />{label}</button>)}</nav>
+        <button className="back-site" onClick={() => go("home")}><Icon name="arrow" /> Back to website</button>
+      </aside>
+      <section className="admin-main">
+        <header><div><p>STUDIO DASHBOARD</p><h1>{adminLinks.find(([id]) => id === tab)?.[2]}</h1></div></header>
+        
+        {tab === "overview" && (
+          <div className="notification-grid">
+            <section className="admin-panel">
+              <div className="panel-head"><div><p>INBOX</p><h2>New requests</h2></div><span>{requests.filter((r) => r.stage === 0).length} new</span></div>
+              <div className="notification-list">
+                {requests.filter((r) => r.stage === 0).slice(0, 5).map((request) => (
+                  <button key={request.id} onClick={() => setSelected(request)}>
+                    <span><Icon name="mail" /></span>
+                    <div><strong>{request.name} submitted a commission</strong><small>{request.type} · {new Date(request.submittedAt).toLocaleDateString()}</small></div>
+                    <Icon name="arrow" />
+                  </button>
+                ))}
+                {requests.length === 0 && <p className="empty-row">New commission requests will appear here.</p>}
+              </div>
+            </section>
+            <section className="admin-panel">
+              <div className="panel-head"><div><p>CALENDAR</p><h2>Upcoming deadlines</h2></div></div>
+              <div className="deadline-list">
+                {upcoming.slice(0, 5).map((request) => (
+                  <button key={request.id} onClick={() => setSelected(request)}>
+                    <time>{new Date(`${request.dueDate}T00:00`).toLocaleDateString("en-US", { month: "short", day: "2-digit" })}</time>
+                    <span><strong>{request.name}</strong><small>{request.type} · {stages[request.stage]}</small></span>
+                  </button>
+                ))}
+                {upcoming.length === 0 && <p className="empty-row">No client deadlines scheduled.</p>}
+              </div>
+            </section>
+            <section className="admin-panel shop-notice">
+              <div>
+                <span className="status-pill"><i /> Shop status</span>
+                <h2>{loadStored<PublishedItem[]>("inkyuu_products", []).length ? "Published and visible" : "Still unavailable"}</h2>
+                <p>{loadStored<PublishedItem[]>("inkyuu_products", []).length} products are currently live. Publish merchandise to automatically open the public shop.</p>
+              </div>
+              <Icon name="spark" size={34} />
+            </section>
+          </div>
+        )}
+
+        {tab === "submissions" && (
+          <div className="admin-panel database-panel">
+            <div className="panel-head">
+              <div><p>PROJECT DATABASE</p><h2>Submission tracker</h2></div>
+              <span>Saved automatically · {requests.length} records</span>
+            </div>
+            <div className="database-table">
+              <div className="database-row database-head" style={{ gridTemplateColumns: "1.2fr 1fr .75fr 1.0fr 1.1fr 75px" }}>
+                <span>Client</span><span>Project</span><span>Due</span><span>Finish level</span><span>Progress</span><span />
+              </div>
+              {requests.map((request) => {
+                const progressPercent = request.stage === 5 ? 100 : Math.min(100, Math.round((request.stage / 5) * 100));
+                return (
+                  <div className="database-row" key={request.id} style={{ gridTemplateColumns: "1.2fr 1fr .75fr 1.0fr 1.1fr 75px" }}>
+                    <button type="button" className="client-cell" onClick={() => setSelected(request)}>
+                      <strong>{request.name}</strong>
+                      <small>{request.email}</small>
+                    </button>
+                    <span>{request.type} · {request.characters} char.</span>
+                    <time>{request.dueDate}</time>
+                    <select value={request.stage} onChange={(e) => updateStage(request.id, Number(e.target.value))}>
+                      {stages.map((stage, index) => <option value={index} key={stage}>{stage}</option>)}
+                    </select>
+                    <div className="progress-cell">
+                      <span><i style={{ width: `${progressPercent}%` }} /></span>
+                      <b>{progressPercent}%</b>
+                    </div>
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                      <button 
+                        type="button"
+                        onClick={() => moveToHistoryAsFinished(request.id)} 
+                        title="Mark as Finished & move to history"
+                        style={{ border: "1px solid var(--orange)", background: "var(--cream)", color: "var(--orange)", width: "30px", height: "30px", borderRadius: "4px", cursor: "pointer", display: "grid", placeItems: "center" }}
+                      >
+                        <Icon name="check" size={14} />
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => removeRequest(request.id)} 
+                        title="Cancel & move to history"
+                        style={{ border: "1px solid var(--line)", background: "white", color: "var(--muted)", width: "30px", height: "30px", borderRadius: "4px", cursor: "pointer", display: "grid", placeItems: "center" }}
+                      >
+                        <Icon name="trash" size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {requests.length === 0 && <p className="empty-row">No submissions yet. Public form responses are retained here.</p>}
+            </div>
+          </div>
+        )}
+
+        {tab === "schedule" && <div className="admin-panel schedule-panel"><div className="panel-head"><div><p>CLIENT DUE DATES</p><h2>Schedule</h2></div><span>{upcoming.length} planned</span></div><div className="schedule-list">{upcoming.map((request) => <button key={request.id} onClick={() => setSelected(request)}><time><strong>{new Date(`${request.dueDate}T00:00`).toLocaleDateString("en-US", { day: "2-digit" })}</strong><span>{new Date(`${request.dueDate}T00:00`).toLocaleDateString("en-US", { month: "short" })}</span></time><div><h3>{request.name}</h3><p>{request.type} · {request.finish} · {request.characters} character{request.characters > 1 ? "s" : ""}</p></div><span className="admin-status">{stages[request.stage]}</span><Icon name="arrow" /></button>)}{upcoming.length === 0 && <p className="empty-row">Requested client due dates will appear automatically.</p>}</div></div>}
+        {tab === "requests" && <div className="admin-panel"><div className="panel-head"><div><p>AUTOMATIC INBOX</p><h2>Client requests</h2></div><span>{requests.length} total</span></div><div className="request-list">{requests.map((request) => <button key={request.id} onClick={() => setSelected(request)}><span className="request-avatar">{request.name.slice(0, 2).toUpperCase()}</span><div><strong>{request.name}</strong><small>{request.type} · {request.finish} · submitted {new Date(request.submittedAt).toLocaleDateString()}</small></div><span>{request.dueDate}</span><Icon name="arrow" /></button>)}{requests.length === 0 && <p className="empty-row">Completed commission forms will be added here automatically.</p>}</div></div>}
+        {tab === "artworks" && <PublishManager mode="gallery" />}
+        {tab === "products" && <PublishManager mode="products" />}
+        {tab === "discounts" && <DiscountManager />}
+        {tab === "history" && <HistoryManager onRestore={(request) => setRequests((current) => [request, ...current.filter((item) => item.id !== request.id)])} />}
+      </section>
+      {selected && <RequestDetail request={selected} close={() => setSelected(null)} />}
+    </main>
+  );
 }
 
 function Login({ onLogin, go }: { onLogin: () => void; go: (page: Page) => void }) {
