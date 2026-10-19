@@ -139,7 +139,6 @@ function Home({ go, openPromo }: { go: (page: Page) => void; openPromo: () => vo
               <Btn onClick={() => go("gallery")}>Explore my work <Icon name="arrow" /></Btn>
               <Btn kind="ghost" onClick={() => go("commission")}>Commission me</Btn>
             </div>
-            <div className="hero-note"><div className="avatars"><span>A</span><span>K</span><span>M</span></div><p><strong>40+ happy clients</strong><br />Drawing joy since 2019</p></div>
           </div>
           <div className="hero-canvas">
             <div className="canvas-label">Featured piece · 06/24</div>
