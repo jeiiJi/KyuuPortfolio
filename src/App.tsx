@@ -342,7 +342,20 @@ function Commission() {
   const [references, setReferences] = useState<string[]>([]);
   const discounts = loadStored<DiscountItem[]>("inkyuu_discounts", []);
 
-  const setValue = (key: keyof typeof form, value: any) => setForm((prev) => ({ ...prev, [key]: value }));
+  const setValue = (key: keyof typeof form, value: any) => {
+    if (key === "artStyle" && value === "Semi-Realistic") {
+      const requests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
+      const activeSemiCount = requests.filter(r => r.type.startsWith("Semi-Realistic")).length;
+      
+      if (activeSemiCount >= 5) {
+        alert("Semi-Realistic commissions are currently unavailable as all active and reservation slots are fully occupied.");
+        return;
+      } else if (activeSemiCount >= 3) {
+        alert("All active Semi-Realistic slots are currently taken. Your order will be placed in a reserved slot.");
+      }
+    }
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
 
   // Pricing calculations
   const basePrice = form.artStyle === "Chibi" 
@@ -576,17 +589,7 @@ function Commission() {
                 <Field label={<>Art Style <span style={{ color: "red" }}>*</span></>}>
                   <select 
                     value={form.artStyle} 
-                    onChange={(e) => {
-                      const selectedStyle = e.target.value;
-                      setForm((prev) => ({
-                        ...prev,
-                        artStyle: selectedStyle,
-                        baseOption: "",
-                        chibiService: "",
-                        colorOption: "",
-                        characters: 1,
-                      }));
-                    }}
+                    onChange={(e) => setValue("artStyle", e.target.value)}
                   >
                     <option value="" disabled>-- Select Art Style --</option>
                     <option value="Chibi">Chibi</option>
@@ -876,13 +879,75 @@ function Shop({ go }: { go: (page: Page) => void }) {
 }
 
 function Guide({ go }: { go: (page: Page) => void }) {
+  const requests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
+  const history = loadStored<CommissionRequestWithHistory[]>("inkyuu_history", []);
+
+  // Filter only Semi-Realistic requests that are active (not finished/cancelled or within 24h grace period)
+  const isSemiRealistic = (type: string) => type.startsWith("Semi-Realistic");
+  
+  const activeSemiRequests = requests.filter(r => isSemiRealistic(r.type));
+  const activeCount = Math.min(3, activeSemiRequests.length);
+  const reservedCount = Math.max(0, Math.min(2, activeSemiRequests.length - 3));
+
   const sections = [
     { number: "01", title: "Rules & regulations", intro: "Clear boundaries keep every project safe, respectful, and enjoyable.", items: [["Content", "No NSFW, nudity, suggestive content, heavy gore, controversial content, or depictions of bodily fluids."], ["Will draw", "Angst, fluff, original characters, fan art, stickers, and memes."], ["Won’t draw", "Canon ships, furries or animals, mecha, cars, or major changes to canon character designs."], ["Copyright", "The artist retains copyright. Public use requires clear credit; alteration, AI training, blockchain, and NFTs are prohibited."]] },
     { number: "02", title: "Workflow & payment", intro: "A milestone-based process with no upfront cost before the initial drafting phase.", items: [["Sketch first", "Work begins and develops through the approved sketch without upfront payment."], ["20% midpoint payment", "A mandatory 20% downpayment is requested once the final sketch is approved."], ["Final settlement", "The remaining balance is due within three calendar days after completion. Unwatermarked files are released after payment clears."], ["Priority projects", "A required deadline can be fast-tracked for an additional 10% of the total project price."]] },
-    { number: "03", title: "Communication & delivery", intro: "Timely feedback protects your slot and keeps the production calendar moving.", items: [["Response window", "Please respond to updates and approval requests within three calendar days."], ["Inactivity", "Fourteen days without communication may be treated as abandonment and the slot may reopen."], ["File storage", "Final high-resolution files remain available through cloud storage for six months."], ["Availability", "Only three commissions are active at a time. Reservations are contacted first when a slot opens."]] },
+    { number: "03", title: "Communication & delivery", intro: "Timely feedback protects your slot and keeps the production calendar moving.", items: [["Response window", "Please respond to updates and approval requests within three calendar days."], ["Inactivity", "Fourteen days without communication may be treated as abandonment and the slot may reopen."], ["File storage", "Final high-resolution files remain available through cloud storage for six months."], ["Availability", "Only three active and two reserved semi-realistic commissions are open at a time. Reservations are contacted first when a slot opens."]] },
     { number: "04", title: "Cancellation", intro: "Refund eligibility changes as time and labor are invested.", items: [["Grace period", "Cancellation within seven days of booking is eligible for a full refund."], ["Mid-production", "After the grace period, cancellation ends production; 12% of the downpayment is refunded with the latest work-in-progress export."], ["Non-payment", "Missing the midpoint or final payment deadlines may terminate the project and forfeit the slot."], ["Force majeure", "For emergencies or technical delays, a revised timeline or cancellation option will be discussed."]] },
   ];
-  return <main className="page-main guide-page"><section className="guide-hero"><div className="wrap"><p className="kicker">Kyuu commission guide</p><h1>Good art starts with <em>clear expectations.</em></h1><p>Everything you need to know before booking a commission with Inkyuu.</p><div><Btn onClick={() => go("commission")}>Start a request <Icon name="arrow" /></Btn><a className="btn btn-outline" href={guidePdf} target="_blank" rel="noreferrer">Open original PDF</a></div></div></section><section className="wrap guide-status"><div><span>Status</span><strong><i /> Open</strong></div><div><span>Active slots</span><strong>0 / 3</strong></div><div><span>Reserved</span><strong>0 / 2</strong></div><div><span>Contact hours</span><strong>10 AM–9 PM UTC+8</strong></div></section><section className="wrap guide-sections">{sections.map((section) => <article key={section.number}><div className="guide-title"><span>{section.number}</span><div><p className="kicker">Commission policy</p><h2>{section.title}</h2><p>{section.intro}</p></div></div><div className="guide-items">{section.items.map(([title, text]) => <div key={title}><h3>{title}</h3><p>{text}</p></div>)}</div></article>)}</section><section className="guide-contact"><div className="wrap"><div><p className="kicker">Questions?</p><h2>Let’s clear things up before we start.</h2><p>Reach the studio at kyuukyuuji@gmail.com or review the complete attached guide.</p></div><Btn onClick={() => go("commission")}>Commission now <Icon name="arrow" /></Btn></div></section></main>;
+  return (
+    <main className="page-main guide-page">
+      <section className="guide-hero">
+        <div className="wrap">
+          <p className="kicker">Kyuu commission guide</p>
+          <h1>Good art starts with <em>clear expectations.</em></h1>
+          <p>Everything you need to know before booking a commission with Inkyuu.</p>
+          <div>
+            <Btn onClick={() => go("commission")}>Start a request <Icon name="arrow" /></Btn>
+            <a className="btn btn-outline" href={guidePdf} target="_blank" rel="noreferrer">Open original PDF</a>
+          </div>
+        </div>
+      </section>
+      <section className="wrap guide-status">
+        <div><span>Status</span><strong><i /> {activeCount >= 3 && reservedCount >= 2 ? "Fully Booked" : "Open"}</strong></div>
+        <div><span>Active slots</span><strong>{activeCount} / 3</strong></div>
+        <div><span>Reserved</span><strong>{reservedCount} / 2</strong></div>
+        <div><span>Contact hours</span><strong>10 AM–9 PM UTC+8</strong></div>
+      </section>
+      <section className="wrap guide-sections">
+        {sections.map((section) => (
+          <article key={section.number}>
+            <div className="guide-title">
+              <span>{section.number}</span>
+              <div>
+                <p className="kicker">Commission policy</p>
+                <h2>{section.title}</h2>
+                <p>{section.intro}</p>
+              </div>
+            </div>
+            <div className="guide-items">
+              {section.items.map(([title, text]) => (
+                <div key={title}>
+                  <h3>{title}</h3>
+                  <p>{text}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+        ))}
+      </section>
+      <section className="guide-contact">
+        <div className="wrap">
+          <div>
+            <p className="kicker">Questions?</p>
+            <h2>Let’s clear things up before we start.</h2>
+            <p>Reach the studio at kyuukyuuji@gmail.com or review the complete attached guide.</p>
+          </div>
+          <Btn onClick={() => go("commission")}>Commission now <Icon name="arrow" /></Btn>
+        </div>
+      </section>
+    </main>
+  );
 }
 
 function About({ go }: { go: (page: Page) => void }) {
@@ -1192,6 +1257,12 @@ function Admin({ go }: { go: (page: Page) => void }) {
   const [tab, setTab] = useState("overview");
   const [requests, setRequests] = useState<CommissionRequest[]>(() => loadStored("inkyuu_requests", []));
   const [selected, setSelected] = useState<CommissionRequest | null>(null);
+
+  // Filter states for submission tracker
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterPriority, setFilterPriority] = useState<string>("all"); // "all" | "priority" | "normal"
+  const [filterStyle, setFilterStyle] = useState<string>("all"); // "all" | "Chibi" | "Semi-Realistic"
+  const [filterSlotStatus, setFilterSlotStatus] = useState<string>("all"); // "all" | "active" | "reserved" | "unoccupied"
   
   const stages = ["Review", "Sketch", "Lineart", "Color", "Render", "Approved"];
   
@@ -1253,6 +1324,37 @@ function Admin({ go }: { go: (page: Page) => void }) {
 
   const upcoming = [...requests].filter((r) => r.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
+  // Filter logic for submission tracker
+  const semiRealisticRequests = requests
+    .filter(r => r.type.startsWith("Semi-Realistic"))
+    .sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
+
+  const activeSemiIds = new Set(semiRealisticRequests.slice(0, 3).map(r => r.id));
+  const reservedSemiIds = new Set(semiRealisticRequests.slice(3, 5).map(r => r.id));
+
+  const filteredRequests = requests.filter((request) => {
+    if (searchQuery.trim() && !request.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+    if (filterPriority === "priority" && !request.priority) return false;
+    if (filterPriority === "normal" && request.priority) return false;
+
+    if (filterStyle !== "all" && !request.type.startsWith(filterStyle)) return false;
+
+    if (filterSlotStatus !== "all") {
+      const isSemi = request.type.startsWith("Semi-Realistic");
+      if (filterSlotStatus === "active") {
+        if (!isSemi || !activeSemiIds.has(request.id)) return false;
+      } else if (filterSlotStatus === "reserved") {
+        if (!isSemi || !reservedSemiIds.has(request.id)) return false;
+      } else if (filterSlotStatus === "unoccupied") {
+        if (isSemi && (activeSemiIds.has(request.id) || reservedSemiIds.has(request.id))) return false;
+      }
+    }
+
+    return true;
+  });
+
   return (
     <main className="admin-shell">
       <aside className="admin-nav">
@@ -1305,22 +1407,68 @@ function Admin({ go }: { go: (page: Page) => void }) {
           <div className="admin-panel database-panel">
             <div className="panel-head">
               <div><p>PROJECT DATABASE</p><h2>Submission tracker</h2></div>
-              <span>Saved automatically · {requests.length} records</span>
+              <span>Saved automatically · {filteredRequests.length} of {requests.length} records</span>
             </div>
+            
+            {/* Filter and Search Controls Bar */}
+            <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr", gap: "10px", padding: "16px 0", borderBottom: "1px solid var(--line)", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <input 
+                  type="text" 
+                  placeholder="Search by customer name..." 
+                  value={searchQuery} 
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ width: "100%", padding: "8px 12px", border: "1px solid var(--line)", background: "var(--paper)", fontSize: "12px", borderRadius: "4px" }}
+                />
+              </div>
+              <div>
+                <select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid var(--line)", background: "var(--paper)", fontSize: "12px", borderRadius: "4px" }}>
+                  <option value="all">All Priorities</option>
+                  <option value="priority">Priority Only</option>
+                  <option value="normal">Normal Only</option>
+                </select>
+              </div>
+              <div>
+                <select value={filterStyle} onChange={(e) => setFilterStyle(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid var(--line)", background: "var(--paper)", fontSize: "12px", borderRadius: "4px" }}>
+                  <option value="all">All Art Styles</option>
+                  <option value="Chibi">Chibi</option>
+                  <option value="Semi-Realistic">Semi-Realistic</option>
+                </select>
+              </div>
+              <div>
+                <select value={filterSlotStatus} onChange={(e) => setFilterSlotStatus(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid var(--line)", background: "var(--paper)", fontSize: "12px", borderRadius: "4px" }}>
+                  <option value="all">All Slot Status</option>
+                  <option value="active">Active Slots (Semi)</option>
+                  <option value="reserved">Reserved Slots (Semi)</option>
+                  <option value="unoccupied">Unoccupied / Chibi</option>
+                </select>
+              </div>
+            </div>
+
             <div className="database-table">
               <div className="database-row database-head" style={{ gridTemplateColumns: "1.2fr 1fr .75fr 1.0fr 1.1fr 75px" }}>
                 <span>Client</span><span>Project</span><span>Due</span><span>Finish level</span><span>Progress</span><span />
               </div>
-              {requests.map((request) => {
+              {filteredRequests.map((request) => {
                 const progressPercent = request.stage === 5 ? 100 : Math.min(100, Math.round((request.stage / 5) * 100));
+                const isSemi = request.type.startsWith("Semi-Realistic");
+                const badgeText = isSemi && activeSemiIds.has(request.id) ? " [Active Slot]" : isSemi && reservedSemiIds.has(request.id) ? " [Reserved Slot]" : "";
+                
                 return (
-                  <div className="database-row" key={request.id} style={{ gridTemplateColumns: "1.2fr 1fr .75fr 1.0fr 1.1fr 75px" }}>
+                  <div 
+                    className="database-row" 
+                    key={request.id} 
+                    style={{ 
+                      gridTemplateColumns: "1.2fr 1fr .75fr 1.0fr 1.1fr 75px",
+                      background: request.priority ? "rgba(248, 118, 42, 0.08)" : "transparent" 
+                    }}
+                  >
                     <button type="button" className="client-cell" onClick={() => setSelected(request)}>
-                      <strong>{request.name}</strong>
+                      <strong>{request.name} {request.priority && <span style={{ color: "var(--orange)", fontSize: "10px" }}>(Priority)</span>}</strong>
                       <small>{request.email}</small>
                     </button>
-                    <span>{request.type} · {request.characters} char.</span>
-                    <time>{request.dueDate}</time>
+                    <span>{request.type}{badgeText} · {request.characters} char.</span>
+                    <time>{request.dueDate || "None"}</time>
                     <select value={request.stage} onChange={(e) => updateStage(request.id, Number(e.target.value))}>
                       {stages.map((stage, index) => <option value={index} key={stage}>{stage}</option>)}
                     </select>
@@ -1349,7 +1497,7 @@ function Admin({ go }: { go: (page: Page) => void }) {
                   </div>
                 );
               })}
-              {requests.length === 0 && <p className="empty-row">No submissions yet. Public form responses are retained here.</p>}
+              {filteredRequests.length === 0 && <p className="empty-row">No matching submissions found.</p>}
             </div>
           </div>
         )}
@@ -1420,7 +1568,42 @@ function Login({ onLogin, go }: { onLogin: () => void; go: (page: Page) => void 
 }
 
 function Footer({ go }: { go: (page: Page) => void }) {
-  return <footer><div className="wrap footer-grid"><div className="footer-brand"><div><img src={logo} alt="" /><img className="footer-wordmark" src={brandName} alt="Inkyuu" /></div><p>Warm, character-led digital art<br />made in the Philippines.</p></div><div><h3>Explore</h3>{[["Gallery", "gallery"], ["Commission", "commission"], ["Guide", "guide"], ["Shop", "shop"], ["About", "about"]].map(([label, page]) => <button key={label} onClick={() => go(page as Page)}>{label}</button>)}</div><div><h3>Say hello</h3><a href="mailto:kyuukyuuji@gmail.com">kyuukyuuji@gmail.com</a><a href="https://instagram.com" target="_blank" rel="noreferrer">Instagram</a><a href="https://facebook.com" target="_blank" rel="noreferrer">Facebook</a></div><div className="footer-note"><p>Currently accepting</p><strong><i /> 3 commission slots</strong><Btn kind="outline" onClick={() => go("commission")}>Request a slot</Btn></div></div><div className="wrap footer-bottom"><span>© 2025 Inkyuu Studio. All art reserved.</span><span>Made with care, color & good music.</span></div></footer>;
+  const requests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
+  const activeSemiCount = requests.filter(r => r.type.startsWith("Semi-Realistic")).length;
+  const slotDisplayCount = Math.min(3, activeSemiCount);
+
+  return (
+    <footer>
+      <div className="wrap footer-grid">
+        <div className="footer-brand">
+          <div>
+            <img src={logo} alt="" />
+            <img className="footer-wordmark" src={brandName} alt="Inkyuu" />
+          </div>
+          <p>Warm, character-led digital art<br />made in the Philippines.</p>
+        </div>
+        <div>
+          <h3>Explore</h3>
+          {[["Gallery", "gallery"], ["Commission", "commission"], ["Guide", "guide"], ["Shop", "shop"], ["About", "about"]].map(([label, page]) => <button key={label} onClick={() => go(page as Page)}>{label}</button>)}
+        </div>
+        <div>
+          <h3>Say hello</h3>
+          <a href="mailto:kyuukyuuji@gmail.com">kyuukyuuji@gmail.com</a>
+          <a href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer">Instagram</a>
+          <a href="https://www.facebook.com/christinejoy.morata02/" target="_blank" rel="noreferrer">Facebook</a>
+        </div>
+        <div className="footer-note">
+          <p>Currently accepting</p>
+          <strong><i /> {slotDisplayCount} / 3 commission slots</strong>
+          <Btn kind="outline" onClick={() => go("commission")}>Request a slot</Btn>
+        </div>
+      </div>
+      <div className="wrap footer-bottom">
+        <span>© 2025 Inkyuu Studio. All art reserved.</span>
+        <span>Made with care, color & good music.</span>
+      </div>
+    </footer>
+  );
 }
 
 export default function App() {
