@@ -5,7 +5,7 @@ import placeholder from "./assets/placeholder.svg";
 import guidePdf from "./assets/Kyuu Commission Guide.pdf";
 
 type Page = "home" | "gallery" | "shop" | "guide" | "about" | "commission" | "admin";
-type Currency = "PHP" | "USD";
+type Currency = "PHP";
 type CommissionRequest = {
   id: number; name: string; email: string; social: string; type: string; finish: string;
   characters: number; background: string; commercial: boolean; priority: boolean;
@@ -70,11 +70,10 @@ const Btn = ({ children, kind = "primary", onClick, type = "button", className =
 const loadStored = <T,>(key: string, fallback: T): T => {
   try { return JSON.parse(localStorage.getItem(key) || "") as T; } catch { return fallback; }
 };
-const money = (php: number, currency: Currency) => currency === "PHP" ? `₱${php.toLocaleString()}` : `$${(php / 58).toFixed(2)}`;
+const money = (php: number) => `₱${php.toLocaleString()}`;
 
-function Navbar({ page, go, currency, setCurrency }: { page: Page; go: (page: Page) => void; currency: Currency; setCurrency: (currency: Currency) => void }) {
+function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
   const [open, setOpen] = useState(false);
-  const [settings, setSettings] = useState(false);
   const links: { label: string; page: Page }[] = [
     { label: "Home", page: "home" },
     { label: "Gallery", page: "gallery" },
@@ -92,8 +91,6 @@ function Navbar({ page, go, currency, setCurrency }: { page: Page; go: (page: Pa
           {links.map((link) => <button key={link.page} className={page === link.page ? "active" : ""} onClick={() => { go(link.page); setOpen(false); }}>{link.label}</button>)}
         </nav>
         <div className="nav-actions">
-          <button className="settings-button" aria-label="Open settings" aria-expanded={settings} onClick={() => setSettings(!settings)}><Icon name="menu" /></button>
-          {settings && <div className="settings-popover"><p>Display currency</p><div>{(["PHP", "USD"] as Currency[]).map((item) => <button className={currency === item ? "active" : ""} key={item} onClick={() => { setCurrency(item); setSettings(false); }}><span>{item === "PHP" ? "₱" : "$"}</span>{item === "PHP" ? "Peso" : "USD"}{currency === item && <Icon name="check" />}</button>)}</div><button className="admin-entry" onClick={() => { setSettings(false); go("admin"); }}><Icon name="user" /> Admin log in <Icon name="arrow" /></button></div>}
           <button className="menu-button" aria-label="Toggle menu" onClick={() => setOpen(!open)}><Icon name={open ? "close" : "menu"} /></button>
         </div>
       </div>
@@ -262,7 +259,7 @@ function Gallery() {
 
 const Field = ({ label, hint, children }: { label: React.ReactNode; hint?: string; children: React.ReactNode }) => <label className="field"><span>{label}</span>{hint && <small>{hint}</small>}{children}</label>;
 
-function Commission({ currency }: { currency: Currency }) {
+function Commission() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     name: "",
@@ -496,7 +493,7 @@ function Commission({ currency }: { currency: Currency }) {
                         ["Fullbody", 200]
                       ].map(([name, price]) => (
                         <button type="button" className={`choice-card ${form.baseOption === name ? "selected" : ""}`} onClick={() => setValue("baseOption", name)} key={name} style={{ width: "100%" }}>
-                          <span className="radio" /><strong>{name}</strong><b>{money(Number(price), currency)}</b><small>Chibi tier (Rendered by default)</small>
+                          <span className="radio" /><strong>{name}</strong><b>{money(Number(price))}</b><small>Chibi tier (Rendered by default)</small>
                         </button>
                       ))
                     ) : form.artStyle === "Semi-Realistic" ? (
@@ -507,7 +504,7 @@ function Commission({ currency }: { currency: Currency }) {
                         ["Thigh-up", 680]
                       ].map(([name, price]) => (
                         <button type="button" className={`choice-card ${form.baseOption === name ? "selected" : ""}`} onClick={() => setValue("baseOption", name)} key={name} style={{ width: "100%" }}>
-                          <span className="radio" /><strong>{name}</strong><b>{money(Number(price), currency)}</b><small>Semi-realism tier</small>
+                          <span className="radio" /><strong>{name}</strong><b>{money(Number(price))}</b><small>Semi-realism tier</small>
                         </button>
                       ))
                     ) : (
@@ -695,34 +692,34 @@ function Commission({ currency }: { currency: Currency }) {
 
         {/* Live Estimate Sidebar */}
         <aside className="estimate-card">
-          <div className="estimate-top"><span>Live Estimate · {currency}</span><Icon name="spark" /></div>
-          <h2>{money(total, currency)}</h2>
+          <div className="estimate-top"><span>Live Estimate · PHP</span><Icon name="spark" /></div>
+          <h2>{money(total)}</h2>
           <div className="estimate-lines">
-            <p><span>{form.artStyle ? `${form.artStyle} (${form.baseOption || "Select base"})` : "Base scope"}</span><b>{money(basePrice, currency)}</b></p>
+            <p><span>{form.artStyle ? `${form.artStyle} (${form.baseOption || "Select base"})` : "Base scope"}</span><b>{money(basePrice)}</b></p>
             {form.artStyle === "Chibi" ? (
               <p><span>Chibi finish</span><b>Rendered (Free)</b></p>
             ) : (
-              <p><span>{form.colorOption || "Color finish"}</span><b>+{money(colorPrice, currency)}</b></p>
+              <p><span>{form.colorOption || "Color finish"}</span><b>+{money(colorPrice)}</b></p>
             )}
             {form.chibiService && (
-              <p><span>Service: {form.chibiService}{form.chibiService === "Sticker set" ? ` (${form.stickerCount})` : ""}</span><b>+{money(chibiServicePrice, currency)}</b></p>
+              <p><span>Service: {form.chibiService}{form.chibiService === "Sticker set" ? ` (${form.stickerCount})` : ""}</span><b>+{money(chibiServicePrice)}</b></p>
             )}
-            <p><span>{form.bgOption || "Background"} background</span><b>+{money(bgPrice, currency)}</b></p>
-            {form.characters > 0 && <p><span>{form.characters} character{form.characters > 1 ? "s" : ""}</span><b>+{money(charMultiplier, currency)}</b></p>}
+            <p><span>{form.bgOption || "Background"} background</span><b>+{money(bgPrice)}</b></p>
+            {form.characters > 0 && <p><span>{form.characters} character{form.characters > 1 ? "s" : ""}</span><b>+{money(charMultiplier)}</b></p>}
             
             {(form.usageType === "Commercial Use" || form.dueDate) && (
               <>
                 <p style={{ marginTop: "10px", color: "var(--gold)", fontWeight: "bold", borderTop: "1px dashed #595959", paddingTop: "8px" }}><span>Additional Fees</span></p>
                 {form.usageType === "Commercial Use" && (
-                  <p><span>Commercial license</span><b>+{money(commercialFee, currency)}</b></p>
+                  <p><span>Commercial license</span><b>+{money(commercialFee)}</b></p>
                 )}
                 {form.dueDate && (
-                  <p><span>Priority due date fee ({dueDateRate === 0.1 ? "10%" : "18%"})</span><b>+{money(priorityFee, currency)}</b></p>
+                  <p><span>Priority due date fee ({dueDateRate === 0.1 ? "10%" : "18%"})</span><b>+{money(priorityFee)}</b></p>
                 )}
               </>
             )}
           </div>
-          <div className="estimate-total"><span>Estimated total</span><strong>{money(total, currency)}</strong></div>
+          <div className="estimate-total"><span>Estimated total</span><strong>{money(total)}</strong></div>
           <p className="fine-print">GCASH is the accepted payment platform. Final confirmation is sent after admin review.</p>
         </aside>
       </div>
@@ -730,10 +727,10 @@ function Commission({ currency }: { currency: Currency }) {
   );
 }
 
-function Shop({ go, currency }: { go: (page: Page) => void; currency: Currency }) {
+function Shop({ go }: { go: (page: Page) => void }) {
   const products = loadStored<PublishedItem[]>("inkyuu_products", []);
   return <main className="page-main">
-    <section className="page-hero wrap"><p className="kicker">The tiny shop</p><h1>Art made to <em>hold.</em></h1><p>Stickers, prints, and little pieces of joy from the Inkyuu studio.</p></section>{products.length > 0 ? <section className="wrap product-grid">{products.map((product) => <article key={product.id}><img src={product.image || placeholder} alt={product.title} /><div><span>{product.category}</span><h2>{product.title}</h2><p>{product.description}</p><strong>{money(product.price || 0, currency)}</strong><small>Published {product.publishedAt}</small></div></article>)}</section> : <section className="empty-shop wrap"><div className="shop-art"><span className="shop-sun" /><img src={placeholder} alt="Artwork placeholder" /></div><div className="shop-copy"><span className="status-pill"><i /> Restocking in progress</span><h2>Shop is still unavailable</h2><p>I'm putting the finishing touches on a cheerful collection of stickers, posters, photocards, portraits, and sticker sets.</p><button className="text-link" onClick={() => go("gallery")}>Browse the gallery while you wait <Icon name="arrow" /></button></div></section>}</main>;
+    <section className="page-hero wrap"><p className="kicker">The tiny shop</p><h1>Art made to <em>hold.</em></h1><p>Stickers, prints, and little pieces of joy from the Inkyuu studio.</p></section>{products.length > 0 ? <section className="wrap product-grid">{products.map((product) => <article key={product.id}><img src={product.image || placeholder} alt={product.title} /><div><span>{product.category}</span><h2>{product.title}</h2><p>{product.description}</p><strong>{money(product.price || 0)}</strong><small>Published {product.publishedAt}</small></div></article>)}</section> : <section className="empty-shop wrap"><div className="shop-art"><span className="shop-sun" /><img src={placeholder} alt="Artwork placeholder" /></div><div className="shop-copy"><span className="status-pill"><i /> Restocking in progress</span><h2>Shop is still unavailable</h2><p>I'm putting the finishing touches on a cheerful collection of stickers, posters, photocards, portraits, and sticker sets.</p><button className="text-link" onClick={() => go("gallery")}>Browse the gallery while you wait <Icon name="arrow" /></button></div></section>}</main>;
 }
 
 function Guide({ go }: { go: (page: Page) => void }) {
@@ -820,7 +817,6 @@ export default function App() {
   };
   const [page, setPage] = useState<Page>(getPage);
   const [promo, setPromo] = useState(false);
-  const [currency, setCurrencyState] = useState<Currency>(() => loadStored("inkyuu_currency", "PHP"));
   const [authenticated, setAuthenticated] = useState(() => sessionStorage.getItem("inkyuu_admin") === "true");
   useEffect(() => {
     const timer = window.setTimeout(() => { if (getPage() === "home") setPromo(true); }, 900);
@@ -835,9 +831,8 @@ export default function App() {
     elements.forEach((element) => observer.observe(element));
     return () => observer.disconnect();
   }, [page]);
-  const setCurrency = (next: Currency) => { setCurrencyState(next); localStorage.setItem("inkyuu_currency", JSON.stringify(next)); };
   const go = (next: Page) => { window.location.hash = next; setPage(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const content = useMemo(() => ({ home: <Home go={go} openPromo={() => setPromo(true)} />, gallery: <Gallery />, shop: <Shop go={go} currency={currency} />, guide: <Guide go={go} />, about: <About go={go} />, commission: <Commission currency={currency} />, admin: <Admin go={go} /> }), [currency]);
+  const content = useMemo(() => ({ home: <Home go={go} openPromo={() => setPromo(true)} />, gallery: <Gallery />, shop: <Shop go={go} />, guide: <Guide go={go} />, about: <About go={go} />, commission: <Commission />, admin: <Admin go={go} /> }), []);
   if (page === "admin") return authenticated ? content.admin : <AdminLogin onLogin={() => setAuthenticated(true)} go={go} />;
-  return <div className="site-shell"><Navbar page={page} go={go} currency={currency} setCurrency={setCurrency} />{content[page]}<Footer go={go} />{promo && <PromoModal close={() => setPromo(false)} go={go} />}</div>;
+  return <div className="site-shell"><Navbar page={page} go={go} />{content[page]}<Footer go={go} />{promo && <PromoModal close={() => setPromo(false)} go={go} />}</div>;
 }
