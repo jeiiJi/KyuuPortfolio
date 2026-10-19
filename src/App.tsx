@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import logo from "./assets/inkdrop-logo.png";
 import brandName from "./assets/brand-name.png";
 import placeholder from "./assets/placeholder.svg";
+import heroArtwork from "./assets/Untitled200_20261016201217.png";
 import guidePdf from "./assets/Kyuu Commission Guide.pdf";
 
 type Page = "home" | "gallery" | "shop" | "guide" | "about" | "commission" | "admin";
@@ -149,7 +150,7 @@ function Home({ go, openPromo }: { go: (page: Page) => void; openPromo: () => vo
     <>
       <main>
         <section className="hero wrap">
-          <div className="hero-copy">
+          <div className="hero-copy" style={{ paddingBottom: "60px" }}>
             <div className="eyebrow"><span className="eyebrow-line" /> Digital artist & illustrator</div>
             <h1>Small moments,<br /><em>boldly drawn.</em></h1>
             <p>I turn warm ideas, favorite characters, and little daydreams into expressive digital art.</p>
@@ -159,10 +160,9 @@ function Home({ go, openPromo }: { go: (page: Page) => void; openPromo: () => vo
             </div>
           </div>
           <div className="hero-canvas">
-            <div className="canvas-label">Featured piece · 06/24</div>
-            <ArtVisual art="hero" label="Abstract illustrated portrait in orange and charcoal" />
-            <div className="float-card"><Icon name="heart" /><span>Made with<br /><strong>lots of heart</strong></span></div>
-            <div className="scribble">original<br />characters</div>
+            <div className="art-visual art-hero">
+              <img src={heroArtwork} alt="Featured artwork" />
+            </div>
           </div>
         </section>
 
@@ -173,7 +173,7 @@ function Home({ go, openPromo }: { go: (page: Page) => void; openPromo: () => vo
           </div>
           <div className="featured-grid">
             {artItems.slice(0, 3).map((item, index) => (
-              <a className="featured-card" key={item.id} href="https://www.instagram.com/" target="_blank" rel="noreferrer">
+              <a className="featured-card" key={item.id} href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer">
                 <div className="featured-number">0{index + 1}</div>
                 <ArtVisual art={item.art} label={item.title} />
                 <div className="card-copy"><span>{item.type}</span><h3>{item.title}</h3><p>{item.desc}</p><b>View social post <Icon name="arrow" size={16} /></b></div>
