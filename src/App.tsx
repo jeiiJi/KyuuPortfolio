@@ -5,16 +5,19 @@ import placeholder from "./assets/placeholder.svg";
 import guidePdf from "./assets/Kyuu Commission Guide.pdf";
 
 type Page = "home" | "gallery" | "shop" | "guide" | "about" | "commission" | "admin";
-type Currency = "PHP";
 type CommissionRequest = {
   id: number; name: string; email: string; social: string; type: string; finish: string;
   characters: number; background: string; commercial: boolean; priority: boolean;
   dueDate: string; notes: string; references: string[]; totalPhp: number;
-  submittedAt: string; stage: number;
+  submittedAt: string; stage: number; discountCode?: string; discountName?: string; discountAmount?: number;
 };
 type PublishedItem = {
   id: number; title: string; description: string; image: string; category: string;
   price?: number; publishedAt: string;
+};
+type DiscountItem = {
+  id: number; title: string; percentage: number; requirementType: string;
+  description: string; startDate: string; endDate: string; bannerImage: string; code: string;
 };
 type IconName =
   | "arrow"
@@ -103,17 +106,32 @@ function ArtVisual({ art, label }: { art: string; label: string }) {
 }
 
 function PromoModal({ close, go }: { close: () => void; go: (page: Page) => void }) {
+  const discounts = loadStored<DiscountItem[]>("inkyuu_discounts", []);
+  const activeDiscount = discounts[0] || {
+    title: "Your idea deserves to be drawn.",
+    percentage: 15,
+    description: "Book a commission this month and enjoy 15% off your first character illustration.",
+    code: "FIRSTDROP15",
+    bannerImage: ""
+  };
+
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={close}>
       <div className="promo-modal" role="dialog" aria-modal="true" aria-labelledby="promo-title" onMouseDown={(e) => e.stopPropagation()}>
         <button className="modal-close" onClick={close} aria-label="Close"><Icon name="close" /></button>
         <div className="promo-layout">
-          <div className="promo-art"><img src={logo} alt="Inkyuu bottle logo" /><span>15%</span></div>
+          <div className="promo-art">
+            {activeDiscount.bannerImage ? (
+              <img src={activeDiscount.bannerImage} alt={activeDiscount.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              <><img src={logo} alt="Inkyuu bottle logo" /><span>{activeDiscount.percentage}%</span></>
+            )}
+          </div>
           <div className="promo-content">
-            <div className="eyebrow"><Icon name="spark" size={15} /> A little treat</div>
-            <h2 id="promo-title">Your idea deserves to be drawn.</h2>
-            <p>Book a commission this month and enjoy 15% off your first character illustration.</p>
-            <div className="promo-code"><span>Use code</span><strong>FIRSTDROP15</strong></div>
+            <div className="eyebrow"><Icon name="spark" size={15} /> Special Offer</div>
+            <h2 id="promo-title">{activeDiscount.title}</h2>
+            <p>{activeDiscount.description}</p>
+            <div className="promo-code"><span>Discount Code</span><strong>{activeDiscount.code || "PROMO"}</strong></div>
             <Btn onClick={() => { close(); go("commission"); }}>Start a commission <Icon name="arrow" /></Btn>
             <button className="text-link" onClick={close}>Maybe later</button>
           </div>
@@ -124,6 +142,7 @@ function PromoModal({ close, go }: { close: () => void; go: (page: Page) => void
 }
 
 function Home({ go, openPromo }: { go: (page: Page) => void; openPromo: () => void }) {
+  const discounts = loadStored<DiscountItem[]>("inkyuu_discounts", []);
   return (
     <>
       <main>
@@ -179,7 +198,9 @@ function Home({ go, openPromo }: { go: (page: Page) => void; openPromo: () => vo
           <div className="medium-grid">
             {[["brush", "Character art", "Originals, fan art & portraits"], ["pen", "Chibi cuties", "Tiny style, big personality"], ["spark", "Merch design", "Stickers, cards & keepsakes"], ["grid", "Visual stories", "Covers, scenes & key art"]].map(([icon, title, desc], i) => <button key={title} onClick={() => go("commission")} className="medium-card"><span>0{i + 1}</span><Icon name={icon as IconName} size={25} /><h3>{title}</h3><p>{desc}</p><b><Icon name="arrow" /></b></button>)}
           </div>
-          <div className="promo-banner"><div><span>FIRST TIME HERE?</span><h2>A warm welcome, with 15% off.</h2><p>Let's make your first Inkyuu piece extra special.</p></div><Btn kind="outline" onClick={openPromo}>Reveal my offer <Icon name="spark" /></Btn></div>
+          {discounts.length > 0 && (
+            <div className="promo-banner"><div><span>SPECIAL OFFER</span><h2>{discounts[0].title}</h2><p>{discounts[0].description}</p></div><Btn kind="outline" onClick={openPromo}>Reveal my offer <Icon name="spark" /></Btn></div>
+          )}
         </section>
         <section className="home-commission-cta"><div className="wrap"><p className="kicker">Three active slots only</p><h2>Ready to bring your idea to life?</h2><p>Tell me what you’re imagining and receive a personalized quote.</p><Btn onClick={() => go("commission")}>Commission now <Icon name="arrow" /></Btn></div></section>
       </main>
@@ -280,8 +301,10 @@ function Commission() {
     confirm1: false,
     confirm2: false,
     confirm3: false,
+    selectedDiscountId: "",
   });
   const [references, setReferences] = useState<string[]>([]);
+  const discounts = loadStored<DiscountItem[]>("inkyuu_discounts", []);
 
   const setValue = (key: keyof typeof form, value: any) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -296,7 +319,6 @@ function Commission() {
       : form.baseOption === "Thigh-up" ? 680 : 0)
     : 0;
 
-  // Service extra price for Chibi solo deals
   const chibiServicePrice = form.artStyle === "Chibi" ? (
     form.chibiService === "Sticker set" ? (form.stickerCount - 4) * 30
     : form.chibiService === "Acrylic Merch" ? 50
@@ -308,7 +330,6 @@ function Commission() {
     : 0
   ) : 0;
 
-  // Color finish price (Only applies to Semi-Realistic)
   const colorPrice = form.artStyle === "Semi-Realistic" 
     ? (form.colorOption === "Rendered" ? 475 
       : form.colorOption === "Plain" ? 280 : 0)
@@ -324,10 +345,8 @@ function Commission() {
       : form.bgOption === "None/Transparent" ? 680 : 0)
     : 0;
   
-  // Overall scope and options base total
   const scopeAndOptionsTotal = basePrice + chibiServicePrice + colorPrice + bgPrice;
 
-  // Character multiplier fee implementation
   const charMultiplier = form.characters > 1 
     ? (form.characters - 1) * (
         form.artStyle === "Semi-Realistic" 
@@ -341,7 +360,6 @@ function Commission() {
   const subtotal = scopeAndOptionsTotal + charMultiplier;
   const commercialFee = form.usageType === "Commercial Use" ? 500 : 0;
 
-  // Calculate days difference for due date constraint
   const getDueDatePercentage = () => {
     if (!form.dueDate) return 0;
     const today = new Date();
@@ -354,7 +372,24 @@ function Commission() {
 
   const dueDateRate = getDueDatePercentage();
   const priorityFee = form.dueDate ? Math.round(subtotal * dueDateRate) : 0;
-  const total = subtotal + commercialFee + priorityFee;
+  const grossTotal = subtotal + commercialFee + priorityFee;
+
+  const selectedDiscount = discounts.find((d) => String(d.id) === String(form.selectedDiscountId));
+  let discountAmount = 0;
+  if (selectedDiscount) {
+    let isValid = true;
+    const req = selectedDiscount.requirementType;
+    if (req === "Chibi Only" && form.artStyle !== "Chibi") isValid = false;
+    if (req === "Semi-Realistic Only" && form.artStyle !== "Semi-Realistic") isValid = false;
+    if (req === "Commercial Use" && form.usageType !== "Commercial Use") isValid = false;
+    if (req === "Personal Use" && form.usageType !== "Personal Use") isValid = false;
+
+    if (isValid) {
+      discountAmount = Math.round(grossTotal * (selectedDiscount.percentage / 100));
+    }
+  }
+
+  const total = Math.max(0, grossTotal - discountAmount);
 
   const uploadReferences = (files: FileList | null) => {
     if (!files) return;
@@ -369,12 +404,37 @@ function Commission() {
     setReferences((current) => current.filter((_, i) => i !== index));
   };
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.confirm1 || !form.confirm2 || !form.confirm3) {
-      alert("Please check all three confirmation boxes to complete your application.");
+  const handleNext = () => {
+    if (step === 1 && (!form.confirm1 || !form.confirm2 || !form.confirm3)) {
+      alert("Please check all three confirmation boxes to proceed.");
       return;
     }
+    if (step === 2 && (!form.name || !form.email || !form.artStyle || !form.usageType)) {
+      alert("Please fill in your name, email, art style, and usage type.");
+      return;
+    }
+    if (step === 3) {
+      if (!form.baseOption || !form.bgOption) {
+        alert("Please select your base scope and background style.");
+        return;
+      }
+      if (form.artStyle === "Chibi" && !form.chibiService) {
+        alert("Please select a Chibi Solo Deal / Service.");
+        return;
+      }
+      if (form.artStyle === "Chibi" && form.chibiService === "YCH" && !form.ychTheme) {
+        alert("Please select a YCH theme.");
+        return;
+      }
+      if (form.artStyle === "Semi-Realistic" && !form.colorOption) {
+        alert("Please select your color finish.");
+        return;
+      }
+    }
+    setStep((prev) => Math.min(5, prev + 1));
+  };
+
+  const handleFinalSubmit = () => {
     const requests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
     const request: CommissionRequest = {
       id: Date.now(),
@@ -388,14 +448,18 @@ function Commission() {
       commercial: form.usageType === "Commercial Use",
       priority: Boolean(form.dueDate),
       dueDate: form.dueDate,
-      notes: `Usage: ${form.usageType}\nService: ${form.chibiService || "N/A"}${form.ychTheme ? `\nYCH Theme: ${form.ychTheme}` : ""}\nBg Details: ${form.backgroundDetails}\nNotes: ${form.additionalDetails}\nConfirmed all terms: Yes`,
+      notes: `Usage: ${form.usageType}\nService: ${form.chibiService || "N/A"}${form.ychTheme ? `\nYCH Theme: ${form.ychTheme}` : ""}\nBg Details: ${form.backgroundDetails}\nNotes: ${form.additionalDetails}\nDiscount Applied: ${selectedDiscount ? selectedDiscount.title : "None"}\nConfirmed all terms: Yes`,
       references,
       totalPhp: total,
       submittedAt: new Date().toISOString(),
       stage: 0,
+      discountCode: selectedDiscount?.code,
+      discountName: selectedDiscount?.title,
+      discountAmount,
     };
     localStorage.setItem("inkyuu_requests", JSON.stringify([request, ...requests]));
     alert("Your commission request was successfully submitted!");
+    go("home");
   };
 
   const maxChars = form.artStyle === "Chibi" ? 4 : form.artStyle === "Semi-Realistic" ? 2 : 4;
@@ -409,35 +473,63 @@ function Commission() {
       </section>
 
       <div className="wrap commission-layout">
-        <form className="commission-form" onSubmit={submit}>
+        <div className="commission-form">
           
           {/* Progress Indicator */}
           <div style={{ background: "white", border: "1px solid var(--line)", padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
             <div>
-              <span style={{ fontSize: "10px", fontWeight: "bold", color: "var(--orange)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Section {step} of 4</span>
+              <span style={{ fontSize: "10px", fontWeight: "bold", color: "var(--orange)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Section {step} of 5</span>
               <h3 style={{ margin: "2px 0 0", fontFamily: "DM Serif Display", fontSize: "20px" }}>
-                {step === 1 && "General Information"}
-                {step === 2 && `${form.artStyle || "Art"} Scope & Options`}
-                {step === 3 && "Project References & Final Notes"}
-                {step === 4 && "Terms of Service & Confirmation"}
+                {step === 1 && "Terms of Service Agreement & Confirmation"}
+                {step === 2 && "General Information"}
+                {step === 3 && `${form.artStyle || "Art"} Scope & Options`}
+                {step === 4 && "Project References & Final Notes"}
+                {step === 5 && "Review & Checkout"}
               </h3>
             </div>
             <div style={{ width: "100px", height: "6px", background: "var(--cream)", borderRadius: "99px", overflow: "hidden" }}>
-              <div style={{ width: `${(step / 4) * 100}%`, height: "100%", background: "var(--orange)", transition: "width 0.3s ease" }} />
+              <div style={{ width: `${(step / 5) * 100}%`, height: "100%", background: "var(--orange)", transition: "width 0.3s ease" }} />
             </div>
           </div>
 
-          {/* PAGE 1: General Information */}
+          {/* PAGE 1: Terms of Service Agreement & Confirmation */}
           {step === 1 && (
             <div className="form-section" style={{ borderTop: "6px solid var(--orange)" }}>
               <div className="form-number">01</div>
+              <div>
+                <h2>Terms of Service Agreement & Confirmation <span style={{ color: "red" }}>*</span></h2>
+                <p style={{ fontSize: "11px", color: "var(--muted)", lineHeight: "1.6", marginTop: "6px" }}>
+                  Please review and check each box below to proceed with your application. By checking these requirements, you acknowledge that you have read the official Commission Guide and explicitly agree to follow these operational boundaries throughout our project.
+                </p>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "20px" }}>
+                <label className="check-row" style={{ margin: 0 }}>
+                  <input type="checkbox" checked={form.confirm1} onChange={(e) => setValue("confirm1", e.target.checked)} />
+                  <span><strong>Guide Review <span style={{ color: "red" }}>*</span></strong><small>I confirm that I have accessed, read, and fully understood the rules and regulations provided in the official Commission Guide.</small></span>
+                </label>
+                <label className="check-row" style={{ margin: 0 }}>
+                  <input type="checkbox" checked={form.confirm2} onChange={(e) => setValue("confirm2", e.target.checked)} />
+                  <span><strong>Payment Terms <span style={{ color: "red" }}>*</span></strong><small>I explicitly accept the payment terms, including the 20% mid-project downpayment and the mandatory 3-day final payment window upon artwork completion.</small></span>
+                </label>
+                <label className="check-row" style={{ margin: 0 }}>
+                  <input type="checkbox" checked={form.confirm3} onChange={(e) => setValue("confirm3", e.target.checked)} />
+                  <span><strong>Operational Boundaries <span style={{ color: "red" }}>*</span></strong><small>I explicitly agree to follow all rules, regulations, and operational terms outlined within the guide for the duration of this project.</small></span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* PAGE 2: General Information */}
+          {step === 2 && (
+            <div className="form-section" style={{ borderTop: "6px solid var(--orange)" }}>
+              <div className="form-number">02</div>
               <div><h2>General Information</h2><p>Provide your contact details and select your overall project parameters.</p></div>
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <Field label={<>Name / Nickname <span style={{ color: "red" }}>*</span></>}>
-                  <input required value={form.name} onChange={(e) => setValue("name", e.target.value)} placeholder="Your name" />
+                  <input value={form.name} onChange={(e) => setValue("name", e.target.value)} placeholder="Your name" />
                 </Field>
                 <Field label={<>Email address <span style={{ color: "red" }}>*</span></>}>
-                  <input required type="email" value={form.email} onChange={(e) => setValue("email", e.target.value)} placeholder="you@example.com" />
+                  <input type="email" value={form.email} onChange={(e) => setValue("email", e.target.value)} placeholder="you@example.com" />
                 </Field>
                 <Field label="Social media handle"><input value={form.social} onChange={(e) => setValue("social", e.target.value)} placeholder="@username" /></Field>
                 
@@ -477,10 +569,10 @@ function Commission() {
             </div>
           )}
 
-          {/* PAGE 2: Chibi & Semi-Realism options */}
-          {step === 2 && (
+          {/* PAGE 3: Chibi & Semi-Realism options */}
+          {step === 3 && (
             <div className="form-section" style={{ borderTop: "6px solid var(--orange)" }}>
-              <div className="form-number">02</div>
+              <div className="form-number">03</div>
               <div><h2>{form.artStyle || "Art"} Scope & Options</h2><p>Select your composition layout, service deals, and character limits.</p></div>
               
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -600,10 +692,10 @@ function Commission() {
             </div>
           )}
 
-          {/* PAGE 3: Project references and final notes */}
-          {step === 3 && (
+          {/* PAGE 4: Project references and final notes */}
+          {step === 4 && (
             <div className="form-section" style={{ borderTop: "6px solid var(--orange)" }}>
-              <div className="form-number">03</div>
+              <div className="form-number">04</div>
               <div><h2>Project references & final notes</h2><p>Provide specific details and upload visual references (up to 10 images).</p></div>
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <Field label="Background details"><textarea rows={3} value={form.backgroundDetails} onChange={(e) => setValue("backgroundDetails", e.target.value)} placeholder="Describe background elements or props..." /></Field>
@@ -625,29 +717,50 @@ function Commission() {
             </div>
           )}
 
-          {/* PAGE 4: Terms of Service Agreement & Confirmation */}
-          {step === 4 && (
+          {/* PAGE 5: Review & Checkout (Discounts & Big Live Estimate) */}
+          {step === 5 && (
             <div className="form-section" style={{ borderTop: "6px solid var(--orange)" }}>
-              <div className="form-number">04</div>
+              <div className="form-number">05</div>
               <div>
-                <h2>Terms of Service Agreement & Confirmation <span style={{ color: "red" }}>*</span></h2>
+                <h2>Review & Checkout</h2>
                 <p style={{ fontSize: "11px", color: "var(--muted)", lineHeight: "1.6", marginTop: "6px" }}>
-                  Please review and check each box below to complete your application. By checking these requirements, you acknowledge that you have read the official Commission Guide and explicitly agree to follow these operational boundaries throughout our project.
+                  Review your total, select applicable active discounts, and submit your request.
                 </p>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "20px" }}>
-                <label className="check-row" style={{ margin: 0 }}>
-                  <input type="checkbox" checked={form.confirm1} onChange={(e) => setValue("confirm1", e.target.checked)} />
-                  <span><strong>Guide Review <span style={{ color: "red" }}>*</span></strong><small>I confirm that I have accessed, read, and fully understood the rules and regulations provided in the official Commission Guide.</small></span>
-                </label>
-                <label className="check-row" style={{ margin: 0 }}>
-                  <input type="checkbox" checked={form.confirm2} onChange={(e) => setValue("confirm2", e.target.checked)} />
-                  <span><strong>Payment Terms <span style={{ color: "red" }}>*</span></strong><small>I explicitly accept the payment terms, including the 20% mid-project downpayment and the mandatory 3-day final payment window upon artwork completion.</small></span>
-                </label>
-                <label className="check-row" style={{ margin: 0 }}>
-                  <input type="checkbox" checked={form.confirm3} onChange={(e) => setValue("confirm3", e.target.checked)} />
-                  <span><strong>Operational Boundaries <span style={{ color: "red" }}>*</span></strong><small>I explicitly agree to follow all rules, regulations, and operational terms outlined within the guide for the duration of this project.</small></span>
-                </label>
+              
+              <div style={{ margin: "20px 0", padding: "24px", background: "var(--cream)", border: "1px solid var(--gold)" }}>
+                <span className="kicker">Final Calculated Total</span>
+                <div style={{ fontSize: "42px", fontFamily: "DM Serif Display", color: "var(--ink)", margin: "8px 0" }}>{money(total)}</div>
+                {discountAmount > 0 && (
+                  <p style={{ fontSize: "12px", color: "var(--orange)", fontWeight: "bold" }}>
+                    Discount applied: -{money(discountAmount)} ({selectedDiscount?.title})
+                  </p>
+                )}
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "20px" }}>
+                <Field label="Select Available Discount">
+                  <select value={form.selectedDiscountId} onChange={(e) => setValue("selectedDiscountId", e.target.value)}>
+                    <option value="">-- No Discount Selected --</option>
+                    {discounts.map((d) => {
+                      let isValid = true;
+                      if (d.requirementType === "Chibi Only" && form.artStyle !== "Chibi") isValid = false;
+                      if (d.requirementType === "Semi-Realistic Only" && form.artStyle !== "Semi-Realistic") isValid = false;
+                      if (d.requirementType === "Commercial Use" && form.usageType !== "Commercial Use") isValid = false;
+                      if (d.requirementType === "Personal Use" && form.usageType !== "Personal Use") isValid = false;
+                      return (
+                        <option key={d.id} value={d.id} disabled={!isValid}>
+                          {d.title} ({d.percentage}% off) {isValid ? "" : `[Requirement unmet: ${d.requirementType}]`}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </Field>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "10px" }}>
+                  <Btn type="button" kind="outline" onClick={() => setStep(2)}>Edit General Info</Btn>
+                  <Btn type="button" kind="outline" onClick={() => setStep(3)}>Edit Scope & Options</Btn>
+                </div>
               </div>
             </div>
           )}
@@ -655,40 +768,28 @@ function Commission() {
           {/* Navigation Controls */}
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: "20px" }}>
             {step > 1 ? (
-              <Btn type="button" kind="outline" onClick={() => setStep(step - 1)}>Back</Btn>
+              <Btn type="button" kind="outline" onClick={() => setStep((prev) => Math.max(1, prev - 1))}>Back</Btn>
             ) : <div />}
 
-            {step < 4 ? (
-              <Btn type="button" onClick={() => {
-                if (step === 1 && (!form.name || !form.email || !form.artStyle || !form.usageType)) {
-                  alert("Please fill in your name, email, art style, and usage type.");
-                  return;
-                }
-                if (step === 2) {
-                  if (!form.baseOption || !form.bgOption) {
-                    alert("Please select your base scope and background style.");
-                    return;
-                  }
-                  if (form.artStyle === "Chibi" && !form.chibiService) {
-                    alert("Please select a Chibi Solo Deal / Service.");
-                    return;
-                  }
-                  if (form.artStyle === "Chibi" && form.chibiService === "YCH" && !form.ychTheme) {
-                    alert("Please select a YCH theme.");
-                    return;
-                  }
-                  if (form.artStyle === "Semi-Realistic" && !form.colorOption) {
-                    alert("Please select your color finish.");
-                    return;
-                  }
-                }
-                setStep(step + 1);
-              }}>Next <Icon name="arrow" /></Btn>
+            {step < 5 ? (
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                onClick={handleNext}
+              >
+                Next <Icon name="arrow" />
+              </button>
             ) : (
-              <Btn type="submit" className="submit-btn">Submit request <Icon name="arrow" /></Btn>
+              <button 
+                type="button" 
+                className="btn btn-primary submit-btn"
+                onClick={handleFinalSubmit}
+              >
+                Submit <Icon name="arrow" />
+              </button>
             )}
           </div>
-        </form>
+        </div>
 
         {/* Live Estimate Sidebar */}
         <aside className="estimate-card">
@@ -717,6 +818,11 @@ function Commission() {
                   <p><span>Priority due date fee ({dueDateRate === 0.1 ? "10%" : "18%"})</span><b>+{money(priorityFee)}</b></p>
                 )}
               </>
+            )}
+            {discountAmount > 0 && (
+              <p style={{ color: "var(--gold)", marginTop: "8px", borderTop: "1px dashed #595959", paddingTop: "8px" }}>
+                <span>Discount ({selectedDiscount?.title})</span><b>-{money(discountAmount)}</b>
+              </p>
             )}
           </div>
           <div className="estimate-total"><span>Estimated total</span><strong>{money(total)}</strong></div>
@@ -771,8 +877,70 @@ function PublishManager({ mode }: { mode: "gallery" | "products" }) {
   return <div className="admin-panel media-manager"><div className="panel-head"><div><p>PUBLISHED LIBRARY</p><h2>{mode === "gallery" ? "Gallery images" : "Shop merchandise"}</h2></div><button className="admin-plus" onClick={() => setOpen(true)}><Icon name="plus" /> Add {mode === "gallery" ? "artwork" : "product"}</button></div><div className="media-list">{items.map((item) => <article key={item.id}><img src={item.image || placeholder} alt={item.title} /><div><span>{item.category}</span><h3>{item.title}</h3><p>{item.description}</p><small>Published {item.publishedAt}</small></div><button aria-label={`Delete ${item.title}`} onClick={() => persist(items.filter((x) => x.id !== item.id))}><Icon name="trash" /></button></article>)}{items.length === 0 && <div className="empty-row">Nothing published yet. Use the plus button to add the first item.</div>}</div>{open && <div className="modal-backdrop" onMouseDown={() => setOpen(false)}><form className="publish-modal" onSubmit={publish} onMouseDown={(e) => e.stopPropagation()}><button type="button" className="modal-close" onClick={() => setOpen(false)}><Icon name="close" /></button><div className="publish-preview"><img src={draft.image || placeholder} alt="Upload preview" /><label><Icon name="plus" /> Choose image<input required={!draft.image} type="file" accept="image/*" onChange={(e) => upload(e.target.files?.[0])} /></label></div><div className="publish-fields"><p className="kicker">{mode === "gallery" ? "New gallery artwork" : "New shop merchandise"}</p><h2>Publish something new</h2><Field label={mode === "gallery" ? "Artwork title" : "Product title"}><input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></Field><Field label="Description"><textarea required rows={4} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field><Field label="Category"><select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>{(mode === "gallery" ? ["Chibi", "Semi-Realistic"] : ["Sticker", "Print", "Photocard", "Portrait", "Sticker set"]).map((x) => <option key={x}>{x}</option>)}</select></Field>{mode === "products" && <Field label="Price in PHP"><input required type="number" min="0" value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value })} /></Field>}<Btn type="submit">Publish <Icon name="arrow" /></Btn></div></form></div>}</div>;
 }
 
+function DiscountManager() {
+  const storageKey = "inkyuu_discounts";
+  const [discounts, setDiscounts] = useState<DiscountItem[]>(() => loadStored(storageKey, []));
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState({ title: "", percentage: "", requirementType: "Any", description: "", startDate: "", endDate: "", code: "", bannerImage: "" });
+  const persist = (next: DiscountItem[]) => { setDiscounts(next); localStorage.setItem(storageKey, JSON.stringify(next)); };
+  const upload = (file?: File) => { if (!file) return; const reader = new FileReader(); reader.onload = () => setDraft({ ...draft, bannerImage: String(reader.result) }); reader.readAsDataURL(file); };
+  const publish = (e: React.FormEvent) => {
+    e.preventDefault();
+    persist([{ id: Date.now(), title: draft.title, percentage: Number(draft.percentage), requirementType: draft.requirementType, description: draft.description, startDate: draft.startDate, endDate: draft.endDate, code: draft.code || "PROMO", bannerImage: draft.bannerImage }, ...discounts]);
+    setDraft({ title: "", percentage: "", requirementType: "Any", description: "", startDate: "", endDate: "", code: "", bannerImage: "" }); setOpen(false);
+  };
+  return (
+    <div className="admin-panel media-manager">
+      <div className="panel-head">
+        <div><p>DISCOUNTS & PROMOS</p><h2>Discount Management</h2></div>
+        <button className="admin-plus" onClick={() => setOpen(true)}><Icon name="plus" /> Add Discount</button>
+      </div>
+      <div className="media-list">
+        {discounts.map((item) => (
+          <article key={item.id}>
+            <img src={item.bannerImage || placeholder} alt={item.title} />
+            <div>
+              <span>{item.percentage}% OFF · {item.requirementType}</span>
+              <h3>{item.title}</h3>
+              <p>{item.description}</p>
+              <small>{item.startDate} to {item.endDate} | Code: <strong>{item.code}</strong></small>
+            </div>
+            <button aria-label={`Delete ${item.title}`} onClick={() => persist(discounts.filter((x) => x.id !== item.id))}><Icon name="trash" /></button>
+          </article>
+        ))}
+        {discounts.length === 0 && <div className="empty-row">No discounts created yet. Use the plus button to add a discount.</div>}
+      </div>
+      {open && (
+        <div className="modal-backdrop" onMouseDown={() => setOpen(false)}>
+          <form className="publish-modal" onSubmit={publish} onMouseDown={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close" onClick={() => setOpen(false)}><Icon name="close" /></button>
+            <div className="publish-preview">
+              <img src={draft.bannerImage || placeholder} alt="Banner preview" />
+              <label><Icon name="plus" /> Banner Placeholder<input type="file" accept="image/*" onChange={(e) => upload(e.target.files?.[0])} /></label>
+            </div>
+            <div className="publish-fields">
+              <p className="kicker">New Discount Offer</p>
+              <h2>Create a Discount</h2>
+              <Field label="Title"><input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Summer Promo" /></Field>
+              <Field label="Discount Percentage (%)"><input required type="number" min="1" max="100" value={draft.percentage} onChange={(e) => setDraft({ ...draft, percentage: e.target.value })} placeholder="15" /></Field>
+              <Field label="Discount Code"><input required value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} placeholder="SUMMER15" /></Field>
+              <Field label="Requirements (Type Validation)"><select value={draft.requirementType} onChange={(e) => setDraft({ ...draft, requirementType: e.target.value })}><option value="Any">Any Commission</option><option value="Chibi Only">Chibi Only</option><option value="Semi-Realistic Only">Semi-Realistic Only</option><option value="Commercial Use">Commercial Use Only</option><option value="Personal Use">Personal Use Only</option></select></Field>
+              <Field label="Description"><textarea required rows={2} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Enjoy 15% off..." /></Field>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <Field label="Start Date"><input required type="date" value={draft.startDate} onChange={(e) => setDraft({ ...draft, startDate: e.target.value })} /></Field>
+                <Field label="End Date"><input required type="date" value={draft.endDate} onChange={(e) => setDraft({ ...draft, endDate: e.target.value })} /></Field>
+              </div>
+              <Btn type="submit">Save Discount <Icon name="arrow" /></Btn>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RequestDetail({ request, close }: { request: CommissionRequest; close: () => void }) {
-  return <div className="modal-backdrop" onMouseDown={close}><div className="request-modal" onMouseDown={(e) => e.stopPropagation()}><button className="modal-close" onClick={close}><Icon name="close" /></button><p className="kicker">Submitted {new Date(request.submittedAt).toLocaleString()}</p><h2>{request.name}’s request</h2><div className="request-answers">{[["Email", request.email], ["Social handle", request.social || "Not provided"], ["Scope", request.type], ["Finish", request.finish], ["Characters", String(request.characters)], ["Background", request.background], ["Commercial use", request.commercial ? "Yes" : "No"], ["Priority", request.priority ? "Yes" : "No"], ["Due date", request.dueDate], ["Estimate", `₱${request.totalPhp.toLocaleString()}`], ["Project notes", request.notes]].map(([label, answer]) => <div key={label}><span>{label}</span><p>{answer}</p></div>)}</div>{request.references.length > 0 && <div className="request-references"><h3>Reference images</h3>{request.references.map((image, i) => <img src={image} alt={`Client reference ${i + 1}`} key={i} />)}</div>}</div></div>;
+  return <div className="modal-backdrop" onMouseDown={close}><div className="request-modal" onMouseDown={(e) => e.stopPropagation()}><button className="modal-close" onClick={close}><Icon name="close" /></button><p className="kicker">Submitted {new Date(request.submittedAt).toLocaleString()}</p><h2>{request.name}’s request</h2><div className="request-answers">{[["Email", request.email], ["Social handle", request.social || "Not provided"], ["Scope", request.type], ["Finish", request.finish], ["Characters", String(request.characters)], ["Background", request.background], ["Commercial use", request.commercial ? "Yes" : "No"], ["Priority", request.priority ? "Yes" : "No"], ["Due date", request.dueDate], ["Discount Applied", request.discountName ? `${request.discountName} (-₱${request.discountAmount?.toLocaleString()})` : "None"], ["Estimate", `₱${request.totalPhp.toLocaleString()}`], ["Project notes", request.notes]].map(([label, answer]) => <div key={label}><span>{label}</span><p>{answer}</p></div>)}</div>{request.references.length > 0 && <div className="request-references"><h3>Reference images</h3>{request.references.map((image, i) => <img src={image} alt={`Client reference ${i + 1}`} key={i} />)}</div>}</div></div>;
 }
 
 function Admin({ go }: { go: (page: Page) => void }) {
@@ -780,7 +948,7 @@ function Admin({ go }: { go: (page: Page) => void }) {
   const [requests, setRequests] = useState<CommissionRequest[]>(() => loadStored("inkyuu_requests", []));
   const [selected, setSelected] = useState<CommissionRequest | null>(null);
   const stages = ["Review", "Sketch", "Lineart", "Color", "Render"];
-  const adminLinks = [["overview", "grid", "Overview"], ["submissions", "user", "Submissions"], ["schedule", "calendar", "Schedule"], ["requests", "mail", "Client requests"], ["artworks", "brush", "Gallery images"], ["products", "spark", "Shop merchandise"]];
+  const adminLinks = [["overview", "grid", "Overview"], ["submissions", "user", "Submissions"], ["schedule", "calendar", "Schedule"], ["requests", "mail", "Client requests"], ["artworks", "brush", "Gallery images"], ["products", "spark", "Shop merchandise"], ["discounts", "spark", "Discounts"]];
   const updateStage = (id: number, stage: number) => { const next = requests.map((request) => request.id === id ? { ...request, stage } : request); setRequests(next); localStorage.setItem("inkyuu_requests", JSON.stringify(next)); };
   const removeRequest = (id: number) => { const next = requests.filter((request) => request.id !== id); setRequests(next); localStorage.setItem("inkyuu_requests", JSON.stringify(next)); };
   const upcoming = [...requests].filter((r) => r.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
@@ -791,23 +959,65 @@ function Admin({ go }: { go: (page: Page) => void }) {
     {tab === "requests" && <div className="admin-panel"><div className="panel-head"><div><p>AUTOMATIC INBOX</p><h2>Client requests</h2></div><span>{requests.length} total</span></div><div className="request-list">{requests.map((request) => <button key={request.id} onClick={() => setSelected(request)}><span className="request-avatar">{request.name.slice(0, 2).toUpperCase()}</span><div><strong>{request.name}</strong><small>{request.type} · {request.finish} · submitted {new Date(request.submittedAt).toLocaleDateString()}</small></div><span>{request.dueDate}</span><Icon name="arrow" /></button>)}{requests.length === 0 && <p className="empty-row">Completed commission forms will be added here automatically.</p>}</div></div>}
     {tab === "artworks" && <PublishManager mode="gallery" />}
     {tab === "products" && <PublishManager mode="products" />}
+    {tab === "discounts" && <DiscountManager />}
   </section>{selected && <RequestDetail request={selected} close={() => setSelected(null)} />}</main>;
+}
+
+function Login({ onLogin, go }: { onLogin: () => void; go: (page: Page) => void }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState(false);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Validating against username "admin" and password "kyuukyuuji@12_36729"
+    if (username === "admin" && password === "kyuukyuuji@12_36729") {
+      sessionStorage.setItem("inkyuu_admin_auth", "true");
+      onLogin();
+    } else {
+      setError(true);
+    }
+  };
+
+  return (
+    <div className="login-page">
+      <button className="login-back" onClick={() => go("home")}>
+        <Icon name="arrow" /> Back to website
+      </button>
+      <div className="login-card">
+        <img src={logo} alt="" />
+        <img className="login-wordmark" src={brandName} alt="Inkyuu" />
+        <p>Studio Admin Access</p>
+        <form onSubmit={handleLogin}>
+          <Field label="Username">
+            <input 
+              type="text" 
+              required 
+              value={username} 
+              onChange={(e) => { setUsername(e.target.value); setError(false); }} 
+              placeholder="Enter username..." 
+            />
+          </Field>
+          <Field label="Password">
+            <input 
+              type="password" 
+              required 
+              value={password} 
+              onChange={(e) => { setPassword(e.target.value); setError(false); }} 
+              placeholder="Enter password..." 
+            />
+          </Field>
+          {error && <span className="login-error">Invalid username or password. Please try again.</span>}
+          <Btn type="submit">Log in <Icon name="arrow" /></Btn>
+        </form>
+        <small>Protected studio route</small>
+      </div>
+    </div>
+  );
 }
 
 function Footer({ go }: { go: (page: Page) => void }) {
   return <footer><div className="wrap footer-grid"><div className="footer-brand"><div><img src={logo} alt="" /><img className="footer-wordmark" src={brandName} alt="Inkyuu" /></div><p>Warm, character-led digital art<br />made in the Philippines.</p></div><div><h3>Explore</h3>{[["Gallery", "gallery"], ["Commission", "commission"], ["Guide", "guide"], ["Shop", "shop"], ["About", "about"]].map(([label, page]) => <button key={label} onClick={() => go(page as Page)}>{label}</button>)}</div><div><h3>Say hello</h3><a href="mailto:kyuukyuuji@gmail.com">kyuukyuuji@gmail.com</a><a href="https://instagram.com" target="_blank" rel="noreferrer">Instagram</a><a href="https://facebook.com" target="_blank" rel="noreferrer">Facebook</a></div><div className="footer-note"><p>Currently accepting</p><strong><i /> 3 commission slots</strong><Btn kind="outline" onClick={() => go("commission")}>Request a slot</Btn></div></div><div className="wrap footer-bottom"><span>© 2025 Inkyuu Studio. All art reserved.</span><span>Made with care, color & good music.</span></div></footer>;
-}
-
-function AdminLogin({ onLogin, go }: { onLogin: () => void; go: (page: Page) => void }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (username === "admin" && password === "kyuukyuuji@12_36729") { sessionStorage.setItem("inkyuu_admin", "true"); onLogin(); }
-    else setError("That username or password is incorrect.");
-  };
-  return <main className="login-page"><button className="login-back" onClick={() => go("home")}><Icon name="arrow" /> Back to website</button><section className="login-card"><img src={logo} alt="" /><img className="login-wordmark" src={brandName} alt="Inkyuu" /><p>Protected studio access</p><form onSubmit={submit}><Field label="Username"><input required value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" /></Field><Field label="Password"><input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /></Field>{error && <span className="login-error">{error}</span>}<Btn type="submit">Log in <Icon name="arrow" /></Btn></form><small>Demo access: admin / inkyuu</small></section></main>;
 }
 
 export default function App() {
@@ -817,13 +1027,25 @@ export default function App() {
   };
   const [page, setPage] = useState<Page>(getPage);
   const [promo, setPromo] = useState(false);
-  const [authenticated, setAuthenticated] = useState(() => sessionStorage.getItem("inkyuu_admin") === "true");
+  const [isAdminAuth, setIsAdminAuth] = useState(() => sessionStorage.getItem("inkyuu_admin_auth") === "true");
+
   useEffect(() => {
-    const timer = window.setTimeout(() => { if (getPage() === "home") setPromo(true); }, 900);
-    const onHash = () => setPage(getPage());
+    const discounts = loadStored<DiscountItem[]>("inkyuu_discounts", []);
+    const timer = window.setTimeout(() => { 
+      if (getPage() === "home" && discounts.length > 0) {
+        setPromo(true); 
+      }
+    }, 900);
+    const onHash = () => {
+      setPage(getPage());
+      if (window.location.hash.replace("#", "") === "admin") {
+        setIsAdminAuth(sessionStorage.getItem("inkyuu_admin_auth") === "true");
+      }
+    };
     window.addEventListener("hashchange", onHash);
     return () => { window.clearTimeout(timer); window.removeEventListener("hashchange", onHash); };
   }, []);
+
   useEffect(() => {
     const elements = document.querySelectorAll("main > section, .featured-card, .medium-card, .gallery-card, .guide-sections article");
     elements.forEach((element) => element.classList.add("scroll-reveal"));
@@ -831,8 +1053,20 @@ export default function App() {
     elements.forEach((element) => observer.observe(element));
     return () => observer.disconnect();
   }, [page]);
+
   const go = (next: Page) => { window.location.hash = next; setPage(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const content = useMemo(() => ({ home: <Home go={go} openPromo={() => setPromo(true)} />, gallery: <Gallery />, shop: <Shop go={go} />, guide: <Guide go={go} />, about: <About go={go} />, commission: <Commission />, admin: <Admin go={go} /> }), []);
-  if (page === "admin") return authenticated ? content.admin : <AdminLogin onLogin={() => setAuthenticated(true)} go={go} />;
-  return <div className="site-shell"><Navbar page={page} go={go} />{content[page]}<Footer go={go} />{promo && <PromoModal close={() => setPromo(false)} go={go} />}</div>;
+  
+  if (page === "admin") {
+    if (!isAdminAuth) {
+      return <Login onLogin={() => setIsAdminAuth(true)} go={go} />;
+    }
+    return content.admin;
+  }
+
+  return <div className="site-shell"><Navbar page={page} go={go} />{content[page]}<Footer go={go} />{promo && loadStored<DiscountItem[]>("inkyuu_discounts", []).length > 0 && <PromoModal close={() => setPromo(false)} go={go} />}</div>;
+}
+
+function go(arg0: string) {
+  throw new Error("Function not implemented.");
 }
