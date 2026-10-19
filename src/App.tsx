@@ -260,61 +260,471 @@ function Gallery() {
   );
 }
 
-const Field = ({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) => <label className="field"><span>{label}</span>{hint && <small>{hint}</small>}{children}</label>;
+const Field = ({ label, hint, children }: { label: React.ReactNode; hint?: string; children: React.ReactNode }) => <label className="field"><span>{label}</span>{hint && <small>{hint}</small>}{children}</label>;
 
 function Commission({ currency }: { currency: Currency }) {
-  const [form, setForm] = useState({ name: "", email: "", social: "", dueDate: "", notes: "" });
-  const [type, setType] = useState("Bust-up");
-  const [finish, setFinish] = useState("Fully Rendered");
-  const [characters, setCharacters] = useState(1);
-  const [background, setBackground] = useState("Simple");
-  const [commercial, setCommercial] = useState(false);
-  const [priority, setPriority] = useState(false);
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    social: "",
+    dueDate: "",
+    artStyle: "",
+    usageType: "",
+    baseOption: "",
+    chibiService: "",
+    stickerCount: 4,
+    ychTheme: "",
+    colorOption: "",
+    bgOption: "",
+    characters: 1,
+    backgroundDetails: "",
+    additionalDetails: "",
+    confirm1: false,
+    confirm2: false,
+    confirm3: false,
+  });
   const [references, setReferences] = useState<string[]>([]);
-  const base = type === "Bust-up" ? 150 : type === "Half-body" ? 250 : 400;
-  const finishPrice = finish === "Sketch" ? 0 : finish === "Lineart" ? 100 : finish === "Flat Color" ? 200 : 300;
-  const charactersPrice = base + finishPrice + (characters - 1) * Math.round((base + finishPrice) * .75);
-  const subtotal = charactersPrice + (background === "Detailed" ? 350 : background === "Simple" ? 100 : 0) + (commercial ? 500 : 0);
-  const total = Math.round(subtotal * (priority ? 1.1 : 1));
-  const setValue = (key: keyof typeof form, value: string) => setForm({ ...form, [key]: value });
+
+  const setValue = (key: keyof typeof form, value: any) => setForm((prev) => ({ ...prev, [key]: value }));
+
+  // Pricing calculations
+  const basePrice = form.artStyle === "Chibi" 
+    ? (form.baseOption === "Headshot" ? 170 
+      : form.baseOption === "Fullbody" ? 200 : 0) 
+    : form.artStyle === "Semi-Realistic" 
+    ? (form.baseOption === "Headshot" ? 250 
+      : form.baseOption === "Bust-up" ? 380 
+      : form.baseOption === "Waist-up" ? 520 
+      : form.baseOption === "Thigh-up" ? 680 : 0)
+    : 0;
+
+  // Service extra price for Chibi solo deals
+  const chibiServicePrice = form.artStyle === "Chibi" ? (
+    form.chibiService === "Sticker set" ? (form.stickerCount - 4) * 30
+    : form.chibiService === "Acrylic Merch" ? 50
+    : form.chibiService === "Badges/Pins/Pfp Design" ? 40
+    : form.chibiService === "Character Reference sheet" ? 150
+    : form.chibiService === "2D Model character sheet" ? 300
+    : form.chibiService === "YCH" ? 80
+    : form.chibiService === "Alternate outfits/expressions" ? 60
+    : 0
+  ) : 0;
+
+  // Color finish price (Only applies to Semi-Realistic)
+  const colorPrice = form.artStyle === "Semi-Realistic" 
+    ? (form.colorOption === "Rendered" ? 475 
+      : form.colorOption === "Plain" ? 280 : 0)
+    : 0;
+
+  const bgPrice = form.artStyle === "Chibi" 
+    ? (form.bgOption === "Complex" ? 50 
+      : form.bgOption === "Plain" ? 0
+      : form.bgOption === "None/Transparent" ? 0 : 0) 
+    : form.artStyle === "Semi-Realistic" 
+    ? (form.bgOption === "Complex" ? 220 
+      : form.bgOption === "Plain" ? 150 
+      : form.bgOption === "None/Transparent" ? 680 : 0)
+    : 0;
+  
+  // Overall scope and options base total
+  const scopeAndOptionsTotal = basePrice + chibiServicePrice + colorPrice + bgPrice;
+
+  // Character multiplier fee implementation
+  const charMultiplier = form.characters > 1 
+    ? (form.characters - 1) * (
+        form.artStyle === "Semi-Realistic" 
+          ? Math.round(scopeAndOptionsTotal * 0.80 + 50) 
+          : form.artStyle === "Chibi" 
+          ? Math.round(scopeAndOptionsTotal * 0.80 + 35) 
+          : 0
+      ) 
+    : 0;
+  
+  const subtotal = scopeAndOptionsTotal + charMultiplier;
+  const commercialFee = form.usageType === "Commercial Use" ? 500 : 0;
+
+  // Calculate days difference for due date constraint
+  const getDueDatePercentage = () => {
+    if (!form.dueDate) return 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(form.dueDate);
+    const diffTime = targetDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 14 ? 0.10 : 0.18;
+  };
+
+  const dueDateRate = getDueDatePercentage();
+  const priorityFee = form.dueDate ? Math.round(subtotal * dueDateRate) : 0;
+  const total = subtotal + commercialFee + priorityFee;
+
   const uploadReferences = (files: FileList | null) => {
     if (!files) return;
-    Array.from(files).slice(0, 3).forEach((file) => {
+    Array.from(files).slice(0, 10 - references.length).forEach((file) => {
       const reader = new FileReader();
-      reader.onload = () => setReferences((current) => [...current, String(reader.result)].slice(0, 3));
+      reader.onload = () => setReferences((current) => [...current, String(reader.result)].slice(0, 10));
       reader.readAsDataURL(file);
     });
   };
+
+  const removeReference = (index: number) => {
+    setReferences((current) => current.filter((_, i) => i !== index));
+  };
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.confirm1 || !form.confirm2 || !form.confirm3) {
+      alert("Please check all three confirmation boxes to complete your application.");
+      return;
+    }
     const requests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
-    const request: CommissionRequest = { id: Date.now(), ...form, type, finish, characters, background, commercial, priority, references, totalPhp: total, submittedAt: new Date().toISOString(), stage: 0 };
+    const request: CommissionRequest = {
+      id: Date.now(),
+      name: form.name,
+      email: form.email,
+      social: form.social,
+      type: `${form.artStyle} - ${form.baseOption}${form.chibiService ? ` (${form.chibiService})` : ""}`,
+      finish: form.artStyle === "Chibi" ? "Rendered (Default)" : form.colorOption,
+      characters: form.characters,
+      background: form.bgOption,
+      commercial: form.usageType === "Commercial Use",
+      priority: Boolean(form.dueDate),
+      dueDate: form.dueDate,
+      notes: `Usage: ${form.usageType}\nService: ${form.chibiService || "N/A"}${form.ychTheme ? `\nYCH Theme: ${form.ychTheme}` : ""}\nBg Details: ${form.backgroundDetails}\nNotes: ${form.additionalDetails}\nConfirmed all terms: Yes`,
+      references,
+      totalPhp: total,
+      submittedAt: new Date().toISOString(),
+      stage: 0,
+    };
     localStorage.setItem("inkyuu_requests", JSON.stringify([request, ...requests]));
-    alert("Your commission request was saved. Inkyuu will be in touch soon.");
-    setForm({ name: "", email: "", social: "", dueDate: "", notes: "" });
-    setReferences([]);
+    alert("Your commission request was successfully submitted!");
   };
+
+  const maxChars = form.artStyle === "Chibi" ? 4 : form.artStyle === "Semi-Realistic" ? 2 : 4;
+
   return (
     <main className="page-main commission-page">
-      <section className="page-hero wrap"><p className="kicker">Commission request</p><h1>Let's make something <em>yours.</em></h1><p>Build your request using Inkyuu’s modular pricing. Your submission will be saved directly to the studio tracker.</p></section>
+      <section className="page-hero wrap">
+        <p className="kicker">Commission Request Form</p>
+        <h1>Let's make something <em>yours.</em></h1>
+        <p>Step-by-step studio commission intake modeled after live Google Forms.</p>
+      </section>
+
       <div className="wrap commission-layout">
         <form className="commission-form" onSubmit={submit}>
-          <div className="form-section"><div className="form-number">01</div><div><h2>Your details</h2><p>Where can I reach you, and when do you need it?</p></div>
-            <div className="two-col"><Field label="Facebook display name / nickname"><input required value={form.name} onChange={(e) => setValue("name", e.target.value)} placeholder="Name or nickname" /></Field><Field label="Email address"><input required type="email" value={form.email} onChange={(e) => setValue("email", e.target.value)} placeholder="you@example.com" /></Field><Field label="Social media handle"><input value={form.social} onChange={(e) => setValue("social", e.target.value)} placeholder="@username" /></Field><Field label="Planned due date"><input required type="date" value={form.dueDate} onChange={(e) => setValue("dueDate", e.target.value)} /></Field></div>
+          
+          {/* Progress Indicator */}
+          <div style={{ background: "white", border: "1px solid var(--line)", padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+            <div>
+              <span style={{ fontSize: "10px", fontWeight: "bold", color: "var(--orange)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Section {step} of 4</span>
+              <h3 style={{ margin: "2px 0 0", fontFamily: "DM Serif Display", fontSize: "20px" }}>
+                {step === 1 && "General Information"}
+                {step === 2 && `${form.artStyle || "Art"} Scope & Options`}
+                {step === 3 && "Project References & Final Notes"}
+                {step === 4 && "Terms of Service & Confirmation"}
+              </h3>
+            </div>
+            <div style={{ width: "100px", height: "6px", background: "var(--cream)", borderRadius: "99px", overflow: "hidden" }}>
+              <div style={{ width: `${(step / 4) * 100}%`, height: "100%", background: "var(--orange)", transition: "width 0.3s ease" }} />
+            </div>
           </div>
-          <div className="form-section"><div className="form-number">02</div><div><h2>Choose the scope</h2><p>Start with the base character crop described in the commission guide.</p></div>
-            <div className="option-grid three">{[["Bust-up", 150], ["Half-body", 250], ["Full-body", 400]].map(([name, price]) => <button type="button" className={`choice-card ${type === name ? "selected" : ""}`} onClick={() => setType(String(name))} key={name}><span className="radio" /><strong>{name}</strong><b>{money(Number(price), currency)}</b><small>Base character scope</small></button>)}</div>
+
+          {/* PAGE 1: General Information */}
+          {step === 1 && (
+            <div className="form-section" style={{ borderTop: "6px solid var(--orange)" }}>
+              <div className="form-number">01</div>
+              <div><h2>General Information</h2><p>Provide your contact details and select your overall project parameters.</p></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <Field label={<>Name / Nickname <span style={{ color: "red" }}>*</span></>}>
+                  <input required value={form.name} onChange={(e) => setValue("name", e.target.value)} placeholder="Your name" />
+                </Field>
+                <Field label={<>Email address <span style={{ color: "red" }}>*</span></>}>
+                  <input required type="email" value={form.email} onChange={(e) => setValue("email", e.target.value)} placeholder="you@example.com" />
+                </Field>
+                <Field label="Social media handle"><input value={form.social} onChange={(e) => setValue("social", e.target.value)} placeholder="@username" /></Field>
+                
+                <Field label="Planned due date (Optional)" hint="NOTE: Expected commissioned pieces will be labeled as PRIORITY. In PRIORITY, it will be prioritized over non-prioritized pieces, and will be charged an extra 18% of total price (or 10% if the due date is more than 14 days away).">
+                  <input type="date" value={form.dueDate} onChange={(e) => setValue("dueDate", e.target.value)} />
+                </Field>
+                
+                <Field label={<>Art Style <span style={{ color: "red" }}>*</span></>}>
+                  <select 
+                    value={form.artStyle} 
+                    onChange={(e) => {
+                      const selectedStyle = e.target.value;
+                      setForm((prev) => ({
+                        ...prev,
+                        artStyle: selectedStyle,
+                        baseOption: "",
+                        chibiService: "",
+                        colorOption: "",
+                        characters: 1,
+                      }));
+                    }}
+                  >
+                    <option value="" disabled>-- Select Art Style --</option>
+                    <option value="Chibi">Chibi</option>
+                    <option value="Semi-Realistic">Semi-Realistic</option>
+                  </select>
+                </Field>
+
+                <Field label={<>Usage Type <span style={{ color: "red" }}>*</span></>}>
+                  <select value={form.usageType} onChange={(e) => setValue("usageType", e.target.value)}>
+                    <option value="" disabled>-- Select Usage Type --</option>
+                    <option value="Personal Use">Personal Use</option>
+                    <option value="Commercial Use">Commercial Use</option>
+                  </select>
+                </Field>
+              </div>
+            </div>
+          )}
+
+          {/* PAGE 2: Chibi & Semi-Realism options */}
+          {step === 2 && (
+            <div className="form-section" style={{ borderTop: "6px solid var(--orange)" }}>
+              <div className="form-number">02</div>
+              <div><h2>{form.artStyle || "Art"} Scope & Options</h2><p>Select your composition layout, service deals, and character limits.</p></div>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div>
+                  <label className="field" style={{ marginBottom: "8px" }}><span>Base Scope <span style={{ color: "red" }}>*</span></span></label>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {form.artStyle === "Chibi" ? (
+                      [
+                        ["Headshot", 170], 
+                        ["Fullbody", 200]
+                      ].map(([name, price]) => (
+                        <button type="button" className={`choice-card ${form.baseOption === name ? "selected" : ""}`} onClick={() => setValue("baseOption", name)} key={name} style={{ width: "100%" }}>
+                          <span className="radio" /><strong>{name}</strong><b>{money(Number(price), currency)}</b><small>Chibi tier (Rendered by default)</small>
+                        </button>
+                      ))
+                    ) : form.artStyle === "Semi-Realistic" ? (
+                      [
+                        ["Headshot", 250], 
+                        ["Bust-up", 380], 
+                        ["Waist-up", 520], 
+                        ["Thigh-up", 680]
+                      ].map(([name, price]) => (
+                        <button type="button" className={`choice-card ${form.baseOption === name ? "selected" : ""}`} onClick={() => setValue("baseOption", name)} key={name} style={{ width: "100%" }}>
+                          <span className="radio" /><strong>{name}</strong><b>{money(Number(price), currency)}</b><small>Semi-realism tier</small>
+                        </button>
+                      ))
+                    ) : (
+                      <p style={{ color: "var(--muted)", fontSize: "11px" }}>Please go back and select an Art Style first.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* CHIBI SPECIFIC SERVICE SELECTION */}
+                {form.artStyle === "Chibi" ? (
+                  <>
+                    <Field label={<>Chibi Solo Deal / Service <span style={{ color: "red" }}>*</span></>}>
+                      <select value={form.chibiService} onChange={(e) => setValue("chibiService", e.target.value)}>
+                        <option value="" disabled>-- Select Chibi Service --</option>
+                        <option value="Solo Deals">Solo Deals</option>
+                        <option value="Sticker set">Sticker set</option>
+                        <option value="Acrylic Merch">Acrylic Merch</option>
+                        <option value="Badges/Pins/Pfp Design">Badges/Pins/Pfp Design</option>
+                        <option value="Character Reference sheet">Character Reference sheet</option>
+                        <option value="2D Model character sheet">2D Model character sheet</option>
+                        <option value="YCH">YCH (Your Character Here)</option>
+                        <option value="Alternate outfits/expressions">Alternate outfits/expressions</option>
+                      </select>
+                    </Field>
+
+                    {/* STICKER SET QUANTITY SELECTOR */}
+                    {form.chibiService === "Sticker set" && (
+                      <Field label={<>Sticker Count (4 to 9 stickers) <span style={{ color: "red" }}>*</span></>}>
+                        <div className="stepper" style={{ maxWidth: "160px" }}>
+                          <button type="button" onClick={() => setValue("stickerCount", Math.max(4, form.stickerCount - 1))}>−</button>
+                          <strong>{form.stickerCount}</strong>
+                          <button type="button" onClick={() => setValue("stickerCount", Math.min(9, form.stickerCount + 1))}>+</button>
+                        </div>
+                      </Field>
+                    )}
+
+                    {/* YCH THEME RADIO SELECTION */}
+                    {form.chibiService === "YCH" && (
+                      <div>
+                        <label className="field" style={{ marginBottom: "8px" }}><span>Select YCH Theme <span style={{ color: "red" }}>*</span></span></label>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
+                          {[
+                            ["Cozy Tea Time", "tea"],
+                            ["Pocket Mascot", "scout"],
+                            ["Cheerful Orange", "orange"]
+                          ].map(([themeName, artKey]) => (
+                            <button
+                              type="button"
+                              key={themeName}
+                              className={`choice-card ${form.ychTheme === themeName ? "selected" : ""}`}
+                              onClick={() => setValue("ychTheme", themeName)}
+                              style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "12px", textAlign: "center" }}
+                            >
+                              <div style={{ width: "100%", height: "70px", marginBottom: "8px", borderRadius: "6px", overflow: "hidden" }}>
+                                <ArtVisual art={artKey} label={themeName} />
+                              </div>
+                              <strong>{themeName}</strong>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  /* SEMI-REALISTIC COLOR FINISH */
+                  <Field label={<>Color Finish <span style={{ color: "red" }}>*</span></>}>
+                    <select value={form.colorOption} onChange={(e) => setValue("colorOption", e.target.value)}>
+                      <option value="" disabled>-- Select Color Finish --</option>
+                      <option value="Rendered">Rendered</option>
+                      <option value="Plain">Plain Color</option>
+                      <option value="Monochrome">Monochrome</option>
+                    </select>
+                  </Field>
+                )}
+
+                <Field label={<>Background Style <span style={{ color: "red" }}>*</span></>}>
+                  <select value={form.bgOption} onChange={(e) => setValue("bgOption", e.target.value)}>
+                    <option value="" disabled>-- Select Background Style --</option>
+                    <option value="None/Transparent">None / Transparent</option>
+                    <option value="Plain">Plain Solid Color</option>
+                    <option value="Complex">Complex Background</option>
+                  </select>
+                </Field>
+
+                <Field label={<>Number of Characters (Max {maxChars}) <span style={{ color: "red" }}>*</span></>}>
+                  <div className="stepper">
+                    <button type="button" onClick={() => setValue("characters", Math.max(1, form.characters - 1))}>−</button>
+                    <strong>{form.characters}</strong>
+                    <button type="button" onClick={() => setValue("characters", Math.min(maxChars, form.characters + 1))}>+</button>
+                  </div>
+                </Field>
+              </div>
+            </div>
+          )}
+
+          {/* PAGE 3: Project references and final notes */}
+          {step === 3 && (
+            <div className="form-section" style={{ borderTop: "6px solid var(--orange)" }}>
+              <div className="form-number">03</div>
+              <div><h2>Project references & final notes</h2><p>Provide specific details and upload visual references (up to 10 images).</p></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <Field label="Background details"><textarea rows={3} value={form.backgroundDetails} onChange={(e) => setValue("backgroundDetails", e.target.value)} placeholder="Describe background elements or props..." /></Field>
+                <Field label="Additional details"><textarea rows={4} value={form.additionalDetails} onChange={(e) => setValue("additionalDetails", e.target.value)} placeholder="Pose description, clothing styles, mood..." /></Field>
+                <Field label="Reference images (Max 10 files)" hint={`Uploaded: ${references.length} / 10`}>
+                  <input type="file" accept="image/*" multiple onChange={(e) => uploadReferences(e.target.files)} />
+                </Field>
+                {references.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "10px" }}>
+                    {references.map((image, index) => (
+                      <div key={index} style={{ position: "relative" }}>
+                        <img src={image} alt={`Reference ${index + 1}`} style={{ width: "80px", height: "80px", objectFit: "cover", border: "1px solid var(--gold)" }} />
+                        <button type="button" onClick={() => removeReference(index)} style={{ position: "absolute", top: 0, right: 0, background: "rgba(0,0,0,0.7)", color: "#fff", border: "none", cursor: "pointer", padding: "2px 6px", fontSize: "10px" }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* PAGE 4: Terms of Service Agreement & Confirmation */}
+          {step === 4 && (
+            <div className="form-section" style={{ borderTop: "6px solid var(--orange)" }}>
+              <div className="form-number">04</div>
+              <div>
+                <h2>Terms of Service Agreement & Confirmation <span style={{ color: "red" }}>*</span></h2>
+                <p style={{ fontSize: "11px", color: "var(--muted)", lineHeight: "1.6", marginTop: "6px" }}>
+                  Please review and check each box below to complete your application. By checking these requirements, you acknowledge that you have read the official Commission Guide and explicitly agree to follow these operational boundaries throughout our project.
+                </p>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "20px" }}>
+                <label className="check-row" style={{ margin: 0 }}>
+                  <input type="checkbox" checked={form.confirm1} onChange={(e) => setValue("confirm1", e.target.checked)} />
+                  <span><strong>Guide Review <span style={{ color: "red" }}>*</span></strong><small>I confirm that I have accessed, read, and fully understood the rules and regulations provided in the official Commission Guide.</small></span>
+                </label>
+                <label className="check-row" style={{ margin: 0 }}>
+                  <input type="checkbox" checked={form.confirm2} onChange={(e) => setValue("confirm2", e.target.checked)} />
+                  <span><strong>Payment Terms <span style={{ color: "red" }}>*</span></strong><small>I explicitly accept the payment terms, including the 20% mid-project downpayment and the mandatory 3-day final payment window upon artwork completion.</small></span>
+                </label>
+                <label className="check-row" style={{ margin: 0 }}>
+                  <input type="checkbox" checked={form.confirm3} onChange={(e) => setValue("confirm3", e.target.checked)} />
+                  <span><strong>Operational Boundaries <span style={{ color: "red" }}>*</span></strong><small>I explicitly agree to follow all rules, regulations, and operational terms outlined within the guide for the duration of this project.</small></span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation Controls */}
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "20px" }}>
+            {step > 1 ? (
+              <Btn type="button" kind="outline" onClick={() => setStep(step - 1)}>Back</Btn>
+            ) : <div />}
+
+            {step < 4 ? (
+              <Btn type="button" onClick={() => {
+                if (step === 1 && (!form.name || !form.email || !form.artStyle || !form.usageType)) {
+                  alert("Please fill in your name, email, art style, and usage type.");
+                  return;
+                }
+                if (step === 2) {
+                  if (!form.baseOption || !form.bgOption) {
+                    alert("Please select your base scope and background style.");
+                    return;
+                  }
+                  if (form.artStyle === "Chibi" && !form.chibiService) {
+                    alert("Please select a Chibi Solo Deal / Service.");
+                    return;
+                  }
+                  if (form.artStyle === "Chibi" && form.chibiService === "YCH" && !form.ychTheme) {
+                    alert("Please select a YCH theme.");
+                    return;
+                  }
+                  if (form.artStyle === "Semi-Realistic" && !form.colorOption) {
+                    alert("Please select your color finish.");
+                    return;
+                  }
+                }
+                setStep(step + 1);
+              }}>Next <Icon name="arrow" /></Btn>
+            ) : (
+              <Btn type="submit" className="submit-btn">Submit request <Icon name="arrow" /></Btn>
+            )}
           </div>
-          <div className="form-section"><div className="form-number">03</div><div><h2>Build your piece</h2><p>Add finish, characters, background, and usage.</p></div>
-            <div className="two-col"><Field label="Finish level"><select value={finish} onChange={(e) => setFinish(e.target.value)}><option>Sketch</option><option>Lineart</option><option>Flat Color</option><option>Fully Rendered</option></select></Field><Field label="Number of characters"><div className="stepper"><button type="button" onClick={() => setCharacters(Math.max(1, characters - 1))}>−</button><strong>{characters}</strong><button type="button" onClick={() => setCharacters(Math.min(5, characters + 1))}>+</button></div></Field><Field label="Background detail"><select value={background} onChange={(e) => setBackground(e.target.value)}><option>None</option><option>Simple</option><option>Detailed</option></select></Field></div>
-            <label className="check-row"><input type="checkbox" checked={commercial} onChange={(e) => setCommercial(e.target.checked)} /><span><strong>Commercial usage</strong><small>For products, marketing, streaming, or business use.</small></span><b>+{money(500, currency)}</b></label>
-            <label className="check-row"><input type="checkbox" checked={priority} onChange={(e) => setPriority(e.target.checked)} /><span><strong>Priority delivery</strong><small>Fast-tracked ahead of the standard production queue.</small></span><b>+10%</b></label>
-          </div>
-          <div className="form-section"><div className="form-number">04</div><div><h2>Tell me your vision</h2><p>Poses, expressions, mood, and clear visual references are helpful.</p></div><Field label="Project notes" hint="NSFW, suggestive content, heavy gore, mecha, and canon ships are not accepted."><textarea required rows={6} value={form.notes} onChange={(e) => setValue("notes", e.target.value)} placeholder="Describe the character and scene..." /></Field><Field label="Reference images" hint="Up to three image files."><input type="file" accept="image/*" multiple onChange={(e) => uploadReferences(e.target.files)} /></Field>{references.length > 0 && <div className="reference-previews">{references.map((image, index) => <img src={image} alt={`Reference ${index + 1}`} key={`${image.slice(-12)}-${index}`} />)}</div>}</div>
-          <label className="terms-check"><input required type="checkbox" /> I agree to the commission guide, copyright, payment, communication, and cancellation terms.</label>
-          <Btn type="submit" className="submit-btn">Send commission request <Icon name="arrow" /></Btn>
         </form>
-        <aside className="estimate-card"><div className="estimate-top"><span>Live estimate · {currency}</span><Icon name="spark" /></div><h2>{money(total, currency)}</h2><div className="estimate-lines"><p><span>{type} base</span><b>{money(base, currency)}</b></p><p><span>{finish}</span><b>+{money(finishPrice, currency)}</b></p><p><span>{characters} character{characters > 1 ? "s" : ""}</span><b>{money(charactersPrice, currency)}</b></p><p><span>{background} background</span><b>+{money(background === "Detailed" ? 350 : background === "Simple" ? 100 : 0, currency)}</b></p>{commercial && <p><span>Commercial license</span><b>+{money(500, currency)}</b></p>}{priority && <p><span>Priority fee</span><b>+10%</b></p>}</div><div className="estimate-total"><span>Estimated total</span><strong>{money(total, currency)}</strong></div><p className="fine-print">Final price may vary after review. GCASH is the accepted payment platform.</p><div className="process-list">{["Request review", "Sketch", "20% midpoint payment", "Final settlement"].map((item, i) => <p key={item}><span>{i + 1}</span>{item}</p>)}</div></aside>
+
+        {/* Live Estimate Sidebar */}
+        <aside className="estimate-card">
+          <div className="estimate-top"><span>Live Estimate · {currency}</span><Icon name="spark" /></div>
+          <h2>{money(total, currency)}</h2>
+          <div className="estimate-lines">
+            <p><span>{form.artStyle ? `${form.artStyle} (${form.baseOption || "Select base"})` : "Base scope"}</span><b>{money(basePrice, currency)}</b></p>
+            {form.artStyle === "Chibi" ? (
+              <p><span>Chibi finish</span><b>Rendered (Free)</b></p>
+            ) : (
+              <p><span>{form.colorOption || "Color finish"}</span><b>+{money(colorPrice, currency)}</b></p>
+            )}
+            {form.chibiService && (
+              <p><span>Service: {form.chibiService}{form.chibiService === "Sticker set" ? ` (${form.stickerCount})` : ""}</span><b>+{money(chibiServicePrice, currency)}</b></p>
+            )}
+            <p><span>{form.bgOption || "Background"} background</span><b>+{money(bgPrice, currency)}</b></p>
+            {form.characters > 0 && <p><span>{form.characters} character{form.characters > 1 ? "s" : ""}</span><b>+{money(charMultiplier, currency)}</b></p>}
+            
+            {(form.usageType === "Commercial Use" || form.dueDate) && (
+              <>
+                <p style={{ marginTop: "10px", color: "var(--gold)", fontWeight: "bold", borderTop: "1px dashed #595959", paddingTop: "8px" }}><span>Additional Fees</span></p>
+                {form.usageType === "Commercial Use" && (
+                  <p><span>Commercial license</span><b>+{money(commercialFee, currency)}</b></p>
+                )}
+                {form.dueDate && (
+                  <p><span>Priority due date fee ({dueDateRate === 0.1 ? "10%" : "18%"})</span><b>+{money(priorityFee, currency)}</b></p>
+                )}
+              </>
+            )}
+          </div>
+          <div className="estimate-total"><span>Estimated total</span><strong>{money(total, currency)}</strong></div>
+          <p className="fine-print">GCASH is the accepted payment platform. Final confirmation is sent after admin review.</p>
+        </aside>
       </div>
     </main>
   );
