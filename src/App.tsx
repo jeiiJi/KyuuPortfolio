@@ -70,7 +70,7 @@ const artItems = [
 ];
 
 const Btn = ({ children, kind = "primary", onClick, type = "button", className = "", style }: { children: React.ReactNode; kind?: "primary" | "outline" | "ghost"; onClick?: () => void; type?: "button" | "submit"; className?: string; style?: React.CSSProperties }) => (
-  <button type={type} className={`btn btn-${kind} ${className}`} onClick={onClick} style={style}>{children}</button>
+  <button type={type} className={`btn btn-${kind} ${className}`} onClick={onClick} style={style}><span className="btn-label">{children}</span></button>
 );
 
 const loadStored = <T,>(key: string, fallback: T): T => {
@@ -150,6 +150,7 @@ function Home({ go, openPromo }: { go: (page: Page) => void; openPromo: () => vo
     <>
       <main>
         <section className="hero wrap">
+          {/* 1. Copy appears first */}
           <div className="hero-copy" style={{ paddingBottom: "60px" }}>
             <div className="eyebrow"><span className="eyebrow-line" /> Digital artist & illustrator</div>
             <h1>Small moments,<br /><em>boldly drawn.</em></h1>
@@ -159,12 +160,16 @@ function Home({ go, openPromo }: { go: (page: Page) => void; openPromo: () => vo
               <Btn kind="ghost" onClick={() => go("commission")}>Commission me</Btn>
             </div>
           </div>
+
+          {/* 2. Canvas/Artwork appears second, placing it below the text */}
           <div className="hero-canvas">
             <div className="art-visual art-hero">
               <img src={heroArtwork} alt="Featured artwork" />
             </div>
           </div>
         </section>
+
+        <ChalkDivider />
 
         <section className="section wrap featured">
           <div className="section-heading">
@@ -525,7 +530,7 @@ function Commission() {
         <div className="commission-form">
           
           {/* Progress Indicator */}
-          <div style={{ background: "white", border: "1px solid var(--line)", padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+          <div className="commission-progress">
             <div>
               <span style={{ fontSize: "12px", fontWeight: "bold", color: "var(--orange)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Section {step} of 5</span>
               <h3 style={{ margin: "2px 0 0", fontFamily: "DM Serif Display", fontSize: "20px" }}>
@@ -536,14 +541,14 @@ function Commission() {
                 {step === 5 && "Review & Checkout"}
               </h3>
             </div>
-            <div style={{ width: "100px", height: "6px", background: "var(--cream)", borderRadius: "99px", overflow: "hidden" }}>
-              <div style={{ width: `${(step / 5) * 100}%`, height: "100%", background: "var(--orange)", transition: "width 0.3s ease" }} />
+            <div className="commission-progress-track">
+              <div className="commission-progress-fill" style={{ width: `${(step / 5) * 100}%` }} />
             </div>
           </div>
 
           {/* PAGE 1: Terms of Service Agreement & Confirmation */}
           {step === 1 && (
-            <div className="form-section" style={{ borderTop: "6px solid var(--orange)" }}>
+            <div className="form-section form-section-accent">
               <div className="form-number">01</div>
               <div>
                 <h2>Terms of Service Agreement & Confirmation <span style={{ color: "red" }}>*</span></h2>
@@ -570,7 +575,7 @@ function Commission() {
 
           {/* PAGE 2: General Information */}
           {step === 2 && (
-            <div className="form-section" style={{ borderTop: "6px solid var(--orange)" }}>
+            <div className="form-section form-section-accent">
               <div className="form-number">02</div>
               <div><h2>General Information</h2><p>Provide your contact details and select your overall project parameters.</p></div>
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -610,7 +615,7 @@ function Commission() {
 
           {/* PAGE 3: Chibi & Semi-Realism options */}
           {step === 3 && (
-            <div className="form-section" style={{ borderTop: "6px solid var(--orange)" }}>
+            <div className="form-section form-section-accent">
               <div className="form-number">03</div>
               <div><h2>{form.artStyle || "Art"} Scope & Options</h2><p>Select your composition layout, service deals, and character limits.</p></div>
               
@@ -733,7 +738,7 @@ function Commission() {
 
           {/* PAGE 4: Project references and final notes */}
           {step === 4 && (
-            <div className="form-section" style={{ borderTop: "6px solid var(--orange)" }}>
+            <div className="form-section form-section-accent">
               <div className="form-number">04</div>
               <div><h2>Project references & final notes</h2><p>Provide specific details and upload visual references (up to 10 images).</p></div>
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -758,7 +763,7 @@ function Commission() {
 
           {/* PAGE 5: Review & Checkout (Discounts & Big Live Estimate) */}
           {step === 5 && (
-            <div className="form-section" style={{ borderTop: "6px solid var(--orange)" }}>
+            <div className="form-section form-section-accent">
               <div className="form-number">05</div>
               <div>
                 <h2>Review & Checkout</h2>
@@ -875,7 +880,7 @@ function Commission() {
 function Shop({ go }: { go: (page: Page) => void }) {
   const products = loadStored<PublishedItem[]>("inkyuu_products", []);
   return <main className="page-main">
-    <section className="page-hero wrap"><p className="kicker">The tiny shop</p><h1>Art made to <em>hold.</em></h1><p>Stickers, prints, and little pieces of joy from the Inkyuu studio.</p></section>{products.length > 0 ? <section className="wrap product-grid">{products.map((product) => <article key={product.id}><img src={product.image || placeholder} alt={product.title} /><div><span>{product.category}</span><h2>{product.title}</h2><p>{product.description}</p><strong>{money(product.price || 0)}</strong><small>Published {product.publishedAt}</small></div></article>)}</section> : <section className="empty-shop wrap"><div className="shop-art"><span className="shop-sun" /><img src={placeholder} alt="Artwork placeholder" /></div><div className="shop-copy"><span className="status-pill"><i /> Restocking in progress</span><h2>Shop is still unavailable</h2><p>I'm putting the finishing touches on a cheerful collection of stickers, posters, photocards, portraits, and sticker sets.</p><button className="text-link" onClick={() => go("gallery")}>Browse the gallery while you wait <Icon name="arrow" /></button></div></section>}</main>;
+    <section className="page-hero wrap"><p className="kicker">The tiny shop</p><h1>Art made to <em>hold.</em></h1><p>Stickers, prints, and little pieces of joy from the Inkyuu studio.</p></section>{products.length > 0 ? <section className="wrap product-grid">{products.map((product) => <article key={product.id}><img src={product.image || placeholder} alt={product.title} /><div><span>{product.category}</span><h2>{product.title}</h2><p>{product.description}</p><strong>{money(product.price || 0)}</strong><small>Published {product.publishedAt}</small></div></article>)}</section> : <section className="empty-shop wrap"><div className="shop-art"><span className="shop-sun" /><img src={placeholder} alt="Artwork placeholder" /></div><div className="shop-copy"><h2>Shop is still unavailable</h2><p>I'm putting the finishing touches on a cheerful collection of stickers, posters, photocards, portraits, and sticker sets.</p><button className="text-link" onClick={() => go("gallery")}>Browse the gallery while you wait <Icon name="arrow" /></button></div></section>}</main>;
 }
 
 function Guide({ go }: { go: (page: Page) => void }) {
@@ -963,19 +968,188 @@ function About({ go }: { go: (page: Page) => void }) {
   );
 }
 
-function PublishManager({ mode }: { mode: "gallery" | "products" }) {
-  const storageKey = mode === "gallery" ? "inkyuu_gallery" : "inkyuu_products";
-  const [items, setItems] = useState<PublishedItem[]>(() => loadStored(storageKey, []));
+function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }) {
+  const storageKey = mode === "gallery" ? "inkyuu_gallery" : mode === "products" ? "inkyuu_products" : "inkyuu_discounts";
+  const [items, setItems] = useState<any[]>(() => loadStored(storageKey, []));
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState({ title: "", description: "", category: mode === "gallery" ? "Chibi" : "Sticker", price: "", image: "" });
-  const persist = (next: PublishedItem[]) => { setItems(next); localStorage.setItem(storageKey, JSON.stringify(next)); };
-  const upload = (file?: File) => { if (!file) return; const reader = new FileReader(); reader.onload = () => setDraft({ ...draft, image: String(reader.result) }); reader.readAsDataURL(file); };
+  const [draft, setDraft] = useState({ 
+    title: "", 
+    description: "", 
+    category: mode === "gallery" ? "Chibi" : mode === "products" ? "Pins" : "Chibi Only", 
+    subCategory: "Sticker set", 
+    price: "", 
+    percentage: "", 
+    requirementType: "Any", 
+    startDate: "", 
+    endDate: "", 
+    code: "", 
+    image: "", 
+    bannerImage: "" 
+  });
+
+  const persist = (next: any[]) => { setItems(next); localStorage.setItem(storageKey, JSON.stringify(next)); };
+  const upload = (file?: File, isBanner = false) => { 
+    if (!file) return; 
+    const reader = new FileReader(); 
+    reader.onload = () => setDraft(prev => ({ ...prev, [isBanner ? "bannerImage" : "image"]: String(reader.result) })); 
+    reader.readAsDataURL(file); 
+  };
+
   const publish = (e: React.FormEvent) => {
     e.preventDefault();
-    persist([{ id: Date.now(), title: draft.title, description: draft.description, category: draft.category, price: Number(draft.price || 0), image: draft.image || placeholder, publishedAt: new Date().toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) }, ...items]);
-    setDraft({ title: "", description: "", category: mode === "gallery" ? "Chibi" : "Sticker", price: "", image: "" }); setOpen(false);
+    const finalCategory = draft.category === "Chibi" ? `Chibi (${draft.subCategory})` : draft.category;
+    
+    if (mode === "discounts") {
+      persist([{
+        id: Date.now(),
+        title: draft.title,
+        percentage: Number(draft.percentage),
+        requirementType: draft.category,
+        description: draft.description,
+        startDate: draft.startDate,
+        endDate: draft.endDate,
+        code: draft.code || "PROMO",
+        bannerImage: draft.bannerImage || placeholder
+      }, ...items]);
+    } else {
+      persist([{
+        id: Date.now(),
+        title: draft.title,
+        description: draft.description,
+        category: finalCategory,
+        price: Number(draft.price || 0),
+        image: draft.image || placeholder,
+        publishedAt: new Date().toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })
+      }, ...items]);
+    }
+
+    setDraft({ title: "", description: "", category: mode === "gallery" ? "Chibi" : mode === "products" ? "Pins" : "Chibi Only", subCategory: "Sticker set", price: "", percentage: "", requirementType: "Any", startDate: "", endDate: "", code: "", image: "", bannerImage: "" }); 
+    setOpen(false);
   };
-  return <div className="admin-panel media-manager"><div className="panel-head"><div><p>PUBLISHED LIBRARY</p><h2>{mode === "gallery" ? "Gallery images" : "Shop merchandise"}</h2></div><button className="admin-plus" onClick={() => setOpen(true)}><Icon name="plus" /> Add {mode === "gallery" ? "artwork" : "product"}</button></div><div className="media-list">{items.map((item) => <article key={item.id}><img src={item.image || placeholder} alt={item.title} /><div><span>{item.category}</span><h3>{item.title}</h3><p>{item.description}</p><small>Published {item.publishedAt}</small></div><button aria-label={`Delete ${item.title}`} onClick={() => persist(items.filter((x) => x.id !== item.id))}><Icon name="trash" /></button></article>)}{items.length === 0 && <div className="empty-row">Nothing published yet. Use the plus button to add the first item.</div>}</div>{open && <div className="modal-backdrop" onMouseDown={() => setOpen(false)}><form className="publish-modal" onSubmit={publish} onMouseDown={(e) => e.stopPropagation()}><button type="button" className="modal-close" onClick={() => setOpen(false)}><Icon name="close" /></button><div className="publish-preview"><img src={draft.image || placeholder} alt="Upload preview" /><label><Icon name="plus" /> Choose image<input required={!draft.image} type="file" accept="image/*" onChange={(e) => upload(e.target.files?.[0])} /></label></div><div className="publish-fields"><p className="kicker">{mode === "gallery" ? "New gallery artwork" : "New shop merchandise"}</p><h2>Publish something new</h2><Field label={mode === "gallery" ? "Artwork title" : "Product title"}><input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></Field><Field label="Description"><textarea required rows={4} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field><Field label="Category"><select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>{(mode === "gallery" ? ["Chibi", "Semi-Realistic"] : ["Sticker", "Print", "Photocard", "Portrait", "Sticker set"]).map((x) => <option key={x}>{x}</option>)}</select></Field>{mode === "products" && <Field label="Price in PHP"><input required type="number" min="0" value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value })} /></Field>}<Btn type="submit">Publish <Icon name="arrow" /></Btn></div></form></div>}</div>;
+
+  return (
+    <div className="admin-panel media-manager">
+      <div className="panel-head">
+        <div>
+          <p>PUBLISHED LIBRARY</p>
+          <h2>{mode === "gallery" ? "Gallery images" : mode === "products" ? "Shop merchandise" : "Discounts"}</h2>
+        </div>
+        <button className="admin-plus" onClick={() => setOpen(true)}>
+          <Icon name="plus" /> Add {mode === "gallery" ? "artwork" : mode === "products" ? "product" : "discount"}
+        </button>
+      </div>
+
+      <div className="media-list">
+        {items.map((item) => (
+          <article key={item.id}>
+            <img src={item.image || item.bannerImage || placeholder} alt={item.title} />
+            <div>
+              <span>{item.category || item.requirementType || `${item.percentage}% OFF`}</span>
+              <h3>{item.title}</h3>
+              <p>{item.description}</p>
+              <small>{mode === "discounts" ? `Code: ${item.code} | ${item.startDate} to ${item.endDate}` : `Published ${item.publishedAt}`}</small>
+            </div>
+            <button aria-label={`Delete ${item.title}`} onClick={() => persist(items.filter((x) => x.id !== item.id))}><Icon name="trash" /></button>
+          </article>
+        ))}
+        {items.length === 0 && <div className="empty-row">Nothing published yet. Use the plus button to add the first item.</div>}
+      </div>
+
+      {open && (
+        <div className="modal-backdrop" onMouseDown={() => setOpen(false)}>
+          <form className="publish-modal" onSubmit={publish} onMouseDown={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close" onClick={() => setOpen(false)}><Icon name="close" /></button>
+            <div className="publish-preview">
+              <img src={draft.image || draft.bannerImage || placeholder} alt="Upload preview" />
+              <label>
+                <Icon name="plus" /> Choose {mode === "discounts" ? "banner" : "image"}
+                <input required={!draft.image && !draft.bannerImage} type="file" accept="image/*" onChange={(e) => upload(e.target.files?.[0], mode === "discounts")} />
+              </label>
+            </div>
+
+            <div className="publish-fields">
+              <p className="kicker">New {mode === "gallery" ? "gallery artwork" : mode === "products" ? "shop merchandise" : "discount offer"}</p>
+              <h2>Publish something new</h2>
+              
+              <Field label="Title">
+                <input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder={mode === "discounts" ? "Summer Promo" : "Item title"} />
+              </Field>
+
+              <Field label="Description">
+                <textarea required rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Write a brief description..." />
+              </Field>
+
+              {/* Category Dropdown */}
+              <Field label="Category">
+                <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>
+                  {mode === "gallery" && (
+                    <>
+                      <option value="Chibi">Chibi</option>
+                      <option value="Semi-Realistic">Semi-Realistic</option>
+                    </>
+                  )}
+                  {mode === "products" && (
+                    <>
+                      <option value="Pins">Pins</option>
+                      <option value="Prints">Prints</option>
+                      <option value="Photocard">Photocard</option>
+                      <option value="Chibi">Chibi</option>
+                    </>
+                  )}
+                  {mode === "discounts" && (
+                    <>
+                      <option value="Chibi Only">Chibi Only</option>
+                      <option value="Semi-Realistic Only">Semi-Realistic Only</option>
+                      <option value="Any">Any Commission</option>
+                      <option value="Commercial Use">Commercial Use</option>
+                    </>
+                  )}
+                </select>
+              </Field>
+
+              {/* Conditional Sub-Dropdown: Appears when category is Chibi / Chibi Only */}
+              {(draft.category === "Chibi" || draft.category === "Chibi Only") && (
+                <Field label="Chibi Service / Type">
+                  <select value={draft.subCategory} onChange={(e) => setDraft({ ...draft, subCategory: e.target.value })}>
+                    <option value="Sticker set">Sticker set</option>
+                    <option value="Acrylic Merch">Acrylic Merch</option>
+                    <option value="Badges/Pins/Pfp Design">Badges/Pins/Pfp Design</option>
+                    <option value="Character Reference sheet">Character Reference sheet</option>
+                    <option value="2D Model character sheet">2D Model character sheet</option>
+                    <option value="YCH">YCH (Your Character Here)</option>
+                    <option value="Alternate outfits/expressions">Alternate outfits/expressions</option>
+                  </select>
+                </Field>
+              )}
+
+              {mode === "products" && (
+                <Field label="Price in PHP">
+                  <input required type="number" min="0" value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value })} placeholder="250" />
+                </Field>
+              )}
+
+              {mode === "discounts" && (
+                <>
+                  <Field label="Discount Percentage (%)">
+                    <input required type="number" min="1" max="100" value={draft.percentage} onChange={(e) => setDraft({ ...draft, percentage: e.target.value })} placeholder="15" />
+                  </Field>
+                  <Field label="Discount Code">
+                    <input required value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} placeholder="CHIBIPROMO" />
+                  </Field>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                    <Field label="Start Date"><input required type="date" value={draft.startDate} onChange={(e) => setDraft({ ...draft, startDate: e.target.value })} /></Field>
+                    <Field label="End Date"><input required type="date" value={draft.endDate} onChange={(e) => setDraft({ ...draft, endDate: e.target.value })} /></Field>
+                  </div>
+                </>
+              )}
+
+              <Btn type="submit">Publish <Icon name="arrow" /></Btn>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function DiscountManager() {
@@ -1258,11 +1432,10 @@ function Admin({ go }: { go: (page: Page) => void }) {
   const [requests, setRequests] = useState<CommissionRequest[]>(() => loadStored("inkyuu_requests", []));
   const [selected, setSelected] = useState<CommissionRequest | null>(null);
 
-  // Filter states for submission tracker
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterPriority, setFilterPriority] = useState<string>("all"); // "all" | "priority" | "normal"
-  const [filterStyle, setFilterStyle] = useState<string>("all"); // "all" | "Chibi" | "Semi-Realistic"
-  const [filterSlotStatus, setFilterSlotStatus] = useState<string>("all"); // "all" | "active" | "reserved" | "unoccupied"
+  const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [filterStyle, setFilterStyle] = useState<string>("all");
+  const [filterSlotStatus, setFilterSlotStatus] = useState<string>("all");
   
   const stages = ["Review", "Sketch", "Lineart", "Color", "Render", "Approved"];
   
@@ -1324,7 +1497,6 @@ function Admin({ go }: { go: (page: Page) => void }) {
 
   const upcoming = [...requests].filter((r) => r.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
-  // Filter logic for submission tracker
   const semiRealisticRequests = requests
     .filter(r => r.type.startsWith("Semi-Realistic"))
     .sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
@@ -1410,7 +1582,6 @@ function Admin({ go }: { go: (page: Page) => void }) {
               <span>Saved automatically · {filteredRequests.length} of {requests.length} records</span>
             </div>
             
-            {/* Filter and Search Controls Bar */}
             <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr", gap: "10px", padding: "16px 0", borderBottom: "1px solid var(--line)", alignItems: "center" }}>
               <div style={{ display: "flex", gap: "6px" }}>
                 <input 
@@ -1504,9 +1675,12 @@ function Admin({ go }: { go: (page: Page) => void }) {
 
         {tab === "schedule" && <div className="admin-panel schedule-panel"><div className="panel-head"><div><p>CLIENT DUE DATES</p><h2>Schedule</h2></div><span>{upcoming.length} planned</span></div><div className="schedule-list">{upcoming.map((request) => <button key={request.id} onClick={() => setSelected(request)}><time><strong>{new Date(`${request.dueDate}T00:00`).toLocaleDateString("en-US", { day: "2-digit" })}</strong><span>{new Date(`${request.dueDate}T00:00`).toLocaleDateString("en-US", { month: "short" })}</span></time><div><h3>{request.name}</h3><p>{request.type} · {request.finish} · {request.characters} character{request.characters > 1 ? "s" : ""}</p></div><span className="admin-status">{stages[request.stage]}</span><Icon name="arrow" /></button>)}{upcoming.length === 0 && <p className="empty-row">Requested client due dates will appear automatically.</p>}</div></div>}
         {tab === "requests" && <div className="admin-panel"><div className="panel-head"><div><p>AUTOMATIC INBOX</p><h2>Client requests</h2></div><span>{requests.length} total</span></div><div className="request-list">{requests.map((request) => <button key={request.id} onClick={() => setSelected(request)}><span className="request-avatar">{request.name.slice(0, 2).toUpperCase()}</span><div><strong>{request.name}</strong><small>{request.type} · {request.finish} · submitted {new Date(request.submittedAt).toLocaleDateString()}</small></div><span>{request.dueDate}</span><Icon name="arrow" /></button>)}{requests.length === 0 && <p className="empty-row">Completed commission forms will be added here automatically.</p>}</div></div>}
+        
+        {/* Gallery, Products, and Discounts unified with PublishManager */}
         {tab === "artworks" && <PublishManager mode="gallery" />}
         {tab === "products" && <PublishManager mode="products" />}
-        {tab === "discounts" && <DiscountManager />}
+        {tab === "discounts" && <PublishManager mode="discounts" />}
+        
         {tab === "history" && <HistoryManager onRestore={(request) => setRequests((current) => [request, ...current.filter((item) => item.id !== request.id)])} />}
       </section>
       {selected && <RequestDetail request={selected} close={() => setSelected(null)} />}
@@ -1608,6 +1782,103 @@ function Footer({ go }: { go: (page: Page) => void }) {
   );
 }
 
+function ChalkDivider() {
+  const art = useMemo(() => {
+    let seed = 11;
+    const rnd = () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const line = (base: number, amp: number, step: number) => {
+      const points: string[] = [];
+      for (let x = -20; x <= 1460; x += step) points.push(`${x},${(base + (rnd() - 0.5) * amp * 2).toFixed(1)}`);
+      return points;
+    };
+    const open = (points: string[]) => `M${points.join(" L")}`;
+    const closed = (points: string[]) => `M-20,180 L${points.join(" L")} L1460,180 Z`;
+    return {
+      dust: closed(line(72, 14, 30)),
+      strokeA: open(line(58, 7, 22)),
+      strokeB: open(line(76, 6, 18)),
+      paper: closed(line(98, 5, 14)),
+      flecks: Array.from({ length: 46 }, () => ({ x: rnd() * 1440, y: 30 + rnd() * 76, r: 0.9 + rnd() * 2.2, gold: rnd() > 0.72 })),
+    };
+  }, []);
+  return (
+    <div className="chalk-divider" aria-hidden="true">
+      <svg viewBox="0 0 1440 170" preserveAspectRatio="none" focusable="false">
+        <path className="cd-dust" d={art.dust} filter="url(#chalk-rough-strong)" />
+        <g filter="url(#chalk-soft)">
+          <path className="cd-stroke cd-stroke-a" d={art.strokeA} />
+          <path className="cd-stroke cd-stroke-b" d={art.strokeB} />
+        </g>
+        <path className="cd-paper" d={art.paper} filter="url(#chalk-edge)" />
+        <g className="cd-flecks">
+          {art.flecks.map((fleck, index) => <ellipse key={index} className={fleck.gold ? "cd-fleck-gold" : undefined} cx={fleck.x.toFixed(1)} cy={fleck.y.toFixed(1)} rx={(fleck.r * 1.5).toFixed(1)} ry={fleck.r.toFixed(1)} />)}
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+function ChalkDefs() {
+  const calm = useMemo(() => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches, []);
+  const grain = "0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.9 0 0 0 -.32";
+  return (
+    <svg className="chalk-defs" width="0" height="0" aria-hidden="true" focusable="false">
+      <defs>
+        <filter id="chalk-rough" x="-4%" y="-4%" width="108%" height="108%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" seed="4" result="warp" />
+          <feDisplacementMap in="SourceGraphic" in2="warp" scale="3.5" xChannelSelector="R" yChannelSelector="G" result="bent" />
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="9" result="grain" />
+          <feColorMatrix in="grain" type="matrix" values={grain} result="speckle" />
+          <feComposite in="bent" in2="speckle" operator="in" />
+        </filter>
+        <filter id="chalk-rough-strong" x="-6%" y="-6%" width="112%" height="112%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" seed="21" result="warp" />
+          <feDisplacementMap in="SourceGraphic" in2="warp" scale="9" xChannelSelector="R" yChannelSelector="G" result="bent" />
+          <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="5" result="grain" />
+          <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.6 0 0 0 -.12" result="speckle" />
+          <feComposite in="bent" in2="speckle" operator="in" />
+        </filter>
+        <filter id="chalk-soft" x="-10%" y="-100%" width="120%" height="300%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2" seed="12" result="warp" />
+          <feDisplacementMap in="SourceGraphic" in2="warp" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="bent" />
+          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="grain" />
+          <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.4 0 0 0 -.05" result="speckle" />
+          <feComposite in="bent" in2="speckle" operator="in" />
+        </filter>
+        <filter id="chalk-edge" x="-2%" y="-10%" width="104%" height="120%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.03 0.08" numOctaves="3" seed="17" result="warp" />
+          <feDisplacementMap in="SourceGraphic" in2="warp" scale="7" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+        <filter id="chalk-edge-fine" x="-4%" y="-20%" width="108%" height="140%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.05 0.12" numOctaves="2" seed="23" result="warp" />
+          <feDisplacementMap in="SourceGraphic" in2="warp" scale="2.6" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+        <filter id="chalk-text" x="-2%" y="-10%" width="104%" height="120%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.07" numOctaves="2" seed="2" result="warp" />
+          <feDisplacementMap in="SourceGraphic" in2="warp" scale="1.4" xChannelSelector="R" yChannelSelector="G" result="bent" />
+          <feTurbulence type="fractalNoise" baseFrequency="0.9 0.55" numOctaves="3" seed="5" result="grain" />
+          <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -1.2 0 0 0 1.5" result="speckle" />
+          <feComposite in="bent" in2="speckle" operator="in" />
+        </filter>
+        <filter id="chalk-boil" x="-4%" y="-4%" width="108%" height="108%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" seed="4" result="warp">
+            {!calm && <animate attributeName="seed" values="4;11;7;19;2;14" dur="0.9s" calcMode="discrete" repeatCount="indefinite" />}
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" in2="warp" scale="4" xChannelSelector="R" yChannelSelector="G" result="bent" />
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="9" result="grain" />
+          <feColorMatrix in="grain" type="matrix" values={grain} result="speckle" />
+          <feComposite in="bent" in2="speckle" operator="in" />
+        </filter>
+      </defs>
+    </svg>
+  );
+}
+
 export default function App() {
   const getPage = (): Page => {
     const hash = window.location.hash.replace("#", "") as Page;
@@ -1635,11 +1906,17 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const elements = document.querySelectorAll("main > section, .featured-card, .medium-card, .gallery-card, .guide-sections article");
+    const elements = document.querySelectorAll("main > section, .featured-card, .medium-card, .gallery-card, .guide-sections article, .product-grid article, .form-section");
     elements.forEach((element) => element.classList.add("scroll-reveal"));
     const observer = new IntersectionObserver((entries) => entries.forEach((entry) => { if (entry.isIntersecting) { entry.target.classList.add("revealed"); observer.unobserve(entry.target); } }), { threshold: .08 });
     elements.forEach((element) => observer.observe(element));
     return () => observer.disconnect();
+  }, [page]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("snap-landing", page === "home");
+    return () => root.classList.remove("snap-landing");
   }, [page]);
 
   const go = (next: Page) => { window.location.hash = next; setPage(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
@@ -1652,7 +1929,15 @@ export default function App() {
     return content.admin;
   }
 
-  return <div className="site-shell"><Navbar page={page} go={go} />{content[page]}<Footer go={go} />{promo && loadStored<DiscountItem[]>("inkyuu_discounts", []).length > 0 && <PromoModal close={() => setPromo(false)} go={go} />}</div>;
+  return (
+    <div className={page === "home" ? "site-shell chalk-theme landing-snap" : "site-shell chalk-theme"}>
+      <ChalkDefs />
+      <Navbar page={page} go={go} />
+      {content[page]}
+      <Footer go={go} />
+      {promo && loadStored<DiscountItem[]>("inkyuu_discounts", []).length > 0 && <PromoModal close={() => setPromo(false)} go={go} />}
+    </div>
+  );
 }
 
 function go(arg0: string) {
