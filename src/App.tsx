@@ -14,8 +14,10 @@ type CommissionRequest = {
 };
 type PublishedItem = {
   id: number; title: string; description: string; image: string; category: string;
+  scope?: string; service?: string; colorFinish?: string;
   price?: number; publishedAt: string;
 };
+type GallerySelection = { category: "Chibi" | "Semi-Realistic"; facet: "Scope" | "Services" | "Color Finish"; value: string };
 type DiscountItem = {
   id: number; title: string; percentage: number; requirementType: string;
   description: string; startDate: string; endDate: string; bannerImage: string; code: string;
@@ -158,8 +160,18 @@ function PromoModal({ close, go }: { close: () => void; go: (page: Page) => void
   );
 }
 
-function Home({ go, openPromo }: { go: (page: Page) => void; openPromo: () => void }) {
+function Home({ go, openPromo }: { go: (page: Page, selection?: GallerySelection) => void; openPromo: () => void }) {
   const discounts = loadStored<DiscountItem[]>("inkyuu_discounts", []);
+  const requests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
+  const activeSemiRequests = requests.filter((request) => request.type.startsWith("Semi-Realistic"));
+  const activeCount = Math.min(3, activeSemiRequests.length);
+  const reservedCount = Math.max(0, Math.min(2, activeSemiRequests.length - 3));
+  const canvasCards: { icon: IconName; title: string; desc: string; selection: GallerySelection }[] = [
+    { icon: "brush", title: "Character art", desc: "Originals, fan art & portraits", selection: { category: "Semi-Realistic", facet: "Scope", value: "Headshot" } },
+    { icon: "pen", title: "Chibi cuties", desc: "Tiny style, big personality", selection: { category: "Chibi", facet: "Scope", value: "Headshot" } },
+    { icon: "spark", title: "Merch design", desc: "Stickers, cards & keepsakes", selection: { category: "Chibi", facet: "Services", value: "Sticker set" } },
+    { icon: "grid", title: "Visual stories", desc: "Covers, scenes & key art", selection: { category: "Semi-Realistic", facet: "Color Finish", value: "Rendered" } },
+  ];
   return (
     <>
       <main id="main-content" tabIndex={-1}>
@@ -216,11 +228,17 @@ function Home({ go, openPromo }: { go: (page: Page) => void; openPromo: () => vo
         <section className="section wrap">
           <div className="section-heading compact"><div><p className="kicker">Ways I make magic</p><h2>Pick your canvas</h2></div></div>
           <div className="medium-grid">
-            {[["brush", "Character art", "Originals, fan art & portraits"], ["pen", "Chibi cuties", "Tiny style, big personality"], ["spark", "Merch design", "Stickers, cards & keepsakes"], ["grid", "Visual stories", "Covers, scenes & key art"]].map(([icon, title, desc], i) => <button key={title} onClick={() => go("commission")} className="medium-card"><span>0{i + 1}</span><Icon name={icon as IconName} size={25} /><h3>{title}</h3><p>{desc}</p><b><Icon name="arrow" /></b></button>)}
+            {canvasCards.map(({ icon, title, desc, selection }, i) => <button key={title} onClick={() => go("gallery", selection)} className="medium-card"><span>0{i + 1}</span><Icon name={icon} size={25} /><h3>{title}</h3><p>{desc}</p><b><Icon name="arrow" /></b></button>)}
           </div>
           {discounts.length > 0 && (
             <div className="promo-banner"><div><span>SPECIAL OFFER</span><h2>{discounts[0].title}</h2><p>{discounts[0].description}</p></div><Btn kind="outline" onClick={openPromo}>Reveal my offer <Icon name="spark" /></Btn></div>
           )}
+        </section>
+        <section className="wrap guide-status home-guide-status" aria-label="Commission availability">
+          <div><span>Status</span><strong><i /> {activeCount >= 3 && reservedCount >= 2 ? "Fully Booked" : "Open"}</strong></div>
+          <div><span>Active slots</span><strong>{activeCount} / 3</strong></div>
+          <div><span>Reserved</span><strong>{reservedCount} / 2</strong></div>
+          <div><span>Contact hours</span><strong>10 AM–9 PM UTC+8</strong></div>
         </section>
         <section className="home-commission-cta"><div className="wrap"><p className="kicker">Three active slots only</p><h2>Ready to bring your idea to life?</h2><p>Tell me what you’re imagining and receive a personalized quote.</p><Btn onClick={() => go("commission")}>Commission now <Icon name="arrow" /></Btn></div></section>
       </main>
@@ -237,6 +255,9 @@ type GalleryItem =
       art: string;
       size: string;
       tags: string[];
+      scope?: string;
+      service?: string;
+      colorFinish?: string;
     }
   | {
       id: number;
@@ -247,25 +268,52 @@ type GalleryItem =
       size: string;
       tags: string[];
       publishedAt: string;
+      scope?: string;
+      service?: string;
+      colorFinish?: string;
     };
 
-function Gallery() {
-  const [filter, setFilter] = useState<"Chibi" | "Semi-Realistic">("Chibi");
+function Gallery({ selection }: { selection: GallerySelection | null }) {
+  const [filter, setFilter] = useState<"Chibi" | "Semi-Realistic">(selection?.category || "Chibi");
+  const [scopeValue, setScopeValue] = useState(selection?.facet === "Scope" ? selection.value : "");
+  const [contextValue, setContextValue] = useState(selection?.facet !== "Scope" ? selection?.value || "" : "");
   const published = loadStored<PublishedItem[]>("inkyuu_gallery", []);
+
+  useEffect(() => {
+    setFilter(selection?.category || "Chibi");
+    setScopeValue(selection?.facet === "Scope" ? selection.value : "");
+    setContextValue(selection?.facet && selection.facet !== "Scope" ? selection.value : "");
+  }, [selection?.category, selection?.facet, selection?.value]);
   
   const allItems: GalleryItem[] = published.map((item) => ({
     id: item.id,
     title: item.title,
-    type: item.category || "Chibi",
+    type: item.category?.startsWith("Semi-Realistic") ? "Semi-Realistic" : "Chibi",
     desc: item.description,
     image: item.image,
     size: "medium",
-    tags: ["published", item.category || "Chibi"],
+    tags: ["published", item.category || "Chibi", item.scope, item.service || item.category?.match(/\(([^)]+)\)/)?.[1], item.colorFinish].filter((tag): tag is string => Boolean(tag)),
     publishedAt: item.publishedAt,
+    scope: item.scope,
+    service: item.service || item.category?.match(/\(([^)]+)\)/)?.[1],
+    colorFinish: item.colorFinish,
   }));
 
   const [selected, setSelected] = useState<GalleryItem | null>(null);
-  const visible = allItems.filter((item) => item.type === filter);
+  const scopeOptions = filter === "Chibi"
+    ? ["Headshot", "Fullbody"]
+    : ["Headshot", "Bust-up", "Waist-up", "Thigh-up"];
+  const contextLabel = filter === "Chibi" ? "Service" : "Color Finish";
+  const contextOptions = filter === "Chibi"
+    ? ["Solo Deals", "Sticker set", "Acrylic Merch", "Badges/Pins/Pfp Design", "Character Reference sheet", "2D Model character sheet", "YCH", "Alternate outfits/expressions"]
+    : ["Rendered", "Plain", "Monochrome"];
+  const visible = allItems.filter((item) => {
+    if (item.type !== filter) return false;
+    if (scopeValue && item.scope !== scopeValue) return false;
+    if (!contextValue) return true;
+    const value = filter === "Chibi" ? item.service : item.colorFinish;
+    return value === contextValue;
+  });
   
   const visual = (item: GalleryItem) => {
     if ("image" in item && item.image) {
@@ -284,7 +332,7 @@ function Gallery() {
   return (
     <main id="main-content" tabIndex={-1} className="page-main">
       <section className="page-hero wrap">
-        <p className="kicker">Selected works · 2023—2025</p>
+        <p className="kicker">Selected works · 2025—2026</p>
         <h1>Gallery of <em>little worlds.</em></h1>
         <p>A collection of character-led illustrations, warm studies, and playful experiments.</p>
       </section>
@@ -293,11 +341,32 @@ function Gallery() {
         <div className="filter-toggle sliding-filter" role="group" aria-label="Filter artwork">
           <div className={`filter-slider-indicator ${filter === "Semi-Realistic" ? "slide-right" : ""}`} aria-hidden="true" />
           {(["Chibi", "Semi-Realistic"] as const).map((item) => (
-            <button key={item} type="button" className={`filter-btn ${filter === item ? "active" : ""}`} aria-pressed={filter === item} onClick={() => setFilter(item)}>
+              <button key={item} type="button" className={`filter-btn ${filter === item ? "active" : ""}`} aria-pressed={filter === item} onClick={() => { setFilter(item); setScopeValue(""); setContextValue(""); }}>
               {item}<span>{allItems.filter((art) => art.type === item).length}</span>
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="sub-filter-bar">
+        <strong className="sub-filter-label">Filter</strong>
+        <label className="sub-filter-select">
+          <span className="sr-only">Scope</span>
+          <select aria-label="Scope" value={scopeValue} onChange={(event) => setScopeValue(event.target.value)}>
+            <option value="">Scope</option>
+            {scopeOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+        </label>
+        <span className="sub-filter-divider" aria-hidden="true">|</span>
+        <label className="sub-filter-select">
+          <span className="sr-only">{contextLabel}</span>
+          <select aria-label={contextLabel} value={contextValue} onChange={(event) => setContextValue(event.target.value)}>
+            <option value="">{contextLabel}</option>
+            {contextOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+        </label>
+        <span className="sub-filter-divider" aria-hidden="true">|</span>
+        <button type="button" className="sub-filter-clear" onClick={() => { setScopeValue(""); setContextValue(""); }}>Clear filters</button>
       </div>
 
       <section className="wrap gallery-grid">
@@ -309,7 +378,7 @@ function Gallery() {
         ))}
         {visible.length === 0 && (
           <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "60px 0", color: "var(--muted)" }}>
-            <p>No {filter} artwork has been added yet.</p>
+            <p>No {[scopeValue, contextValue, filter].filter(Boolean).join(" ")} artwork has been added yet.</p>
           </div>
         )}
       </section>
@@ -339,7 +408,7 @@ function Gallery() {
 
 const Field = ({ label, hint, children }: { label: React.ReactNode; hint?: string; children: React.ReactNode }) => <label className="field"><span>{label}</span>{hint && <small>{hint}</small>}{children}</label>;
 
-function Commission() {
+function Commission({ go }: { go: (page: Page) => void }) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     name: "",
@@ -361,13 +430,13 @@ function Commission() {
     confirm1: false,
     confirm2: false,
     confirm3: false,
-    selectedDiscountId: "",
+    discountCode: "",
   });
   const [references, setReferences] = useState<string[]>([]);
   const discounts = loadStored<DiscountItem[]>("inkyuu_discounts", []);
 
   const setValue = (key: keyof typeof form, value: any) => {
-    if (key === "artStyle" && value === "Semi-Realistic") {
+    if (key === "artStyle" && value === "Semi-Realistic" && form.artStyle !== "Semi-Realistic") {
       const requests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
       const activeSemiCount = requests.filter(r => r.type.startsWith("Semi-Realistic")).length;
       
@@ -377,6 +446,18 @@ function Commission() {
       } else if (activeSemiCount >= 3) {
         alert("All active Semi-Realistic slots are currently taken. Your order will be placed in a reserved slot.");
       }
+    }
+    if (key === "artStyle") {
+      setForm((prev) => ({
+        ...prev,
+        artStyle: value,
+        baseOption: "",
+        chibiService: "",
+        ychTheme: "",
+        colorOption: "",
+        bgOption: "",
+      }));
+      return;
     }
     setForm((prev) => ({ ...prev, [key]: value }));
   };
@@ -466,22 +547,60 @@ function Commission() {
   const priorityFee = form.dueDate ? Math.round(subtotal * dueDateRate) : 0;
   const grossTotal = subtotal + commercialFee + priorityFee;
 
-  const selectedDiscount = discounts.find((d) => String(d.id) === String(form.selectedDiscountId));
-  let discountAmount = 0;
-  if (selectedDiscount) {
-    let isValid = true;
-    const req = selectedDiscount.requirementType;
-    if (req === "Chibi Only" && form.artStyle !== "Chibi") isValid = false;
-    if (req === "Semi-Realistic Only" && form.artStyle !== "Semi-Realistic") isValid = false;
-    if (req === "Commercial Use" && form.usageType !== "Commercial Use") isValid = false;
-    if (req === "Personal Use" && form.usageType !== "Personal Use") isValid = false;
-
-    if (isValid) {
-      discountAmount = Math.round(grossTotal * (selectedDiscount.percentage / 100));
-    }
-  }
+  const currentDate = new Date();
+  const today = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(currentDate.getDate()).padStart(2, "0")}`;
+  const activeDiscounts = discounts.filter((discount) =>
+    (!discount.startDate || discount.startDate <= today) &&
+    (!discount.endDate || discount.endDate >= today)
+  );
+  const selectedDiscount = activeDiscounts.find((discount) =>
+    discount.code.trim().toLocaleUpperCase() === form.discountCode.trim().toLocaleUpperCase()
+  );
+  const selectedDiscountIsEligible = Boolean(selectedDiscount && (
+    (selectedDiscount.requirementType !== "Chibi Only" || form.artStyle === "Chibi") &&
+    (selectedDiscount.requirementType !== "Semi-Realistic Only" || form.artStyle === "Semi-Realistic") &&
+    (selectedDiscount.requirementType !== "Commercial Use" || form.usageType === "Commercial Use") &&
+    (selectedDiscount.requirementType !== "Personal Use" || form.usageType === "Personal Use")
+  ));
+  const discountAmount = selectedDiscount && selectedDiscountIsEligible
+    ? Math.round(grossTotal * (selectedDiscount.percentage / 100))
+    : 0;
 
   const total = Math.max(0, grossTotal - discountAmount);
+  const estimateBreakdown = (
+    <>
+      <p><span>{form.artStyle ? `${form.artStyle} (${form.baseOption || "Select base"})` : "Base scope"}</span><b>{money(basePrice)}</b></p>
+      {form.artStyle === "Chibi" ? (
+        <p><span>Chibi finish</span><b>Rendered (Free)</b></p>
+      ) : (
+        <p><span>{form.colorOption || "Color finish"}</span><b>+{money(colorPrice)}</b></p>
+      )}
+      {form.chibiService && (
+        <p>
+          <span>
+            Service: {form.chibiService}
+            {form.chibiService === "Sticker set" ? ` (${form.stickerCount} stickers)` : ""}
+            {form.chibiService === "Alternate outfits/expressions" ? ` (${form.alternativesCount} options)` : ""}
+          </span>
+          <b>+{money(chibiServicePrice)}</b>
+        </p>
+      )}
+      <p><span>{form.bgOption || "Background"} background</span><b>+{money(bgPrice)}</b></p>
+      {form.characters > 0 && <p><span>{form.characters} character{form.characters > 1 ? "s" : ""}</span><b>+{money(charMultiplier)}</b></p>}
+      {(form.usageType === "Commercial Use" || form.dueDate) && (
+        <>
+          <p className="estimate-subheading"><span>Additional Fees</span></p>
+          {form.usageType === "Commercial Use" && <p><span>Commercial license</span><b>+{money(commercialFee)}</b></p>}
+          {form.dueDate && <p><span>Priority due date fee ({dueDateRate === 0.1 ? "10%" : "18%"})</span><b>+{money(priorityFee)}</b></p>}
+        </>
+      )}
+      {discountAmount > 0 && (
+        <p className="estimate-discount">
+          <span>Discount ({selectedDiscount?.title})</span><b>-{money(discountAmount)}</b>
+        </p>
+      )}
+    </>
+  );
 
   const uploadReferences = (files: FileList | null) => {
     if (!files) return;
@@ -501,11 +620,15 @@ function Commission() {
       alert("Please check all three confirmation boxes to proceed.");
       return;
     }
-    if (step === 2 && (!form.name || !form.email || !form.artStyle || !form.usageType)) {
-      alert("Please fill in your name, email, art style, and usage type.");
+    if (step === 2 && (!form.name || !form.email || !form.usageType)) {
+      alert("Please fill in your name, email, and usage type.");
       return;
     }
     if (step === 3) {
+      if (!form.artStyle) {
+        alert("Please select an Art Style.");
+        return;
+      }
       if (!form.baseOption || !form.bgOption) {
         alert("Please select your base scope and background style.");
         return;
@@ -564,7 +687,7 @@ function Commission() {
         <p>Step-by-step studio commission intake modeled after live Google Forms.</p>
       </section>
 
-      <div className="wrap commission-layout">
+      <div className={`wrap commission-layout ${step > 2 && step < 5 ? "has-estimate" : "without-estimate"}`}>
         <div className="commission-form">
           <div className="commission-progress">
             <div>
@@ -611,7 +734,7 @@ function Commission() {
           {step === 2 && (
             <div className="form-section form-section-accent">
               <div className="form-number">02</div>
-              <div><h2>General Information</h2><p>Provide your contact details and select your overall project parameters.</p></div>
+              <div><h2>General Information</h2><p>Provide your contact details and usage preferences.</p></div>
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <Field label={<>Name / Nickname <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
                   <input value={form.name} onChange={(e) => setValue("name", e.target.value)} placeholder="Your name" />
@@ -624,18 +747,6 @@ function Commission() {
                 <Field label="Planned due date (Optional)" hint="NOTE: Expected commissioned pieces will be labeled as PRIORITY. In PRIORITY, it will be prioritized over non-prioritized pieces, and will be charged an extra 18% of total price (or 10% if the due date is more than 14 days away).">
                   <input type="date" value={form.dueDate} onChange={(e) => setValue("dueDate", e.target.value)} />
                 </Field>
-                
-                <Field label={<>Art Style <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
-                  <select 
-                    value={form.artStyle} 
-                    onChange={(e) => setValue("artStyle", e.target.value)}
-                  >
-                    <option value="" disabled>-- Select Art Style --</option>
-                    <option value="Chibi">Chibi</option>
-                    <option value="Semi-Realistic">Semi-Realistic</option>
-                  </select>
-                </Field>
-
                 <Field label={<>Usage Type <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
                   <select value={form.usageType} onChange={(e) => setValue("usageType", e.target.value)}>
                     <option value="" disabled>-- Select Usage Type --</option>
@@ -650,9 +761,30 @@ function Commission() {
           {step === 3 && (
             <div className="form-section form-section-accent">
               <div className="form-number">03</div>
-              <div><h2>{form.artStyle || "Art"} Scope & Options</h2><p>Select your composition layout, service deals, and character limits.</p></div>
+              <div><h2>Art Style, Scope & Options</h2><p>Choose your art style, then select a composition and its matching options.</p></div>
               
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div className="field">
+                  <span>Art Style <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></span>
+                  <div className="art-style-grid">
+                    {[
+                      { name: "Chibi", art: "scout", description: "Cute, expressive character art" },
+                      { name: "Semi-Realistic", art: "sunset", description: "Detailed portraits and illustrations" },
+                    ].map(({ name, art, description }) => (
+                      <button
+                        key={name}
+                        type="button"
+                        className={`art-style-card ${form.artStyle === name ? "selected" : ""}`}
+                        aria-pressed={form.artStyle === name}
+                        onClick={() => setValue("artStyle", name)}
+                      >
+                        <ArtVisual art={art} label={`${name} example artwork`} />
+                        <span className="art-style-copy"><strong>{name}</strong><small>{description}</small></span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div>
                   <label className="field" style={{ marginBottom: "8px" }}><span>Base Scope <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></span></label>
                   <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -677,7 +809,7 @@ function Commission() {
                         </button>
                       ))
                     ) : (
-                      <p style={{ color: "var(--muted)", fontSize: "14px" }}>Please go back and select an Art Style first.</p>
+                      <p style={{ color: "var(--muted)", fontSize: "14px" }}>Choose an Art Style to see the available scopes and options.</p>
                     )}
                   </div>
                 </div>
@@ -810,34 +942,34 @@ function Commission() {
                 </p>
               </div>
               
-              <div style={{ margin: "20px 0", padding: "24px", background: "var(--cream)", border: "1px solid var(--gold)" }}>
-                <span className="kicker">Final Calculated Total</span>
-                <div style={{ fontSize: "42px", fontFamily: "DM Serif Display", color: "var(--ink)", margin: "8px 0" }}>{money(total)}</div>
-                {discountAmount > 0 && (
-                  <p style={{ fontSize: "14px", color: "var(--orange)", fontWeight: "bold" }}>
-                    Discount applied: -{money(discountAmount)} ({selectedDiscount?.title})
-                  </p>
-                )}
+              <div className="checkout-summary estimate-card">
+                <div className="estimate-top"><span>Order Summary · PHP</span><Icon name="spark" /></div>
+                <h2>{money(total)}</h2>
+                <div className="estimate-lines">{estimateBreakdown}</div>
+                <div className="estimate-total"><span>Estimated total</span><strong>{money(total)}</strong></div>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "20px" }}>
-                <Field label="Select Available Discount">
-                  <select value={form.selectedDiscountId} onChange={(e) => setValue("selectedDiscountId", e.target.value)}>
-                    <option value="">-- No Discount Selected --</option>
-                    {discounts.map((d) => {
-                      let isValid = true;
-                      if (d.requirementType === "Chibi Only" && form.artStyle !== "Chibi") isValid = false;
-                      if (d.requirementType === "Semi-Realistic Only" && form.artStyle !== "Semi-Realistic") isValid = false;
-                      if (d.requirementType === "Commercial Use" && form.usageType !== "Commercial Use") isValid = false;
-                      if (d.requirementType === "Personal Use" && form.usageType !== "Personal Use") isValid = false;
-                      return (
-                        <option key={d.id} value={d.id} disabled={!isValid}>
-                          {d.title} ({d.percentage}% off) {isValid ? "" : `[Requirement unmet: ${d.requirementType}]`}
-                        </option>
-                      );
-                    })}
-                  </select>
+                <Field label="Discount Code" hint={
+                  selectedDiscount && selectedDiscountIsEligible
+                    ? `${selectedDiscount.title} · ${selectedDiscount.percentage}% off`
+                    : selectedDiscount
+                      ? `This code requires ${selectedDiscount.requirementType}.`
+                      : "Type a discount code or choose a suggestion."
+                }>
+                  <input
+                    type="text"
+                    value={form.discountCode}
+                    onChange={(event) => setValue("discountCode", event.target.value)}
+                    list="active-discount-codes"
+                    autoComplete="off"
+                    placeholder="Enter discount code"
+                  />
+                  <datalist id="active-discount-codes">
+                    {activeDiscounts.map((discount) => <option key={discount.id} value={discount.code} label={`${discount.title} · ${discount.percentage}% off`} />)}
+                  </datalist>
                 </Field>
+                {form.discountCode && !selectedDiscount && <p className="discount-feedback">No active discount matches this code.</p>}
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "10px" }}>
                   <Btn type="button" kind="outline" onClick={() => setStep(2)}>Edit General Info</Btn>
@@ -845,6 +977,16 @@ function Commission() {
                 </div>
               </div>
             </div>
+          )}
+
+          {step > 2 && step < 5 && (
+            <aside className="estimate-card estimate-card-mobile">
+              <div className="estimate-top"><span>Live Estimate · PHP</span><Icon name="spark" /></div>
+              <h2>{money(total)}</h2>
+              <div className="estimate-lines">{estimateBreakdown}</div>
+              <div className="estimate-total"><span>Estimated total</span><strong>{money(total)}</strong></div>
+              <p className="fine-print">GCASH is the accepted payment platform. Final confirmation is sent after admin review.</p>
+            </aside>
           )}
 
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: "20px" }}>
@@ -872,49 +1014,13 @@ function Commission() {
           </div>
         </div>
 
-        <aside className="estimate-card">
+        {step > 2 && step < 5 && <aside className="estimate-card estimate-card-desktop">
           <div className="estimate-top"><span>Live Estimate · PHP</span><Icon name="spark" /></div>
           <h2>{money(total)}</h2>
-          <div className="estimate-lines">
-            <p><span>{form.artStyle ? `${form.artStyle} (${form.baseOption || "Select base"})` : "Base scope"}</span><b>{money(basePrice)}</b></p>
-            {form.artStyle === "Chibi" ? (
-              <p><span>Chibi finish</span><b>Rendered (Free)</b></p>
-            ) : (
-              <p><span>{form.colorOption || "Color finish"}</span><b>+{money(colorPrice)}</b></p>
-            )}
-            {form.chibiService && (
-              <p>
-                <span>
-                  Service: {form.chibiService}
-                  {form.chibiService === "Sticker set" ? ` (${form.stickerCount} stickers)` : ""}
-                  {form.chibiService === "Alternate outfits/expressions" ? ` (${form.alternativesCount} options)` : ""}
-                </span>
-                <b>+{money(chibiServicePrice)}</b>
-              </p>
-            )}
-            <p><span>{form.bgOption || "Background"} background</span><b>+{money(bgPrice)}</b></p>
-            {form.characters > 0 && <p><span>{form.characters} character{form.characters > 1 ? "s" : ""}</span><b>+{money(charMultiplier)}</b></p>}
-            
-            {(form.usageType === "Commercial Use" || form.dueDate) && (
-              <>
-                <p style={{ marginTop: "10px", color: "var(--gold)", fontWeight: "bold", borderTop: "1px dashed #595959", paddingTop: "8px" }}><span>Additional Fees</span></p>
-                {form.usageType === "Commercial Use" && (
-                  <p><span>Commercial license</span><b>+{money(commercialFee)}</b></p>
-                )}
-                {form.dueDate && (
-                  <p><span>Priority due date fee ({dueDateRate === 0.1 ? "10%" : "18%"})</span><b>+{money(priorityFee)}</b></p>
-                )}
-              </>
-            )}
-            {discountAmount > 0 && (
-              <p style={{ color: "var(--gold)", marginTop: "8px", borderTop: "1px dashed #595959", paddingTop: "8px" }}>
-                <span>Discount ({selectedDiscount?.title})</span><b>-{money(discountAmount)}</b>
-              </p>
-            )}
-          </div>
+          <div className="estimate-lines">{estimateBreakdown}</div>
           <div className="estimate-total"><span>Estimated total</span><strong>{money(total)}</strong></div>
           <p className="fine-print">GCASH is the accepted payment platform. Final confirmation is sent after admin review.</p>
-        </aside>
+        </aside>}
       </div>
     </main>
   );
@@ -926,14 +1032,7 @@ function Shop({ go }: { go: (page: Page) => void }) {
     <section className="page-hero wrap"><p className="kicker">The tiny shop</p><h1>Art made to <em>hold.</em></h1><p>Stickers, prints, and little pieces of joy from the Inkyuu studio.</p></section>{products.length > 0 ? <section className="wrap product-grid">{products.map((product) => <article key={product.id}><img src={product.image || placeholder} alt={product.title} /><div><span>{product.category}</span><h2>{product.title}</h2><p>{product.description}</p><strong>{money(product.price || 0)}</strong><small>Published {product.publishedAt}</small></div></article>)}</section> : <section className="empty-shop wrap"><div className="shop-art"><span className="shop-sun" /><img src={placeholder} alt="Artwork placeholder" /></div><div className="shop-copy"><h2>Shop is still unavailable</h2><p>I'm putting the finishing touches on a cheerful collection of stickers, posters, photocards, portraits, and sticker sets.</p><button className="text-link" onClick={() => go("gallery")}>Browse the gallery while you wait <Icon name="arrow" /></button></div></section>}</main>;
 }
 
-function Guide({ go }: { go: (page: Page) => void }) {
-  const requests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
-  const isSemiRealistic = (type: string) => type.startsWith("Semi-Realistic");
-  
-  const activeSemiRequests = requests.filter(r => isSemiRealistic(r.type));
-  const activeCount = Math.min(3, activeSemiRequests.length);
-  const reservedCount = Math.max(0, Math.min(2, activeSemiRequests.length - 3));
-
+function Guide() {
   const sections = [
     { number: "01", title: "Rules & regulations", intro: "Clear boundaries keep every project safe, respectful, and enjoyable.", items: [["Content", "No NSFW, nudity, suggestive content, heavy gore, controversial content, or depictions of bodily fluids."], ["Will draw", "Angst, fluff, original characters, fan art, stickers, and memes."], ["Won’t draw", "Canon ships, furries or animals, mecha, cars, or major changes to canon character designs."], ["Copyright", "The artist retains copyright. Public use requires clear credit; alteration, AI training, blockchain, and NFTs are prohibited."]] },
     { number: "02", title: "Workflow & payment", intro: "A milestone-based process with no upfront cost before the initial drafting phase.", items: [["Sketch first", "Work begins and develops through the approved sketch without upfront payment."], ["20% midpoint payment", "A mandatory 20% downpayment is requested once the final sketch is approved."], ["Final settlement", "The remaining balance is due within three calendar days after completion. Unwatermarked files are released after payment clears."], ["Priority projects", "A required deadline can be fast-tracked for an additional 10% of the total project price."]] },
@@ -942,22 +1041,10 @@ function Guide({ go }: { go: (page: Page) => void }) {
   ];
   return (
     <main id="main-content" tabIndex={-1} className="page-main guide-page">
-      <section className="guide-hero">
-        <div className="wrap">
-          <p className="kicker">Kyuu commission guide</p>
-          <h1>Good art starts with <em>clear expectations.</em></h1>
-          <p>Everything you need to know before booking a commission with Inkyuu.</p>
-          <div>
-            <Btn onClick={() => go("commission")}>Start a request <Icon name="arrow" /></Btn>
-            <a className="btn btn-outline" href={guidePdf} target="_blank" rel="noreferrer">Open original PDF</a>
-          </div>
-        </div>
-      </section>
-      <section className="wrap guide-status">
-        <div><span>Status</span><strong><i /> {activeCount >= 3 && reservedCount >= 2 ? "Fully Booked" : "Open"}</strong></div>
-        <div><span>Active slots</span><strong>{activeCount} / 3</strong></div>
-        <div><span>Reserved</span><strong>{reservedCount} / 2</strong></div>
-        <div><span>Contact hours</span><strong>10 AM–9 PM UTC+8</strong></div>
+      <section className="page-hero wrap">
+        <p className="kicker">Kyuu commission guide</p>
+        <h1>Good art starts with <em>clear expectations.</em></h1>
+        <p>Everything you need to know before booking a commission with Inkyuu.</p>
       </section>
       <section className="wrap guide-sections">
         {sections.map((section) => (
@@ -981,6 +1068,9 @@ function Guide({ go }: { go: (page: Page) => void }) {
           </article>
         ))}
       </section>
+      <div className="wrap guide-pdf-link">
+        <a className="btn btn-outline" href={guidePdf} target="_blank" rel="noreferrer">Open Original PDF</a>
+      </div>
     </main>
   );
 }
@@ -1029,6 +1119,8 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
     description: "", 
     category: mode === "gallery" ? "Chibi" : mode === "products" ? "Pins" : "Chibi Only", 
     subCategory: "Sticker set", 
+    scope: "Headshot",
+    colorFinish: "Rendered",
     price: "", 
     percentage: "", 
     requirementType: "Any", 
@@ -1069,13 +1161,18 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
         title: draft.title,
         description: draft.description,
         category: finalCategory,
+        ...(mode === "gallery" ? {
+          scope: draft.scope,
+          service: draft.category === "Chibi" ? draft.subCategory : undefined,
+          colorFinish: draft.category === "Semi-Realistic" ? draft.colorFinish : undefined,
+        } : {}),
         price: Number(draft.price || 0),
         image: draft.image || placeholder,
         publishedAt: new Date().toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })
       }, ...items]);
     }
 
-    setDraft({ title: "", description: "", category: mode === "gallery" ? "Chibi" : mode === "products" ? "Pins" : "Chibi Only", subCategory: "Sticker set", price: "", percentage: "", requirementType: "Any", startDate: "", endDate: "", code: "", image: "", bannerImage: "" }); 
+    setDraft({ title: "", description: "", category: mode === "gallery" ? "Chibi" : mode === "products" ? "Pins" : "Chibi Only", subCategory: "Sticker set", scope: "Headshot", colorFinish: "Rendered", price: "", percentage: "", requirementType: "Any", startDate: "", endDate: "", code: "", image: "", bannerImage: "" });
     setOpen(false);
   };
 
@@ -1132,7 +1229,7 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
               </Field>
 
               <Field label="Category">
-                <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>
+                <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value, scope: "Headshot" })}>
                   {mode === "gallery" && (
                     <>
                       <option value="Chibi">Chibi</option>
@@ -1158,9 +1255,18 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
                 </select>
               </Field>
 
-              {(draft.category === "Chibi" || draft.category === "Chibi Only") && (
+              {mode === "gallery" && (
+                <Field label="Scope">
+                  <select value={draft.scope} onChange={(e) => setDraft({ ...draft, scope: e.target.value })}>
+                    {(draft.category === "Chibi" ? ["Headshot", "Fullbody"] : ["Headshot", "Bust-up", "Waist-up", "Thigh-up"]).map((scope) => <option key={scope} value={scope}>{scope}</option>)}
+                  </select>
+                </Field>
+              )}
+
+              {(draft.category === "Chibi" || (mode !== "gallery" && draft.category === "Chibi Only")) && (
                 <Field label="Chibi Service / Type">
                   <select value={draft.subCategory} onChange={(e) => setDraft({ ...draft, subCategory: e.target.value })}>
+                    <option value="Solo Deals">Solo Deals</option>
                     <option value="Sticker set">Sticker set</option>
                     <option value="Acrylic Merch">Acrylic Merch</option>
                     <option value="Badges/Pins/Pfp Design">Badges/Pins/Pfp Design</option>
@@ -1168,6 +1274,16 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
                     <option value="2D Model character sheet">2D Model character sheet</option>
                     <option value="YCH">YCH (Your Character Here)</option>
                     <option value="Alternate outfits/expressions">Alternate outfits/expressions</option>
+                  </select>
+                </Field>
+              )}
+
+              {mode === "gallery" && draft.category === "Semi-Realistic" && (
+                <Field label="Color Finish">
+                  <select value={draft.colorFinish} onChange={(e) => setDraft({ ...draft, colorFinish: e.target.value })}>
+                    <option value="Rendered">Rendered</option>
+                    <option value="Plain">Plain Color</option>
+                    <option value="Monochrome">Monochrome</option>
                   </select>
                 </Field>
               )}
@@ -1846,8 +1962,18 @@ function ChalkDefs() {
 
 export default function App() {
   const getPage = (): Page => {
-    const hash = window.location.hash.replace("#", "") as Page;
+    const hash = window.location.hash.replace("#", "").split("?")[0] as Page;
     return ["home", "gallery", "shop", "guide", "about", "commission", "admin"].includes(hash) ? hash : "home";
+  };
+  const getGallerySelection = (): GallerySelection | null => {
+    const query = new URLSearchParams(window.location.hash.split("?")[1] || "");
+    const category = query.get("category");
+    const facet = query.get("facet");
+    const value = query.get("value");
+    if ((category !== "Chibi" && category !== "Semi-Realistic") || !value) return null;
+    const validFacets = category === "Chibi" ? ["Scope", "Services"] : ["Scope", "Color Finish"];
+    if (!facet || !validFacets.includes(facet)) return null;
+    return { category, facet: facet as GallerySelection["facet"], value };
   };
   const [page, setPage] = useState<Page>(getPage);
   const [promo, setPromo] = useState(false);
@@ -1884,13 +2010,14 @@ export default function App() {
     document.getElementById("main-content")?.focus({ preventScroll: true });
   }, [page]);
 
-  const go = (next: Page) => {
-    window.location.hash = next;
+  const go = (next: Page, selection?: GallerySelection) => {
+    const query = selection ? `?category=${encodeURIComponent(selection.category)}&facet=${encodeURIComponent(selection.facet)}&value=${encodeURIComponent(selection.value)}` : "";
+    window.location.hash = `${next}${next === "gallery" ? query : ""}`;
     setPage(next);
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
   };
-  const content = useMemo(() => ({ home: <Home go={go} openPromo={() => setPromo(true)} />, gallery: <Gallery />, shop: <Shop go={go} />, guide: <Guide go={go} />, about: <About go={go} />, commission: <Commission />, admin: <Admin go={go} /> }), []);
+  const content = { home: <Home go={go} openPromo={() => setPromo(true)} />, gallery: <Gallery selection={getGallerySelection()} />, shop: <Shop go={go} />, guide: <Guide />, about: <About go={go} />, commission: <Commission go={go} />, admin: <Admin go={go} /> };
   
   if (page === "admin") {
     if (!isAdminAuth) {
@@ -1908,8 +2035,4 @@ export default function App() {
       {promo && loadStored<DiscountItem[]>("inkyuu_discounts", []).length > 0 && <PromoModal close={() => setPromo(false)} go={go} />}
     </div>
   );
-}
-
-function go(arg0: string) {
-  throw new Error("Function not implemented.");
 }
