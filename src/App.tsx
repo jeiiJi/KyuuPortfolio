@@ -333,6 +333,7 @@ function Commission() {
     baseOption: "",
     chibiService: "",
     stickerCount: 4,
+    alternativesCount: 2,
     ychTheme: "",
     colorOption: "",
     bgOption: "",
@@ -362,7 +363,7 @@ function Commission() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  // Pricing calculations
+  // Base Scope pricing
   const basePrice = form.artStyle === "Chibi" 
     ? (form.baseOption === "Headshot" ? 170 
       : form.baseOption === "Fullbody" ? 200 : 0) 
@@ -373,16 +374,36 @@ function Commission() {
       : form.baseOption === "Thigh-up" ? 680 : 0)
     : 0;
 
-  const chibiServicePrice = form.artStyle === "Chibi" ? (
-    form.chibiService === "Sticker set" ? (form.stickerCount - 4) * 30
-    : form.chibiService === "Acrylic Merch" ? 50
-    : form.chibiService === "Badges/Pins/Pfp Design" ? 40
-    : form.chibiService === "Character Reference sheet" ? 150
-    : form.chibiService === "2D Model character sheet" ? 300
-    : form.chibiService === "YCH" ? 80
-    : form.chibiService === "Alternate outfits/expressions" ? 60
-    : 0
-  ) : 0;
+  // Updated Chibi Pricing formulas
+  const calculateChibiServicePrice = () => {
+    if (form.artStyle !== "Chibi" || !form.chibiService) return 0;
+
+    switch (form.chibiService) {
+      case "Solo Deals":
+        return basePrice;
+      case "Sticker set": {
+        // Base discount of 20 increases by 10 for each sticker above 4
+        const discount = 20 + (form.stickerCount - 4) * 10;
+        return (basePrice * form.stickerCount) - discount;
+      }
+      case "Acrylic Merch":
+        return basePrice + 50;
+      case "Badges/Pins/Pfp Design":
+        return basePrice + 30;
+      case "Character Reference sheet":
+        return (basePrice * 4) + 30;
+      case "2D Model character sheet":
+        return (basePrice * 5) + 300;
+      case "YCH":
+        return Math.max(0, basePrice - 10);
+      case "Alternate outfits/expressions":
+        return (basePrice * form.alternativesCount) + 30;
+      default:
+        return 0;
+    }
+  };
+
+  const chibiServicePrice = calculateChibiServicePrice();
 
   const colorPrice = form.artStyle === "Semi-Realistic" 
     ? (form.colorOption === "Rendered" ? 475 
@@ -399,7 +420,9 @@ function Commission() {
       : form.bgOption === "None/Transparent" ? 680 : 0)
     : 0;
   
-  const scopeAndOptionsTotal = basePrice + chibiServicePrice + colorPrice + bgPrice;
+  const scopeAndOptionsTotal = form.artStyle === "Chibi"
+    ? chibiServicePrice + bgPrice
+    : basePrice + colorPrice + bgPrice;
 
   const charMultiplier = form.characters > 1 
     ? (form.characters - 1) * (
@@ -502,7 +525,7 @@ function Commission() {
       commercial: form.usageType === "Commercial Use",
       priority: Boolean(form.dueDate),
       dueDate: form.dueDate,
-      notes: `Usage: ${form.usageType}\nService: ${form.chibiService || "N/A"}${form.ychTheme ? `\nYCH Theme: ${form.ychTheme}` : ""}\nBg Details: ${form.backgroundDetails}\nNotes: ${form.additionalDetails}\nDiscount Applied: ${selectedDiscount ? selectedDiscount.title : "None"}\nConfirmed all terms: Yes`,
+      notes: `Usage: ${form.usageType}\nService: ${form.chibiService || "N/A"}${form.chibiService === "Alternate outfits/expressions" ? ` (${form.alternativesCount} alternatives)` : ""}${form.ychTheme ? `\nYCH Theme: ${form.ychTheme}` : ""}\nBg Details: ${form.backgroundDetails}\nNotes: ${form.additionalDetails}\nDiscount Applied: ${selectedDiscount ? selectedDiscount.title : "None"}\nConfirmed all terms: Yes`,
       references,
       totalPhp: total,
       submittedAt: new Date().toISOString(),
@@ -677,6 +700,17 @@ function Commission() {
                       </Field>
                     )}
 
+                    {/* ALTERNATIVE OUTFITS/EXPRESSIONS STEPPER SELECTOR */}
+                    {form.chibiService === "Alternate outfits/expressions" && (
+                      <Field label={<>Number of Alternatives (2 to 6 options) <span style={{ color: "red" }}>*</span></>}>
+                        <div className="stepper" style={{ maxWidth: "160px" }}>
+                          <button type="button" onClick={() => setValue("alternativesCount", Math.max(2, form.alternativesCount - 1))}>−</button>
+                          <strong>{form.alternativesCount}</strong>
+                          <button type="button" onClick={() => setValue("alternativesCount", Math.min(6, form.alternativesCount + 1))}>+</button>
+                        </div>
+                      </Field>
+                    )}
+
                     {/* YCH THEME RADIO SELECTION */}
                     {form.chibiService === "YCH" && (
                       <div>
@@ -847,7 +881,14 @@ function Commission() {
               <p><span>{form.colorOption || "Color finish"}</span><b>+{money(colorPrice)}</b></p>
             )}
             {form.chibiService && (
-              <p><span>Service: {form.chibiService}{form.chibiService === "Sticker set" ? ` (${form.stickerCount})` : ""}</span><b>+{money(chibiServicePrice)}</b></p>
+              <p>
+                <span>
+                  Service: {form.chibiService}
+                  {form.chibiService === "Sticker set" ? ` (${form.stickerCount} stickers)` : ""}
+                  {form.chibiService === "Alternate outfits/expressions" ? ` (${form.alternativesCount} options)` : ""}
+                </span>
+                <b>+{money(chibiServicePrice)}</b>
+              </p>
             )}
             <p><span>{form.bgOption || "Background"} background</span><b>+{money(bgPrice)}</b></p>
             {form.characters > 0 && <p><span>{form.characters} character{form.characters > 1 ? "s" : ""}</span><b>+{money(charMultiplier)}</b></p>}
