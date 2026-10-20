@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import logo from "./assets/inkdrop-logo.png";
 import brandName from "./assets/brand-name.png";
 import placeholder from "./assets/placeholder.svg";
@@ -29,6 +29,7 @@ type IconName =
   | "grid"
   | "heart"
   | "instagram"
+  | "facebook"
   | "mail"
   | "menu"
   | "pen"
@@ -48,6 +49,7 @@ const Icon = ({ name, size = 18 }: { name: IconName; size?: number }) => {
     grid: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
     heart: <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z" />,
     instagram: <><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".5" fill="currentColor" /></>,
+    facebook: ( <><circle cx="12" cy="12" r="9" /><path d="M13.5 19v-6h2l.3-2.3h-2.3V9.2c0-.7.2-1.1 1.2-1.1H16V6.1c-.2 0-.9-.1-1.8-.1-1.8 0-3.1 1.1-3.1 3.2v1.5H9v2.3h2.1v6h2.4Z" fill="currentColor" stroke="none"/></>),
     mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>,
     menu: <path d="M4 7h16M4 12h16M4 17h16" />,
     pen: <><path d="m15 5 4 4L8 20H4v-4L15 5Z" /><path d="m13 7 4 4" /></>,
@@ -80,6 +82,12 @@ const money = (php: number) => `₱${php.toLocaleString()}`;
 
 function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
   const links: { label: string; page: Page }[] = [
     { label: "Home", page: "home" },
     { label: "Gallery", page: "gallery" },
@@ -93,11 +101,11 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
         <button className="brand" onClick={() => go("home")} aria-label="Inkyuu home">
           <img className="brand-symbol" src={logo} alt="" /><img className="brand-wordmark" src={brandName} alt="Inkyuu" />
         </button>
-        <nav className={open ? "nav-links open" : "nav-links"} aria-label="Main navigation">
-          {links.map((link) => <button key={link.page} className={page === link.page ? "active" : ""} onClick={() => { go(link.page); setOpen(false); }}>{link.label}</button>)}
+        <nav id="primary-nav" className={open ? "nav-links open" : "nav-links"} aria-label="Main navigation">
+          {links.map((link) => <button key={link.page} className={page === link.page ? "active" : ""} aria-current={page === link.page ? "page" : undefined} onClick={() => { go(link.page); setOpen(false); }}>{link.label}</button>)}
         </nav>
         <div className="nav-actions">
-          <button className="menu-button" aria-label="Toggle menu" onClick={() => setOpen(!open)}><Icon name={open ? "close" : "menu"} /></button>
+          <button type="button" className="menu-button" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} aria-controls="primary-nav" onClick={() => setOpen(!open)}><Icon name={open ? "close" : "menu"} /></button>
         </div>
       </div>
     </header>
@@ -118,10 +126,16 @@ function PromoModal({ close, go }: { close: () => void; go: (page: Page) => void
     bannerImage: ""
   };
 
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [close]);
+
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={close}>
       <div className="promo-modal" role="dialog" aria-modal="true" aria-labelledby="promo-title" onMouseDown={(e) => e.stopPropagation()}>
-        <button className="modal-close" onClick={close} aria-label="Close"><Icon name="close" /></button>
+        <button type="button" className="modal-close" onClick={close} aria-label="Close offer" autoFocus><Icon name="close" /></button>
         <div className="promo-layout">
           <div className="promo-art">
             {activeDiscount.bannerImage ? (
@@ -148,20 +162,19 @@ function Home({ go, openPromo }: { go: (page: Page) => void; openPromo: () => vo
   const discounts = loadStored<DiscountItem[]>("inkyuu_discounts", []);
   return (
     <>
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <section className="hero wrap">
-          {/* 1. Copy appears first */}
-          <div className="hero-copy" style={{ paddingBottom: "60px" }}>
+          {/* Copy appears first */}
+          <div className="hero-copy">
             <div className="eyebrow"><span className="eyebrow-line" /> Digital artist & illustrator</div>
             <h1>Small moments,<br /><em>boldly drawn.</em></h1>
             <p>I turn warm ideas, favorite characters, and little daydreams into expressive digital art.</p>
             <div className="hero-actions">
               <Btn onClick={() => go("gallery")}>Explore my work <Icon name="arrow" /></Btn>
-              <Btn kind="ghost" onClick={() => go("commission")}>Commission me</Btn>
             </div>
           </div>
 
-          {/* 2. Canvas/Artwork appears second, placing it below the text */}
+          {/* Canvas/Artwork appears as a clean background element with transparent asset blending */}
           <div className="hero-canvas">
             <div className="art-visual art-hero">
               <img src={heroArtwork} alt="Featured artwork" />
@@ -181,7 +194,7 @@ function Home({ go, openPromo }: { go: (page: Page) => void; openPromo: () => vo
               <a className="featured-card" key={item.id} href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer">
                 <div className="featured-number">0{index + 1}</div>
                 <ArtVisual art={item.art} label={item.title} />
-                <div className="card-copy"><span>{item.type}</span><h3>{item.title}</h3><p>{item.desc}</p><b>View social post <Icon name="arrow" size={16} /></b></div>
+                <div className="card-copy"><span>{item.type}</span><h3>{item.title}</h3><p>{item.desc}</p><b>View social post <Icon name="arrow" size={16} /><span className="sr-only"> (opens in a new tab)</span></b></div>
               </a>
             ))}
           </div>
@@ -240,7 +253,6 @@ function Gallery() {
   const [filter, setFilter] = useState<"Chibi" | "Semi-Realistic">("Chibi");
   const published = loadStored<PublishedItem[]>("inkyuu_gallery", []);
   
-  // Only published items appear in the gallery now (placeholders removed)
   const allItems: GalleryItem[] = published.map((item) => ({
     id: item.id,
     title: item.title,
@@ -262,20 +274,26 @@ function Gallery() {
     return <ArtVisual art="placeholder" label={item.title} />;
   };
 
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setSelected(null); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selected]);
+
   return (
-    <main className="page-main">
+    <main id="main-content" tabIndex={-1} className="page-main">
       <section className="page-hero wrap">
         <p className="kicker">Selected works · 2023—2025</p>
         <h1>Gallery of <em>little worlds.</em></h1>
         <p>A collection of character-led illustrations, warm studies, and playful experiments.</p>
       </section>
       
-      {/* Sliding Filter Toggle Bar */}
       <div className="filter-bar">
-        <div className="filter-toggle sliding-filter" aria-label="Filter artwork">
-          <div className={`filter-slider-indicator ${filter === "Semi-Realistic" ? "slide-right" : ""}`} />
+        <div className="filter-toggle sliding-filter" role="group" aria-label="Filter artwork">
+          <div className={`filter-slider-indicator ${filter === "Semi-Realistic" ? "slide-right" : ""}`} aria-hidden="true" />
           {(["Chibi", "Semi-Realistic"] as const).map((item) => (
-            <button key={item} className={`filter-btn ${filter === item ? "active" : ""}`} onClick={() => setFilter(item)}>
+            <button key={item} type="button" className={`filter-btn ${filter === item ? "active" : ""}`} aria-pressed={filter === item} onClick={() => setFilter(item)}>
               {item}<span>{allItems.filter((art) => art.type === item).length}</span>
             </button>
           ))}
@@ -298,12 +316,12 @@ function Gallery() {
 
       {selected && (
         <div className="modal-backdrop" onMouseDown={() => setSelected(null)}>
-          <div className="project-modal" role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setSelected(null)}><Icon name="close" /></button>
+          <div className="project-modal" role="dialog" aria-modal="true" aria-labelledby="project-title" onMouseDown={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close" aria-label="Close artwork details" autoFocus onClick={() => setSelected(null)}><Icon name="close" /></button>
             <div className="project-image">{visual(selected)}</div>
             <div className="project-copy">
               <p className="kicker">{selected.type} · Featured project</p>
-              <h2>{selected.title}</h2>
+              <h2 id="project-title">{selected.title}</h2>
               <p>{selected.desc}</p>
               <div className="tags">{selected.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
               <div className="project-meta">
@@ -363,7 +381,6 @@ function Commission() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  // Base Scope pricing
   const basePrice = form.artStyle === "Chibi" 
     ? (form.baseOption === "Headshot" ? 170 
       : form.baseOption === "Fullbody" ? 200 : 0) 
@@ -374,7 +391,6 @@ function Commission() {
       : form.baseOption === "Thigh-up" ? 680 : 0)
     : 0;
 
-  // Updated Chibi Pricing formulas
   const calculateChibiServicePrice = () => {
     if (form.artStyle !== "Chibi" || !form.chibiService) return 0;
 
@@ -382,7 +398,6 @@ function Commission() {
       case "Solo Deals":
         return basePrice;
       case "Sticker set": {
-        // Base discount of 20 increases by 10 for each sticker above 4
         const discount = 20 + (form.stickerCount - 4) * 10;
         return (basePrice * form.stickerCount) - discount;
       }
@@ -542,7 +557,7 @@ function Commission() {
   const maxChars = form.artStyle === "Chibi" ? 4 : form.artStyle === "Semi-Realistic" ? 2 : 4;
 
   return (
-    <main className="page-main commission-page">
+    <main id="main-content" tabIndex={-1} className="page-main commission-page">
       <section className="page-hero wrap">
         <p className="kicker">Commission Request Form</p>
         <h1>Let's make something <em>yours.</em></h1>
@@ -551,11 +566,9 @@ function Commission() {
 
       <div className="wrap commission-layout">
         <div className="commission-form">
-          
-          {/* Progress Indicator */}
           <div className="commission-progress">
             <div>
-              <span style={{ fontSize: "12px", fontWeight: "bold", color: "var(--orange)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Section {step} of 5</span>
+              <span className="commission-progress-step">Section {step} of 5</span>
               <h3 style={{ margin: "2px 0 0", fontFamily: "DM Serif Display", fontSize: "20px" }}>
                 {step === 1 && "Terms of Service Agreement & Confirmation"}
                 {step === 2 && "General Information"}
@@ -569,12 +582,11 @@ function Commission() {
             </div>
           </div>
 
-          {/* PAGE 1: Terms of Service Agreement & Confirmation */}
           {step === 1 && (
             <div className="form-section form-section-accent">
               <div className="form-number">01</div>
               <div>
-                <h2>Terms of Service Agreement & Confirmation <span style={{ color: "red" }}>*</span></h2>
+                <h2>Terms of Service Agreement & Confirmation <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></h2>
                 <p style={{ fontSize: "14px", color: "var(--muted)", lineHeight: "1.6", marginTop: "6px" }}>
                   Please review and check each box below to proceed with your application. By checking these requirements, you acknowledge that you have read the official Commission Guide and explicitly agree to follow these operational boundaries throughout our project.
                 </p>
@@ -582,30 +594,29 @@ function Commission() {
               <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "20px" }}>
                 <label className="check-row" style={{ margin: 0 }}>
                   <input type="checkbox" checked={form.confirm1} onChange={(e) => setValue("confirm1", e.target.checked)} />
-                  <span><strong>Guide Review <span style={{ color: "red" }}>*</span></strong><small>I confirm that I have accessed, read, and fully understood the rules and regulations provided in the official Commission Guide.</small></span>
+                  <span><strong>Guide Review <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></strong><small>I confirm that I have accessed, read, and fully understood the rules and regulations provided in the official Commission Guide.</small></span>
                 </label>
                 <label className="check-row" style={{ margin: 0 }}>
                   <input type="checkbox" checked={form.confirm2} onChange={(e) => setValue("confirm2", e.target.checked)} />
-                  <span><strong>Payment Terms <span style={{ color: "red" }}>*</span></strong><small>I explicitly accept the payment terms, including the 20% mid-project downpayment and the mandatory 3-day final payment window upon artwork completion.</small></span>
+                  <span><strong>Payment Terms <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></strong><small>I explicitly accept the payment terms, including the 20% mid-project downpayment and the mandatory 3-day final payment window upon artwork completion.</small></span>
                 </label>
                 <label className="check-row" style={{ margin: 0 }}>
                   <input type="checkbox" checked={form.confirm3} onChange={(e) => setValue("confirm3", e.target.checked)} />
-                  <span><strong>Operational Boundaries <span style={{ color: "red" }}>*</span></strong><small>I explicitly agree to follow all rules, regulations, and operational terms outlined within the guide for the duration of this project.</small></span>
+                  <span><strong>Operational Boundaries <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></strong><small>I explicitly agree to follow all rules, regulations, and operational terms outlined within the guide for the duration of this project.</small></span>
                 </label>
               </div>
             </div>
           )}
 
-          {/* PAGE 2: General Information */}
           {step === 2 && (
             <div className="form-section form-section-accent">
               <div className="form-number">02</div>
               <div><h2>General Information</h2><p>Provide your contact details and select your overall project parameters.</p></div>
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <Field label={<>Name / Nickname <span style={{ color: "red" }}>*</span></>}>
+                <Field label={<>Name / Nickname <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
                   <input value={form.name} onChange={(e) => setValue("name", e.target.value)} placeholder="Your name" />
                 </Field>
-                <Field label={<>Email address <span style={{ color: "red" }}>*</span></>}>
+                <Field label={<>Email address <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
                   <input type="email" value={form.email} onChange={(e) => setValue("email", e.target.value)} placeholder="you@example.com" />
                 </Field>
                 <Field label="Social media handle"><input value={form.social} onChange={(e) => setValue("social", e.target.value)} placeholder="@username" /></Field>
@@ -614,7 +625,7 @@ function Commission() {
                   <input type="date" value={form.dueDate} onChange={(e) => setValue("dueDate", e.target.value)} />
                 </Field>
                 
-                <Field label={<>Art Style <span style={{ color: "red" }}>*</span></>}>
+                <Field label={<>Art Style <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
                   <select 
                     value={form.artStyle} 
                     onChange={(e) => setValue("artStyle", e.target.value)}
@@ -625,7 +636,7 @@ function Commission() {
                   </select>
                 </Field>
 
-                <Field label={<>Usage Type <span style={{ color: "red" }}>*</span></>}>
+                <Field label={<>Usage Type <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
                   <select value={form.usageType} onChange={(e) => setValue("usageType", e.target.value)}>
                     <option value="" disabled>-- Select Usage Type --</option>
                     <option value="Personal Use">Personal Use</option>
@@ -636,7 +647,6 @@ function Commission() {
             </div>
           )}
 
-          {/* PAGE 3: Chibi & Semi-Realism options */}
           {step === 3 && (
             <div className="form-section form-section-accent">
               <div className="form-number">03</div>
@@ -644,14 +654,14 @@ function Commission() {
               
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <div>
-                  <label className="field" style={{ marginBottom: "8px" }}><span>Base Scope <span style={{ color: "red" }}>*</span></span></label>
+                  <label className="field" style={{ marginBottom: "8px" }}><span>Base Scope <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></span></label>
                   <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                     {form.artStyle === "Chibi" ? (
                       [
                         ["Headshot", 170], 
                         ["Fullbody", 200]
                       ].map(([name, price]) => (
-                        <button type="button" className={`choice-card ${form.baseOption === name ? "selected" : ""}`} onClick={() => setValue("baseOption", name)} key={name} style={{ width: "100%" }}>
+                        <button type="button" className={`choice-card ${form.baseOption === name ? "selected" : ""}`} aria-pressed={form.baseOption === name} onClick={() => setValue("baseOption", name)} key={name} style={{ width: "100%" }}>
                           <span className="radio" /><strong>{name}</strong><b>{money(Number(price))}</b><small>Chibi tier (Rendered by default)</small>
                         </button>
                       ))
@@ -662,7 +672,7 @@ function Commission() {
                         ["Waist-up", 520], 
                         ["Thigh-up", 680]
                       ].map(([name, price]) => (
-                        <button type="button" className={`choice-card ${form.baseOption === name ? "selected" : ""}`} onClick={() => setValue("baseOption", name)} key={name} style={{ width: "100%" }}>
+                        <button type="button" className={`choice-card ${form.baseOption === name ? "selected" : ""}`} aria-pressed={form.baseOption === name} onClick={() => setValue("baseOption", name)} key={name} style={{ width: "100%" }}>
                           <span className="radio" /><strong>{name}</strong><b>{money(Number(price))}</b><small>Semi-realism tier</small>
                         </button>
                       ))
@@ -672,10 +682,9 @@ function Commission() {
                   </div>
                 </div>
 
-                {/* CHIBI SPECIFIC SERVICE SELECTION */}
                 {form.artStyle === "Chibi" ? (
                   <>
-                    <Field label={<>Chibi Solo Deal / Service <span style={{ color: "red" }}>*</span></>}>
+                    <Field label={<>Chibi Solo Deal / Service <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
                       <select value={form.chibiService} onChange={(e) => setValue("chibiService", e.target.value)}>
                         <option value="" disabled>-- Select Chibi Service --</option>
                         <option value="Solo Deals">Solo Deals</option>
@@ -689,9 +698,8 @@ function Commission() {
                       </select>
                     </Field>
 
-                    {/* STICKER SET QUANTITY SELECTOR */}
                     {form.chibiService === "Sticker set" && (
-                      <Field label={<>Sticker Count (4 to 9 stickers) <span style={{ color: "red" }}>*</span></>}>
+                      <Field label={<>Sticker Count (4 to 9 stickers) <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
                         <div className="stepper" style={{ maxWidth: "160px" }}>
                           <button type="button" onClick={() => setValue("stickerCount", Math.max(4, form.stickerCount - 1))}>−</button>
                           <strong>{form.stickerCount}</strong>
@@ -700,9 +708,8 @@ function Commission() {
                       </Field>
                     )}
 
-                    {/* ALTERNATIVE OUTFITS/EXPRESSIONS STEPPER SELECTOR */}
                     {form.chibiService === "Alternate outfits/expressions" && (
-                      <Field label={<>Number of Alternatives (2 to 6 options) <span style={{ color: "red" }}>*</span></>}>
+                      <Field label={<>Number of Alternatives (2 to 6 options) <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
                         <div className="stepper" style={{ maxWidth: "160px" }}>
                           <button type="button" onClick={() => setValue("alternativesCount", Math.max(2, form.alternativesCount - 1))}>−</button>
                           <strong>{form.alternativesCount}</strong>
@@ -711,10 +718,9 @@ function Commission() {
                       </Field>
                     )}
 
-                    {/* YCH THEME RADIO SELECTION */}
                     {form.chibiService === "YCH" && (
                       <div>
-                        <label className="field" style={{ marginBottom: "8px" }}><span>Select YCH Theme <span style={{ color: "red" }}>*</span></span></label>
+                        <label className="field" style={{ marginBottom: "8px" }}><span>Select YCH Theme <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></span></label>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
                           {[
                             ["Cozy Tea Time", "tea"],
@@ -725,6 +731,7 @@ function Commission() {
                               type="button"
                               key={themeName}
                               className={`choice-card ${form.ychTheme === themeName ? "selected" : ""}`}
+                              aria-pressed={form.ychTheme === themeName}
                               onClick={() => setValue("ychTheme", themeName)}
                               style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "12px", textAlign: "center" }}
                             >
@@ -739,8 +746,7 @@ function Commission() {
                     )}
                   </>
                 ) : (
-                  /* SEMI-REALISTIC COLOR FINISH */
-                  <Field label={<>Color Finish <span style={{ color: "red" }}>*</span></>}>
+                  <Field label={<>Color Finish <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
                     <select value={form.colorOption} onChange={(e) => setValue("colorOption", e.target.value)}>
                       <option value="" disabled>-- Select Color Finish --</option>
                       <option value="Rendered">Rendered</option>
@@ -750,7 +756,7 @@ function Commission() {
                   </Field>
                 )}
 
-                <Field label={<>Background Style <span style={{ color: "red" }}>*</span></>}>
+                <Field label={<>Background Style <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
                   <select value={form.bgOption} onChange={(e) => setValue("bgOption", e.target.value)}>
                     <option value="" disabled>-- Select Background Style --</option>
                     <option value="None/Transparent">None / Transparent</option>
@@ -759,7 +765,7 @@ function Commission() {
                   </select>
                 </Field>
 
-                <Field label={<>Number of Characters (Max {maxChars}) <span style={{ color: "red" }}>*</span></>}>
+                <Field label={<>Number of Characters (Max {maxChars}) <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
                   <div className="stepper">
                     <button type="button" onClick={() => setValue("characters", Math.max(1, form.characters - 1))}>−</button>
                     <strong>{form.characters}</strong>
@@ -770,7 +776,6 @@ function Commission() {
             </div>
           )}
 
-          {/* PAGE 4: Project references and final notes */}
           {step === 4 && (
             <div className="form-section form-section-accent">
               <div className="form-number">04</div>
@@ -795,7 +800,6 @@ function Commission() {
             </div>
           )}
 
-          {/* PAGE 5: Review & Checkout (Discounts & Big Live Estimate) */}
           {step === 5 && (
             <div className="form-section form-section-accent">
               <div className="form-number">05</div>
@@ -843,7 +847,6 @@ function Commission() {
             </div>
           )}
 
-          {/* Navigation Controls */}
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: "20px" }}>
             {step > 1 ? (
               <Btn type="button" kind="outline" onClick={() => setStep((prev) => Math.max(1, prev - 1))}>Back</Btn>
@@ -869,7 +872,6 @@ function Commission() {
           </div>
         </div>
 
-        {/* Live Estimate Sidebar */}
         <aside className="estimate-card">
           <div className="estimate-top"><span>Live Estimate · PHP</span><Icon name="spark" /></div>
           <h2>{money(total)}</h2>
@@ -920,15 +922,12 @@ function Commission() {
 
 function Shop({ go }: { go: (page: Page) => void }) {
   const products = loadStored<PublishedItem[]>("inkyuu_products", []);
-  return <main className="page-main">
+  return <main id="main-content" tabIndex={-1} className="page-main">
     <section className="page-hero wrap"><p className="kicker">The tiny shop</p><h1>Art made to <em>hold.</em></h1><p>Stickers, prints, and little pieces of joy from the Inkyuu studio.</p></section>{products.length > 0 ? <section className="wrap product-grid">{products.map((product) => <article key={product.id}><img src={product.image || placeholder} alt={product.title} /><div><span>{product.category}</span><h2>{product.title}</h2><p>{product.description}</p><strong>{money(product.price || 0)}</strong><small>Published {product.publishedAt}</small></div></article>)}</section> : <section className="empty-shop wrap"><div className="shop-art"><span className="shop-sun" /><img src={placeholder} alt="Artwork placeholder" /></div><div className="shop-copy"><h2>Shop is still unavailable</h2><p>I'm putting the finishing touches on a cheerful collection of stickers, posters, photocards, portraits, and sticker sets.</p><button className="text-link" onClick={() => go("gallery")}>Browse the gallery while you wait <Icon name="arrow" /></button></div></section>}</main>;
 }
 
 function Guide({ go }: { go: (page: Page) => void }) {
   const requests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
-  const history = loadStored<CommissionRequestWithHistory[]>("inkyuu_history", []);
-
-  // Filter only Semi-Realistic requests that are active (not finished/cancelled or within 24h grace period)
   const isSemiRealistic = (type: string) => type.startsWith("Semi-Realistic");
   
   const activeSemiRequests = requests.filter(r => isSemiRealistic(r.type));
@@ -942,7 +941,7 @@ function Guide({ go }: { go: (page: Page) => void }) {
     { number: "04", title: "Cancellation", intro: "Refund eligibility changes as time and labor are invested.", items: [["Grace period", "Cancellation within seven days of booking is eligible for a full refund."], ["Mid-production", "After the grace period, cancellation ends production; 12% of the downpayment is refunded with the latest work-in-progress export."], ["Non-payment", "Missing the midpoint or final payment deadlines may terminate the project and forfeit the slot."], ["Force majeure", "For emergencies or technical delays, a revised timeline or cancellation option will be discussed."]] },
   ];
   return (
-    <main className="page-main guide-page">
+    <main id="main-content" tabIndex={-1} className="page-main guide-page">
       <section className="guide-hero">
         <div className="wrap">
           <p className="kicker">Kyuu commission guide</p>
@@ -982,29 +981,41 @@ function Guide({ go }: { go: (page: Page) => void }) {
           </article>
         ))}
       </section>
-      <section className="guide-contact">
-        <div className="wrap">
-          <div>
-            <p className="kicker">Questions?</p>
-            <h2>Let’s clear things up before we start.</h2>
-            <p>Reach the studio at kyuukyuuji@gmail.com or review the complete attached guide.</p>
-          </div>
-          <Btn onClick={() => go("commission")}>Commission now <Icon name="arrow" /></Btn>
-        </div>
-      </section>
     </main>
   );
 }
 
 function About({ go }: { go: (page: Page) => void }) {
   return (
-    <main className="page-main about-page">
+    <main id="main-content" tabIndex={-1} className="page-main about-page">
       <section className="about-hero wrap"><div><p className="kicker">The person behind the pixels</p><h1>Making art feel <em>personal.</em></h1><p>I'm Kyuu, an independent digital artist exploring softness, character, and playful visual storytelling.</p><Btn onClick={() => go("commission")}>Work with me <Icon name="arrow" /></Btn></div><div className="about-portrait"><ArtVisual art="artist" label="Artist portrait" /><div className="portrait-note">Based in the Philippines<br />Creating worldwide</div></div></section>
       <section className="wrap story-grid"><div><p className="kicker">My story</p><h2>From notebook margins to a studio of my own.</h2></div><div><p>What started as doodles between classes became a way to connect with people around the world. My work lives somewhere between gentle realism and joyful exaggeration.</p><p>I believe good art feels like recognition: a character that finally looks the way you imagined, or a gift that says what words could not.</p></div></section>
-      <section className="expertise-section"><div className="wrap"><p className="kicker">Core expertise</p><h2>What I bring to the canvas</h2><div className="expertise-grid">{["Character illustration", "Chibi design", "Portrait commissions", "Merchandise artwork", "Visual storytelling", "Color direction"].map((item, i) => <div key={item}><span>0{i + 1}</span><Icon name={i % 2 ? "spark" : "pen"} /><h3>{item}</h3></div>)}</div></div></section>
+      <section className="expertise-section"><div className="wrap"><p className="kicker">Core expertise</p><h2>What I bring to the canvas</h2><ul className="expertise-grid">{["Character illustration", "Chibi design", "Portrait commissions", "Merchandise artwork", "Visual storytelling", "Color direction"].map((item, i) => <li key={item}><span aria-hidden="true">0{i + 1}</span><Icon name={i % 2 ? "spark" : "pen"} /><h3>{item}</h3></li>)}</ul></div></section>
       <section className="wrap timeline-section"><div><p className="kicker">Along the way</p><h2>Milestones & art events</h2><p>A few memorable stops in an always-growing creative practice.</p></div><div className="timeline">{[["2021", "First 100 commissions", "Reached a joyful little milestone with clients across eight countries."], ["2022", "Komiket Manila", "Debuted an original sticker and mini-print collection."], ["2023", "Graphika Art Fair", "Joined a community showcase celebrating independent illustrators."], ["2025", "Inkyuu studio", "Opened a dedicated online home for art, commissions, and shop drops."]].map(([year, title, desc]) => <div key={year}><span>{year}</span><article><h3>{title}</h3><p>{desc}</p></article></div>)}</div></section>
       <section className="wrap collaborators"><p className="kicker">Featured collaborators</p><h2>Good things made together</h2><div>{["Cloud Nine Café", "Daydream Press", "Mori Studio", "Sunday Club"].map((name) => <span key={name}>{name}</span>)}</div></section>
-      <section className="contact-band"><div className="wrap"><div><p className="kicker">Say hello</p><h2>Have an idea? My inbox is open.</h2></div><div className="contact-links"><a href="mailto:kyuukyuuji@gmail.com"><Icon name="mail" /> kyuukyuuji@gmail.com</a><a href="https://instagram.com" target="_blank" rel="noreferrer"><Icon name="instagram" /> @inkyuu.art</a></div></div></section>
+      <section className="wrap official-contacts-section" style={{ paddingBottom: "100px" }}>
+        <div className="section-heading compact">
+          <div>
+            <p className="kicker">Official channels</p>
+            <h2>Official Contacts</h2>
+          </div>
+          <p>Connect with me directly through my verified studio social profiles.</p>
+        </div>
+        <div className="medium-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
+          <a href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer" className="medium-card">
+            <span>01</span>
+            <Icon name="instagram" size={25} />
+            <h3>Instagram</h3>
+            <p>@jeii_ji · Daily sketches, client updates, and finished artwork portfolios.</p>
+          </a>
+          <a href="https://www.facebook.com/christinejoy.morata02/" target="_blank" rel="noreferrer" className="medium-card">
+            <span>02</span>
+            <Icon name="facebook" size={25} />
+            <h3>Facebook</h3>
+            <p>Christine Joy Morata · Studio announcements, inquiries, and community posts.</p>
+          </a>
+        </div>
+      </section>
     </main>
   );
 }
@@ -1120,7 +1131,6 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
                 <textarea required rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Write a brief description..." />
               </Field>
 
-              {/* Category Dropdown */}
               <Field label="Category">
                 <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>
                   {mode === "gallery" && (
@@ -1148,7 +1158,6 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
                 </select>
               </Field>
 
-              {/* Conditional Sub-Dropdown: Appears when category is Chibi / Chibi Only */}
               {(draft.category === "Chibi" || draft.category === "Chibi Only") && (
                 <Field label="Chibi Service / Type">
                   <select value={draft.subCategory} onChange={(e) => setDraft({ ...draft, subCategory: e.target.value })}>
@@ -1185,68 +1194,6 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
               )}
 
               <Btn type="submit">Publish <Icon name="arrow" /></Btn>
-            </div>
-          </form>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DiscountManager() {
-  const storageKey = "inkyuu_discounts";
-  const [discounts, setDiscounts] = useState<DiscountItem[]>(() => loadStored(storageKey, []));
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState({ title: "", percentage: "", requirementType: "Any", description: "", startDate: "", endDate: "", code: "", bannerImage: "" });
-  const persist = (next: DiscountItem[]) => { setDiscounts(next); localStorage.setItem(storageKey, JSON.stringify(next)); };
-  const upload = (file?: File) => { if (!file) return; const reader = new FileReader(); reader.onload = () => setDraft({ ...draft, bannerImage: String(reader.result) }); reader.readAsDataURL(file); };
-  const publish = (e: React.FormEvent) => {
-    e.preventDefault();
-    persist([{ id: Date.now(), title: draft.title, percentage: Number(draft.percentage), requirementType: draft.requirementType, description: draft.description, startDate: draft.startDate, endDate: draft.endDate, code: draft.code || "PROMO", bannerImage: draft.bannerImage }, ...discounts]);
-    setDraft({ title: "", percentage: "", requirementType: "Any", description: "", startDate: "", endDate: "", code: "", bannerImage: "" }); setOpen(false);
-  };
-  return (
-    <div className="admin-panel media-manager">
-      <div className="panel-head">
-        <div><p>DISCOUNTS & PROMOS</p><h2>Discount Management</h2></div>
-        <button className="admin-plus" onClick={() => setOpen(true)}><Icon name="plus" /> Add Discount</button>
-      </div>
-      <div className="media-list">
-        {discounts.map((item) => (
-          <article key={item.id}>
-            <img src={item.bannerImage || placeholder} alt={item.title} />
-            <div>
-              <span>{item.percentage}% OFF · {item.requirementType}</span>
-              <h3>{item.title}</h3>
-              <p>{item.description}</p>
-              <small>{item.startDate} to {item.endDate} | Code: <strong>{item.code}</strong></small>
-            </div>
-            <button aria-label={`Delete ${item.title}`} onClick={() => persist(discounts.filter((x) => x.id !== item.id))}><Icon name="trash" /></button>
-          </article>
-        ))}
-        {discounts.length === 0 && <div className="empty-row">No discounts created yet. Use the plus button to add a discount.</div>}
-      </div>
-      {open && (
-        <div className="modal-backdrop" onMouseDown={() => setOpen(false)}>
-          <form className="publish-modal" onSubmit={publish} onMouseDown={(e) => e.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={() => setOpen(false)}><Icon name="close" /></button>
-            <div className="publish-preview">
-              <img src={draft.bannerImage || placeholder} alt="Banner preview" />
-              <label><Icon name="plus" /> Banner Placeholder<input type="file" accept="image/*" onChange={(e) => upload(e.target.files?.[0])} /></label>
-            </div>
-            <div className="publish-fields">
-              <p className="kicker">New Discount Offer</p>
-              <h2>Create a Discount</h2>
-              <Field label="Title"><input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Summer Promo" /></Field>
-              <Field label="Discount Percentage (%)"><input required type="number" min="1" max="100" value={draft.percentage} onChange={(e) => setDraft({ ...draft, percentage: e.target.value })} placeholder="15" /></Field>
-              <Field label="Discount Code"><input required value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} placeholder="SUMMER15" /></Field>
-              <Field label="Requirements (Type Validation)"><select value={draft.requirementType} onChange={(e) => setDraft({ ...draft, requirementType: e.target.value })}><option value="Any">Any Commission</option><option value="Chibi Only">Chibi Only</option><option value="Semi-Realistic Only">Semi-Realistic Only</option><option value="Commercial Use">Commercial Use Only</option><option value="Personal Use">Personal Use Only</option></select></Field>
-              <Field label="Description"><textarea required rows={2} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Enjoy 15% off..." /></Field>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                <Field label="Start Date"><input required type="date" value={draft.startDate} onChange={(e) => setDraft({ ...draft, startDate: e.target.value })} /></Field>
-                <Field label="End Date"><input required type="date" value={draft.endDate} onChange={(e) => setDraft({ ...draft, endDate: e.target.value })} /></Field>
-              </div>
-              <Btn type="submit">Save Discount <Icon name="arrow" /></Btn>
             </div>
           </form>
         </div>
@@ -1436,7 +1383,6 @@ function RequestDetail({ request, close }: { request: CommissionRequest; close: 
             style={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column", alignItems: "center" }} 
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {/* Top Bar with Controls and X Close Button */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: "12px", background: "rgba(255,255,255,0.1)", padding: "8px 16px", borderRadius: "8px" }}>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button type="button" onClick={handleZoomIn} style={{ background: "white", border: "none", padding: "6px 12px", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>Zoom +</button>
@@ -1453,7 +1399,6 @@ function RequestDetail({ request, close }: { request: CommissionRequest; close: 
               </button>
             </div>
 
-            {/* Largened Image Container */}
             <div style={{ overflow: "auto", maxWidth: "100%", maxHeight: "80vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
               <img 
                 src={zoomedImage} 
@@ -1717,7 +1662,6 @@ function Admin({ go }: { go: (page: Page) => void }) {
         {tab === "schedule" && <div className="admin-panel schedule-panel"><div className="panel-head"><div><p>CLIENT DUE DATES</p><h2>Schedule</h2></div><span>{upcoming.length} planned</span></div><div className="schedule-list">{upcoming.map((request) => <button key={request.id} onClick={() => setSelected(request)}><time><strong>{new Date(`${request.dueDate}T00:00`).toLocaleDateString("en-US", { day: "2-digit" })}</strong><span>{new Date(`${request.dueDate}T00:00`).toLocaleDateString("en-US", { month: "short" })}</span></time><div><h3>{request.name}</h3><p>{request.type} · {request.finish} · {request.characters} character{request.characters > 1 ? "s" : ""}</p></div><span className="admin-status">{stages[request.stage]}</span><Icon name="arrow" /></button>)}{upcoming.length === 0 && <p className="empty-row">Requested client due dates will appear automatically.</p>}</div></div>}
         {tab === "requests" && <div className="admin-panel"><div className="panel-head"><div><p>AUTOMATIC INBOX</p><h2>Client requests</h2></div><span>{requests.length} total</span></div><div className="request-list">{requests.map((request) => <button key={request.id} onClick={() => setSelected(request)}><span className="request-avatar">{request.name.slice(0, 2).toUpperCase()}</span><div><strong>{request.name}</strong><small>{request.type} · {request.finish} · submitted {new Date(request.submittedAt).toLocaleDateString()}</small></div><span>{request.dueDate}</span><Icon name="arrow" /></button>)}{requests.length === 0 && <p className="empty-row">Completed commission forms will be added here automatically.</p>}</div></div>}
         
-        {/* Gallery, Products, and Discounts unified with PublishManager */}
         {tab === "artworks" && <PublishManager mode="gallery" />}
         {tab === "products" && <PublishManager mode="products" />}
         {tab === "discounts" && <PublishManager mode="discounts" />}
@@ -1736,7 +1680,6 @@ function Login({ onLogin, go }: { onLogin: () => void; go: (page: Page) => void 
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Validating against username "admin" and password "kyuukyuuji@12_36729"
     if (username === "admin" && password === "kyuukyuuji@12_36729") {
       sessionStorage.setItem("inkyuu_admin_auth", "true");
       onLogin();
@@ -1785,10 +1728,6 @@ function Login({ onLogin, go }: { onLogin: () => void; go: (page: Page) => void 
 }
 
 function Footer({ go }: { go: (page: Page) => void }) {
-  const requests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
-  const activeSemiCount = requests.filter(r => r.type.startsWith("Semi-Realistic")).length;
-  const slotDisplayCount = Math.min(3, activeSemiCount);
-
   return (
     <footer>
       <div className="wrap footer-grid">
@@ -1799,20 +1738,15 @@ function Footer({ go }: { go: (page: Page) => void }) {
           </div>
           <p>Warm, character-led digital art<br />made in the Philippines.</p>
         </div>
-        <div>
+        <nav className="footer-col" aria-label="Explore">
           <h3>Explore</h3>
-          {[["Gallery", "gallery"], ["Commission", "commission"], ["Guide", "guide"], ["Shop", "shop"], ["About", "about"]].map(([label, page]) => <button key={label} onClick={() => go(page as Page)}>{label}</button>)}
-        </div>
-        <div>
+          {[["Gallery", "gallery"], ["Commission", "commission"], ["Guide", "guide"], ["Shop", "shop"], ["About", "about"]].map(([label, page]) => <button type="button" key={label} onClick={() => go(page as Page)}>{label}</button>)}
+        </nav>
+        <div className="footer-col">
           <h3>Say hello</h3>
           <a href="mailto:kyuukyuuji@gmail.com">kyuukyuuji@gmail.com</a>
-          <a href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer">Instagram</a>
-          <a href="https://www.facebook.com/christinejoy.morata02/" target="_blank" rel="noreferrer">Facebook</a>
-        </div>
-        <div className="footer-note">
-          <p>Currently accepting</p>
-          <strong><i /> {slotDisplayCount} / 3 commission slots</strong>
-          <Btn kind="outline" onClick={() => go("commission")}>Request a slot</Btn>
+          <a href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer">Instagram<span className="sr-only"> (opens in a new tab)</span></a>
+          <a href="https://www.facebook.com/christinejoy.morata02/" target="_blank" rel="noreferrer">Facebook<span className="sr-only"> (opens in a new tab)</span></a>
         </div>
       </div>
       <div className="wrap footer-bottom">
@@ -1865,7 +1799,6 @@ function ChalkDivider() {
 }
 
 function ChalkDefs() {
-  const calm = useMemo(() => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches, []);
   const grain = "0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.9 0 0 0 -.32";
   return (
     <svg className="chalk-defs" width="0" height="0" aria-hidden="true" focusable="false">
@@ -1904,15 +1837,6 @@ function ChalkDefs() {
           <feDisplacementMap in="SourceGraphic" in2="warp" scale="1.4" xChannelSelector="R" yChannelSelector="G" result="bent" />
           <feTurbulence type="fractalNoise" baseFrequency="0.9 0.55" numOctaves="3" seed="5" result="grain" />
           <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -1.2 0 0 0 1.5" result="speckle" />
-          <feComposite in="bent" in2="speckle" operator="in" />
-        </filter>
-        <filter id="chalk-boil" x="-4%" y="-4%" width="108%" height="108%" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" seed="4" result="warp">
-            {!calm && <animate attributeName="seed" values="4;11;7;19;2;14" dur="0.9s" calcMode="discrete" repeatCount="indefinite" />}
-          </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" in2="warp" scale="4" xChannelSelector="R" yChannelSelector="G" result="bent" />
-          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="9" result="grain" />
-          <feColorMatrix in="grain" type="matrix" values={grain} result="speckle" />
           <feComposite in="bent" in2="speckle" operator="in" />
         </filter>
       </defs>
@@ -1954,13 +1878,18 @@ export default function App() {
     return () => observer.disconnect();
   }, [page]);
 
+  const firstRender = useRef(true);
   useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle("snap-landing", page === "home");
-    return () => root.classList.remove("snap-landing");
+    if (firstRender.current) { firstRender.current = false; return; }
+    document.getElementById("main-content")?.focus({ preventScroll: true });
   }, [page]);
 
-  const go = (next: Page) => { window.location.hash = next; setPage(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const go = (next: Page) => {
+    window.location.hash = next;
+    setPage(next);
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
+  };
   const content = useMemo(() => ({ home: <Home go={go} openPromo={() => setPromo(true)} />, gallery: <Gallery />, shop: <Shop go={go} />, guide: <Guide go={go} />, about: <About go={go} />, commission: <Commission />, admin: <Admin go={go} /> }), []);
   
   if (page === "admin") {
@@ -1971,7 +1900,7 @@ export default function App() {
   }
 
   return (
-    <div className={page === "home" ? "site-shell chalk-theme landing-snap" : "site-shell chalk-theme"}>
+    <div className="site-shell chalk-theme">
       <ChalkDefs />
       <Navbar page={page} go={go} />
       {content[page]}
