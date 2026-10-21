@@ -4,12 +4,15 @@ import brandName from "./assets/brand-name.png";
 import placeholder from "./assets/placeholder.svg";
 import heroArtwork from "./assets/Untitled200_20261016201217.png";
 
+const API_URL = "https://kyuu.my-eportfolio.workers.dev";
+
 type Page = "home" | "gallery" | "shop" | "guide" | "about" | "commission" | "admin";
 type CommissionRequest = {
   id: number; name: string; email: string; social: string; type: string; finish: string;
   characters: number; background: string; commercial: boolean; priority: boolean;
   dueDate: string; notes: string; references: string[]; totalPhp: number;
   submittedAt: string; stage: number; discountCode?: string; discountName?: string; discountAmount?: number;
+  historyType?: "Finished" | "Cancelled"; submittedToHistoryAt?: string;
 };
 type PublishedItem = {
   id: number; title: string; description: string; image: string; category: string;
@@ -20,6 +23,11 @@ type GallerySelection = { category: "Chibi" | "Semi-Realistic"; facet: "Scope" |
 type DiscountItem = {
   id: number; title: string; percentage: number; requirementType: string;
   description: string; startDate: string; endDate: string; bannerImage: string; code: string;
+};
+type AdminLibraryItem = {
+  id: number; title: string; description: string; image?: string; bannerImage?: string;
+  category?: string; requirementType?: string; percentage?: number;
+  publishedAt?: string; price?: number; code?: string; startDate?: string; endDate?: string;
 };
 type IconName =
   | "arrow"
@@ -76,9 +84,57 @@ const Btn = ({ children, kind = "primary", onClick, type = "button", className =
   <button type={type} className={`btn btn-${kind} ${className}`} onClick={onClick} style={style}><span className="btn-label">{children}</span></button>
 );
 
-const loadStored = <T,>(key: string, fallback: T): T => {
-  try { return JSON.parse(localStorage.getItem(key) || "") as T; } catch { return fallback; }
+const apiRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
+  const response = await fetch(`${API_URL}${path}`, init);
+  const text = await response.text();
+  let data: unknown;
+
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error(response.ok ? "The server returned an invalid response." : text || `Request failed (${response.status}).`);
+  }
+
+  if (!response.ok) {
+    const serverError = data && typeof data === "object" && "error" in data && typeof data.error === "string"
+      ? data.error
+      : `Request failed (${response.status}).`;
+    throw new Error(serverError);
+  }
+
+  return data as T;
 };
+function useApiData<T>(path: string) {
+  const [items, setItems] = useState<T[]>([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    apiRequest<T[]>(path)
+      .then((data) => {
+        if (!Array.isArray(data)) throw new Error(`The server returned invalid data for ${path}.`);
+        if (active) {
+          setItems(data);
+          setError("");
+        }
+      })
+      .catch((loadError) => {
+        if (!active) return;
+        const message = loadError instanceof Error ? loadError.message : String(loadError);
+        setError(message);
+        console.error(`Failed to load ${path} from D1:`, loadError);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [path]);
+
+  return { items, error, loading };
+}
 const money = (php: number) => `₱${php.toLocaleString()}`;
 
 function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
@@ -118,7 +174,7 @@ function ArtVisual({ art, label }: { art: string; label: string }) {
 }
 
 function PromoModal({ close, go }: { close: () => void; go: (page: Page) => void }) {
-  const discounts = loadStored<DiscountItem[]>("inkyuu_discounts", []);
+  const { items: discounts, error } = useApiData<DiscountItem>("/api/discounts");
   const activeDiscount = discounts[0] || {
     title: "Your idea deserves to be drawn.",
     percentage: 15,
@@ -149,6 +205,7 @@ function PromoModal({ close, go }: { close: () => void; go: (page: Page) => void
             <div className="eyebrow"><Icon name="spark" size={15} /> Special Offer</div>
             <h2 id="promo-title">{activeDiscount.title}</h2>
             <p>{activeDiscount.description}</p>
+            {error && <p role="alert">Offer details could not be loaded from the server: {error}</p>}
             <div className="promo-code"><span>Discount Code</span><strong>{activeDiscount.code || "PROMO"}</strong></div>
             <Btn onClick={() => { close(); go("commission"); }}>Start a commission <Icon name="arrow" /></Btn>
             <button className="text-link" onClick={close}>Maybe later</button>
@@ -160,9 +217,9 @@ function PromoModal({ close, go }: { close: () => void; go: (page: Page) => void
 }
 
 function Home({ go, openPromo }: { go: (page: Page, selection?: GallerySelection) => void; openPromo: () => void }) {
-  const discounts = loadStored<DiscountItem[]>("inkyuu_discounts", []);
-  const requests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
-  const activeSemiRequests = requests.filter((request) => request.type.startsWith("Semi-Realistic"));
+  const { items: discounts, error: discountError } = useApiData<DiscountItem>("/api/discounts");
+  const { items: requests, error: requestError } = useApiData<CommissionRequest>("/api/commissions");
+  const activeSemiRequests = requests.filter((request) => !request.historyType && request.type.startsWith("Semi-Realistic"));
   const activeCount = Math.min(3, activeSemiRequests.length);
   const reservedCount = Math.max(0, Math.min(2, activeSemiRequests.length - 3));
   const canvasCards: { icon: IconName; title: string; desc: string; selection: GallerySelection }[] = [
@@ -232,6 +289,7 @@ function Home({ go, openPromo }: { go: (page: Page, selection?: GallerySelection
           {discounts.length > 0 && (
             <div className="promo-banner"><div><span>SPECIAL OFFER</span><h2>{discounts[0].title}</h2><p>{discounts[0].description}</p></div><Btn kind="outline" onClick={openPromo}>Reveal my offer <Icon name="spark" /></Btn></div>
           )}
+          {(discountError || requestError) && <p role="alert">Live offer or availability data could not be loaded: {discountError || requestError}</p>}
         </section>
         <section className="wrap guide-status home-guide-status" aria-label="Commission availability">
           <div><span>Status</span><strong><i /> {activeCount >= 3 && reservedCount >= 2 ? "Fully Booked" : "Open"}</strong></div>
@@ -276,7 +334,7 @@ function Gallery({ selection }: { selection: GallerySelection | null }) {
   const [filter, setFilter] = useState<"Chibi" | "Semi-Realistic">(selection?.category || "Chibi");
   const [scopeValue, setScopeValue] = useState(selection?.facet === "Scope" ? selection.value : "");
   const [contextValue, setContextValue] = useState(selection?.facet !== "Scope" ? selection?.value || "" : "");
-  const published = loadStored<PublishedItem[]>("inkyuu_gallery", []);
+  const { items: published, error: galleryError } = useApiData<PublishedItem>("/api/gallery");
 
   useEffect(() => {
     setFilter(selection?.category || "Chibi");
@@ -367,6 +425,7 @@ function Gallery({ selection }: { selection: GallerySelection | null }) {
       </div>
 
       <section className="wrap gallery-grid">
+        {galleryError && <p role="alert" style={{ gridColumn: "1 / -1" }}>Gallery data could not be loaded from the server: {galleryError}</p>}
         {visible.map((item) => (
           <button className={`gallery-card gallery-image-only ${item.size}`} key={item.id} onClick={() => setSelected(item)} aria-label={`View ${item.title} details`}>
             {visual(item)}
@@ -430,12 +489,16 @@ function Commission({ go }: { go: (page: Page) => void }) {
     discountCode: "",
   });
   const [references, setReferences] = useState<string[]>([]);
-  const discounts = loadStored<DiscountItem[]>("inkyuu_discounts", []);
+  const { items: discounts, error: discountError } = useApiData<DiscountItem>("/api/discounts");
+  const { items: requests, error: requestError, loading: requestsLoading } = useApiData<CommissionRequest>("/api/commissions");
 
   const setValue = (key: keyof typeof form, value: any) => {
     if (key === "artStyle" && value === "Semi-Realistic" && form.artStyle !== "Semi-Realistic") {
-      const requests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
-      const activeSemiCount = requests.filter(r => r.type.startsWith("Semi-Realistic")).length;
+      if (requestsLoading) {
+        alert("Commission availability is still loading. Please try again in a moment.");
+        return;
+      }
+      const activeSemiCount = requests.filter(r => !r.historyType && r.type.startsWith("Semi-Realistic")).length;
       
       if (activeSemiCount >= 5) {
         alert("Semi-Realistic commissions are currently unavailable as all active and reservation slots are fully occupied.");
@@ -646,8 +709,7 @@ function Commission({ go }: { go: (page: Page) => void }) {
     setStep((prev) => Math.min(5, prev + 1));
   };
 
-  const handleFinalSubmit = () => {
-    const requests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
+  const handleFinalSubmit = async () => {
     const request: CommissionRequest = {
       id: Date.now(),
       name: form.name,
@@ -669,9 +731,20 @@ function Commission({ go }: { go: (page: Page) => void }) {
       discountName: selectedDiscount?.title,
       discountAmount,
     };
-    localStorage.setItem("inkyuu_requests", JSON.stringify([request, ...requests]));
-    alert("Your commission request was successfully submitted!");
-    go("home");
+
+    try {
+      await apiRequest<{ success: boolean }>("/api/commissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request)
+      });
+
+      alert("Your commission request was successfully submitted to the database!");
+      go("home");
+    } catch (error) {
+      console.error("Submission Error Details:", error);
+      alert(`Failed to save request: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   const maxChars = form.artStyle === "Chibi" ? 4 : form.artStyle === "Semi-Realistic" ? 2 : 4;
@@ -683,6 +756,7 @@ function Commission({ go }: { go: (page: Page) => void }) {
         <h1>Let's make something <em>yours.</em></h1>
         <p>Step-by-step studio commission intake modeled after live Google Forms.</p>
       </section>
+      {(discountError || requestError) && <p className="wrap" role="alert">Live commission data could not be loaded: {discountError || requestError}</p>}
 
       <div className={`wrap commission-layout ${step > 2 && step < 5 ? "has-estimate" : "without-estimate"}`}>
         <div className="commission-form">
@@ -1024,9 +1098,9 @@ function Commission({ go }: { go: (page: Page) => void }) {
 }
 
 function Shop({ go }: { go: (page: Page) => void }) {
-  const products = loadStored<PublishedItem[]>("inkyuu_products", []);
+  const { items: products, error } = useApiData<PublishedItem>("/api/products");
   return <main id="main-content" tabIndex={-1} className="page-main">
-    <section className="page-hero wrap"><p className="kicker">The tiny shop</p><h1>Art made to <em>hold.</em></h1><p>Stickers, prints, and little pieces of joy from the Inkyuu studio.</p></section>{products.length > 0 ? <section className="wrap product-grid">{products.map((product) => <article key={product.id}><img src={product.image || placeholder} alt={product.title} /><div><span>{product.category}</span><h2>{product.title}</h2><p>{product.description}</p><strong>{money(product.price || 0)}</strong><small>Published {product.publishedAt}</small></div></article>)}</section> : <section className="empty-shop wrap"><div className="shop-art"><span className="shop-sun" /><img src={placeholder} alt="Artwork placeholder" /></div><div className="shop-copy"><h2>Shop is still unavailable</h2><p>I'm putting the finishing touches on a cheerful collection of stickers, posters, photocards, portraits, and sticker sets.</p><button className="text-link" onClick={() => go("gallery")}>Browse the gallery while you wait <Icon name="arrow" /></button></div></section>}</main>;
+    <section className="page-hero wrap"><p className="kicker">The tiny shop</p><h1>Art made to <em>hold.</em></h1><p>Stickers, prints, and little pieces of joy from the Inkyuu studio.</p></section>{error && <p className="wrap" role="alert">Shop data could not be loaded from the server: {error}</p>}{products.length > 0 ? <section className="wrap product-grid">{products.map((product) => <article key={product.id}><img src={product.image || placeholder} alt={product.title} /><div><span>{product.category}</span><h2>{product.title}</h2><p>{product.description}</p><strong>{money(product.price || 0)}</strong><small>Published {product.publishedAt}</small></div></article>)}</section> : !error && <section className="empty-shop wrap"><div className="shop-art"><span className="shop-sun" /><img src={placeholder} alt="Artwork placeholder" /></div><div className="shop-copy"><h2>Shop is still unavailable</h2><p>I'm putting the finishing touches on a cheerful collection of stickers, posters, photocards, portraits, and sticker sets.</p><button className="text-link" onClick={() => go("gallery")}>Browse the gallery while you wait <Icon name="arrow" /></button></div></section>}</main>;
 }
 
 function Guide() {
@@ -1187,8 +1261,9 @@ function About({ go }: { go: (page: Page) => void }) {
 }
 
 function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }) {
-  const storageKey = mode === "gallery" ? "inkyuu_gallery" : mode === "products" ? "inkyuu_products" : "inkyuu_discounts";
-  const [items, setItems] = useState<any[]>(() => loadStored(storageKey, []));
+  const [items, setItems] = useState<AdminLibraryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState({ 
     title: "", 
@@ -1207,7 +1282,26 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
     bannerImage: "" 
   });
 
-  const persist = (next: any[]) => { setItems(next); localStorage.setItem(storageKey, JSON.stringify(next)); };
+  const loadItems = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await apiRequest<AdminLibraryItem[]>(`/api/${mode}`);
+      if (!Array.isArray(data)) throw new Error(`The server returned invalid ${mode} data.`);
+      setItems(data);
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : String(loadError);
+      setError(message);
+      console.error(`Failed to load ${mode} from D1:`, loadError);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadItems();
+  }, [mode]);
+
   const upload = (file?: File, isBanner = false) => { 
     if (!file) return; 
     const reader = new FileReader(); 
@@ -1215,12 +1309,12 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
     reader.readAsDataURL(file); 
   };
 
-  const publish = (e: React.FormEvent) => {
+  const publish = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalCategory = draft.category === "Chibi" ? `Chibi (${draft.subCategory})` : draft.category;
-    
-    if (mode === "discounts") {
-      persist([{
+
+    const item: AdminLibraryItem = mode === "discounts"
+      ? {
         id: Date.now(),
         title: draft.title,
         percentage: Number(draft.percentage),
@@ -1230,9 +1324,8 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
         endDate: draft.endDate,
         code: draft.code || "PROMO",
         bannerImage: draft.bannerImage || placeholder
-      }, ...items]);
-    } else {
-      persist([{
+      }
+      : {
         id: Date.now(),
         title: draft.title,
         description: draft.description,
@@ -1245,7 +1338,21 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
         price: Number(draft.price || 0),
         image: draft.image || placeholder,
         publishedAt: new Date().toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })
-      }, ...items]);
+      };
+
+    try {
+      await apiRequest<{ success: boolean }>(`/api/${mode}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(item)
+      });
+      await loadItems();
+    } catch (publishError) {
+      const message = publishError instanceof Error ? publishError.message : String(publishError);
+      setError(message);
+      console.error(`Failed to publish ${mode} item to D1:`, publishError);
+      alert(`Failed to publish: ${message}`);
+      return;
     }
 
     setDraft({ title: "", description: "", category: mode === "gallery" ? "Chibi" : mode === "products" ? "Pins" : "Chibi Only", subCategory: "Sticker set", scope: "Headshot", colorFinish: "Rendered", price: "", percentage: "", requirementType: "Any", startDate: "", endDate: "", code: "", image: "", bannerImage: "" });
@@ -1265,6 +1372,8 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
       </div>
 
       <div className="media-list">
+        {loading && <p className="empty-row">Loading from D1…</p>}
+        {error && <p className="empty-row" role="alert">Unable to load or update data: {error}</p>}
         {items.map((item) => (
           <article key={item.id}>
             <img src={item.image || item.bannerImage || placeholder} alt={item.title} />
@@ -1274,10 +1383,20 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
               <p>{item.description}</p>
               <small>{mode === "discounts" ? `Code: ${item.code} | ${item.startDate} to ${item.endDate}` : `Published ${item.publishedAt}`}</small>
             </div>
-            <button aria-label={`Delete ${item.title}`} onClick={() => persist(items.filter((x) => x.id !== item.id))}><Icon name="trash" /></button>
+            <button aria-label={`Delete ${item.title}`} onClick={async () => {
+              try {
+                await apiRequest<{ success: boolean }>(`/api/${mode}/${item.id}`, { method: "DELETE" });
+                setItems((current) => current.filter((existing) => existing.id !== item.id));
+              } catch (deleteError) {
+                const message = deleteError instanceof Error ? deleteError.message : String(deleteError);
+                setError(message);
+                console.error(`Failed to delete ${mode} item from D1:`, deleteError);
+                alert(`Failed to delete: ${message}`);
+              }
+            }}><Icon name="trash" /></button>
           </article>
         ))}
-        {items.length === 0 && <div className="empty-row">Nothing published yet. Use the plus button to add the first item.</div>}
+        {!loading && !error && items.length === 0 && <div className="empty-row">Nothing published yet. Use the plus button to add the first item.</div>}
       </div>
 
       {open && (
@@ -1400,12 +1519,24 @@ type CommissionRequestWithHistory = CommissionRequest & {
 };
 
 function HistoryManager({ onRestore }: { onRestore: (request: CommissionRequest) => void }) {
-  const storageKey = "inkyuu_history";
-  const requestsStorageKey = "inkyuu_requests";
-  const [historyItems, setHistoryItems] = useState<CommissionRequestWithHistory[]>(() => loadStored(storageKey, []));
+  const [historyItems, setHistoryItems] = useState<CommissionRequestWithHistory[]>([]);
   const [itemToDelete, setItemToDelete] = useState<CommissionRequestWithHistory | null>(null);
+  const [error, setError] = useState("");
 
-  const handleUndo = (id: number) => {
+  useEffect(() => {
+    apiRequest<CommissionRequestWithHistory[]>("/api/commissions")
+      .then((data) => {
+        if (!Array.isArray(data)) throw new Error("The server returned invalid commission history.");
+        setHistoryItems(data.filter((item) => item.historyType));
+      })
+      .catch((loadError) => {
+        const message = loadError instanceof Error ? loadError.message : String(loadError);
+        setError(message);
+        console.error("Failed to load commission history from D1:", loadError);
+      });
+  }, []);
+
+  const handleUndo = async (id: number) => {
     const itemToRestore = historyItems.find(item => item.id === id);
     if (!itemToRestore) return;
 
@@ -1418,29 +1549,41 @@ function HistoryManager({ onRestore }: { onRestore: (request: CommissionRequest)
       }
     }
 
-    const activeRequests = loadStored<CommissionRequest[]>(requestsStorageKey, []);
-    if (activeRequests.some((request) => request.id === id)) return;
-
-    const nextHistory = historyItems.filter(item => item.id !== id);
-    const { historyType: _historyType, submittedToHistoryAt: _archivedAt, ...requestData } = itemToRestore;
     const restoredItem: CommissionRequest = {
-      ...requestData,
+      ...itemToRestore,
+      historyType: undefined,
+      submittedToHistoryAt: undefined,
       stage: itemToRestore.historyType === "Finished" ? 4 : itemToRestore.stage,
     };
-    const nextRequests = [restoredItem, ...activeRequests];
 
-    localStorage.setItem(storageKey, JSON.stringify(nextHistory));
-    localStorage.setItem(requestsStorageKey, JSON.stringify(nextRequests));
-    setHistoryItems(nextHistory);
-    onRestore(restoredItem);
+    try {
+      await apiRequest<{ success: boolean }>(`/api/commissions/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: restoredItem.stage, historyType: null, submittedToHistoryAt: null })
+      });
+      setHistoryItems((current) => current.filter((item) => item.id !== id));
+      onRestore(restoredItem);
+    } catch (restoreError) {
+      const message = restoreError instanceof Error ? restoreError.message : String(restoreError);
+      setError(message);
+      console.error("Failed to restore commission from D1 history:", restoreError);
+      alert(`Failed to restore request: ${message}`);
+    }
   };
 
-  const confirmPermanentDelete = () => {
+  const confirmPermanentDelete = async () => {
     if (!itemToDelete) return;
-    const nextHistory = historyItems.filter(item => item.id !== itemToDelete.id);
-    setHistoryItems(nextHistory);
-    localStorage.setItem(storageKey, JSON.stringify(nextHistory));
-    setItemToDelete(null);
+    try {
+      await apiRequest<{ success: boolean }>(`/api/commissions/${itemToDelete.id}`, { method: "DELETE" });
+      setHistoryItems((current) => current.filter((item) => item.id !== itemToDelete.id));
+      setItemToDelete(null);
+    } catch (deleteError) {
+      const message = deleteError instanceof Error ? deleteError.message : String(deleteError);
+      setError(message);
+      console.error("Failed to permanently delete commission from D1 history:", deleteError);
+      alert(`Failed to delete history record: ${message}`);
+    }
   };
 
   const isWithin24Hours = (dateString?: string) => {
@@ -1455,6 +1598,7 @@ function HistoryManager({ onRestore }: { onRestore: (request: CommissionRequest)
         <div><p>COMPLETED ARCHIVE</p><h2>History</h2></div>
         <span>{historyItems.length} total records</span>
       </div>
+      {error && <p className="empty-row" role="alert">Unable to load or update history: {error}</p>}
       <div className="media-list" style={{ gridTemplateColumns: "1fr" }}>
         {historyItems.map((item) => {
           const isFinished = item.historyType !== "Cancelled";
@@ -1492,7 +1636,7 @@ function HistoryManager({ onRestore }: { onRestore: (request: CommissionRequest)
             </article>
           );
         })}
-        {historyItems.length === 0 && <div className="empty-row">No history records yet. Finished or cancelled requests will appear here.</div>}
+        {historyItems.length === 0 && !error && <div className="empty-row">No history records yet. Finished or cancelled requests will appear here.</div>}
       </div>
 
       {itemToDelete && (
@@ -1607,8 +1751,41 @@ function RequestDetail({ request, close }: { request: CommissionRequest; close: 
 
 function Admin({ go }: { go: (page: Page) => void }) {
   const [tab, setTab] = useState("overview");
-  const [requests, setRequests] = useState<CommissionRequest[]>(() => loadStored("inkyuu_requests", []));
+  const [requests, setRequests] = useState<CommissionRequest[]>([]);
   const [selected, setSelected] = useState<CommissionRequest | null>(null);
+  const [requestError, setRequestError] = useState("");
+  const [productsCount, setProductsCount] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setRequestError("");
+
+    apiRequest<CommissionRequest[]>("/api/commissions")
+      .then((data) => {
+        if (!Array.isArray(data)) throw new Error("The server returned invalid commission data.");
+        if (active) setRequests(data.filter((request) => !request.historyType));
+      })
+      .catch((err) => {
+        if (!active) return;
+        const message = err instanceof Error ? err.message : String(err);
+        setRequestError((current) => current ? `${current}; ${message}` : message);
+        console.error("Error loading commissions from D1:", err);
+      });
+
+    apiRequest<PublishedItem[]>("/api/products")
+      .then((data) => {
+        if (!Array.isArray(data)) throw new Error("The server returned invalid product data.");
+        if (active) setProductsCount(data.length);
+      })
+      .catch((err) => {
+        if (!active) return;
+        const message = err instanceof Error ? err.message : String(err);
+        setRequestError((current) => current ? `${current}; ${message}` : message);
+        console.error("Error loading products from D1:", err);
+      });
+
+    return () => { active = false; };
+  }, [tab]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState<string>("all");
@@ -1628,49 +1805,58 @@ function Admin({ go }: { go: (page: Page) => void }) {
     ["history", "clock", "History"]
   ];
 
-  const updateStage = (id: number, stageIndex: number) => {
-    const next = requests.map((request) => Number(request.id) === Number(id) ? { ...request, stage: stageIndex } : request);
-    setRequests(next);
-    localStorage.setItem("inkyuu_requests", JSON.stringify(next));
-  };
-
-  const moveToHistoryAsFinished = (id: number) => {
-    const activeRequests = loadStored<CommissionRequest[]>("inkyuu_requests", []);
-    const targetRequest = activeRequests.find((request) => Number(request.id) === Number(id));
-    if (!targetRequest) {
-      setRequests(activeRequests);
-      return;
+  const updateStage = async (id: number, stageIndex: number) => {
+    try {
+      await apiRequest<{ success: boolean }>(`/api/commissions/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: stageIndex }),
+      });
+      setRequests((current) => current.map((request) => Number(request.id) === Number(id) ? { ...request, stage: stageIndex } : request));
+    } catch (updateError) {
+      const message = updateError instanceof Error ? updateError.message : String(updateError);
+      console.error("Failed to update commission stage in D1:", updateError);
+      alert(`Failed to update commission: ${message}`);
     }
-
-    const historyKey = "inkyuu_history";
-    const historyItems = loadStored<CommissionRequestWithHistory[]>(historyKey, []);
-    const archivedItem: CommissionRequestWithHistory = {
-      ...targetRequest,
-      stage: 5,
-      historyType: "Finished",
-      submittedToHistoryAt: new Date().toISOString(),
-    };
-
-    localStorage.setItem(historyKey, JSON.stringify([archivedItem, ...historyItems]));
-
-    const nextRequests = activeRequests.filter((request) => Number(request.id) !== Number(id));
-    localStorage.setItem("inkyuu_requests", JSON.stringify(nextRequests));
-    setRequests(nextRequests);
-    setTab("history");
   };
 
-  const removeRequest = (id: number) => {
+  const moveToHistoryAsFinished = async (id: number) => {
+    const submittedToHistoryAt = new Date().toISOString();
+    try {
+      await apiRequest<{ success: boolean }>(`/api/commissions/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: 5, historyType: "Finished", submittedToHistoryAt }),
+      });
+      setRequests((current) => current.filter((request) => Number(request.id) !== Number(id)));
+      setTab("history");
+    } catch (archiveError) {
+      const message = archiveError instanceof Error ? archiveError.message : String(archiveError);
+      console.error("Failed to move commission to D1 history:", archiveError);
+      alert(`Failed to archive commission: ${message}`);
+    }
+  };
+
+  const removeRequest = async (id: number) => {
     const targetRequest = requests.find(r => Number(r.id) === Number(id));
-    if (targetRequest) {
-      const historyKey = "inkyuu_history";
-      const historyItems = loadStored<any[]>(historyKey, []);
-      const cancelledItem = { ...targetRequest, historyType: "Cancelled", submittedToHistoryAt: new Date().toISOString() };
-      localStorage.setItem(historyKey, JSON.stringify([cancelledItem, ...historyItems]));
-    }
+    if (!targetRequest) return;
 
-    const nextRequests = requests.filter((request) => Number(request.id) !== Number(id));
-    setRequests(nextRequests);
-    localStorage.setItem("inkyuu_requests", JSON.stringify(nextRequests));
+    const timestamp = new Date().toISOString();
+    try {
+      await apiRequest<{ success: boolean }>(`/api/commissions/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stage: targetRequest.stage,
+          historyType: "Cancelled",
+          submittedToHistoryAt: timestamp,
+        }),
+      });
+      setRequests((current) => current.filter((request) => Number(request.id) !== Number(id)));
+    } catch (error) {
+      console.error("Failed to update cancellation status in D1:", error);
+      alert(`Error updating commission status: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   const upcoming = [...requests].filter((r) => r.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
@@ -1714,6 +1900,7 @@ function Admin({ go }: { go: (page: Page) => void }) {
       </aside>
       <section className="admin-main">
         <header><div><p>STUDIO DASHBOARD</p><h1>{adminLinks.find(([id]) => id === tab)?.[2]}</h1></div></header>
+        {requestError && <p className="empty-row" role="alert">Unable to load admin data from D1: {requestError}</p>}
         
         {tab === "overview" && (
           <div className="notification-grid">
@@ -1745,8 +1932,8 @@ function Admin({ go }: { go: (page: Page) => void }) {
             <section className="admin-panel shop-notice">
               <div>
                 <span className="status-pill"><i /> Shop status</span>
-                <h2>{loadStored<PublishedItem[]>("inkyuu_products", []).length ? "Published and visible" : "Still unavailable"}</h2>
-                <p>{loadStored<PublishedItem[]>("inkyuu_products", []).length} products are currently live. Publish merchandise to automatically open the public shop.</p>
+                <h2>{productsCount ? "Published and visible" : "Still unavailable"}</h2>
+                <p>{productsCount} products are currently live. Publish merchandise to automatically open the public shop.</p>
               </div>
               <Icon name="spark" size={34} />
             </section>
@@ -2053,15 +2240,22 @@ export default function App() {
   };
   const [page, setPage] = useState<Page>(getPage);
   const [promo, setPromo] = useState(false);
+  const [promoAvailable, setPromoAvailable] = useState(false);
   const [isAdminAuth, setIsAdminAuth] = useState(() => sessionStorage.getItem("inkyuu_admin_auth") === "true");
 
   useEffect(() => {
-    const discounts = loadStored<DiscountItem[]>("inkyuu_discounts", []);
-    const timer = window.setTimeout(() => { 
-      if (getPage() === "home" && discounts.length > 0) {
-        setPromo(true); 
-      }
-    }, 900);
+    let active = true;
+    let timer: number | undefined;
+    apiRequest<DiscountItem[]>("/api/discounts")
+      .then((discounts) => {
+        if (!Array.isArray(discounts)) throw new Error("The server returned invalid discount data.");
+        if (!active) return;
+        setPromoAvailable(discounts.length > 0);
+        if (getPage() === "home" && discounts.length > 0) {
+          timer = window.setTimeout(() => setPromo(true), 900);
+        }
+      })
+      .catch((error) => console.error("Unable to check D1 discounts for the promo modal:", error));
     const onHash = () => {
       setPage(getPage());
       if (window.location.hash.replace("#", "") === "admin") {
@@ -2069,7 +2263,11 @@ export default function App() {
       }
     };
     window.addEventListener("hashchange", onHash);
-    return () => { window.clearTimeout(timer); window.removeEventListener("hashchange", onHash); };
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+      window.removeEventListener("hashchange", onHash);
+    };
   }, []);
 
   useEffect(() => {
@@ -2108,7 +2306,7 @@ export default function App() {
       <Navbar page={page} go={go} />
       {content[page]}
       <Footer go={go} />
-      {promo && loadStored<DiscountItem[]>("inkyuu_discounts", []).length > 0 && <PromoModal close={() => setPromo(false)} go={go} />}
+      {promo && promoAvailable && <PromoModal close={() => setPromo(false)} go={go} />}
     </div>
   );
 }

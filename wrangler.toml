@@ -1,0 +1,9 @@
+name = "kyuu"
+compatibility_date = "2026-01-01"
+
+main = "worker.js"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "inkyuu-db"
+database_id = "36ec7161-a727-40c8-856c-93b37ebb6f50"
