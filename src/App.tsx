@@ -1154,10 +1154,10 @@ function About({ go }: { go: (page: Page) => void }) {
       <section className="wrap timeline-section"><div><p className="kicker">Along the way</p><h2>Milestones & art events</h2><p>A few memorable stops in an always-growing creative practice.</p></div><div className="timeline">{[["2021", "First 100 commissions", "Reached a joyful little milestone with clients across eight countries."], ["2022", "Komiket Manila", "Debuted an original sticker and mini-print collection."], ["2023", "Graphika Art Fair", "Joined a community showcase celebrating independent illustrators."], ["2025", "Inkyuu studio", "Opened a dedicated online home for art, commissions, and shop drops."]].map(([year, title, desc]) => <div key={year}><span>{year}</span><article><h3>{title}</h3><p>{desc}</p></article></div>)}</div></section>
       <section className="wrap collaborators"><p className="kicker">Featured collaborators</p><h2>Good things made together</h2><div>{["Cloud Nine Café", "Daydream Press", "Mori Studio", "Sunday Club"].map((name) => <span key={name}>{name}</span>)}</div></section>
       <section className="wrap official-contacts-section" style={{ paddingBottom: "100px" }}>
-        <div className="section-heading compact">
+        <div className="section-heading compact channels">
           <div>
-            <p className="kicker">Official channels</p>
-            <h2>Official Contacts</h2>
+            <p className="kicker">Where to Contact Me</p>
+            <h2>Official channels</h2>
           </div>
           <p>Connect with me directly through my verified studio social profiles.</p>
         </div>
