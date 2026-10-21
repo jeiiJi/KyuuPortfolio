@@ -2751,7 +2751,7 @@ function Footer({ go }: { go: (page: Page) => void }) {
         </div>
       </div>
       <div className="wrap footer-bottom">
-        <span>© 2025 Inkyuu Studio. All art reserved.</span>
+        <span>© 2026 Inkyuu Studio. All rights reserved.</span>
         <span>Made with care, color & good music.</span>
       </div>
     </footer>
