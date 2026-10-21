@@ -3,7 +3,6 @@ import logo from "./assets/inkdrop-logo.png";
 import brandName from "./assets/brand-name.png";
 import placeholder from "./assets/placeholder.svg";
 import heroArtwork from "./assets/Untitled200_20261016201217.png";
-import guidePdf from "./assets/Kyuu Commission Guide.pdf";
 
 type Page = "home" | "gallery" | "shop" | "guide" | "about" | "commission" | "admin";
 type CommissionRequest = {
@@ -357,7 +356,6 @@ function Gallery({ selection }: { selection: GallerySelection | null }) {
             {scopeOptions.map((value) => <option key={value} value={value}>{value}</option>)}
           </select>
         </label>
-        <span className="sub-filter-divider" aria-hidden="true">|</span>
         <label className="sub-filter-select">
           <span className="sr-only">{contextLabel}</span>
           <select aria-label={contextLabel} value={contextValue} onChange={(event) => setContextValue(event.target.value)}>
@@ -365,7 +363,6 @@ function Gallery({ selection }: { selection: GallerySelection | null }) {
             {contextOptions.map((value) => <option key={value} value={value}>{value}</option>)}
           </select>
         </label>
-        <span className="sub-filter-divider" aria-hidden="true">|</span>
         <button type="button" className="sub-filter-clear" onClick={() => { setScopeValue(""); setContextValue(""); }}>Clear filters</button>
       </div>
 
@@ -1033,44 +1030,114 @@ function Shop({ go }: { go: (page: Page) => void }) {
 }
 
 function Guide() {
-  const sections = [
-    { number: "01", title: "Rules & regulations", intro: "Clear boundaries keep every project safe, respectful, and enjoyable.", items: [["Content", "No NSFW, nudity, suggestive content, heavy gore, controversial content, or depictions of bodily fluids."], ["Will draw", "Angst, fluff, original characters, fan art, stickers, and memes."], ["Won’t draw", "Canon ships, furries or animals, mecha, cars, or major changes to canon character designs."], ["Copyright", "The artist retains copyright. Public use requires clear credit; alteration, AI training, blockchain, and NFTs are prohibited."]] },
-    { number: "02", title: "Workflow & payment", intro: "A milestone-based process with no upfront cost before the initial drafting phase.", items: [["Sketch first", "Work begins and develops through the approved sketch without upfront payment."], ["20% midpoint payment", "A mandatory 20% downpayment is requested once the final sketch is approved."], ["Final settlement", "The remaining balance is due within three calendar days after completion. Unwatermarked files are released after payment clears."], ["Priority projects", "A required deadline can be fast-tracked for an additional 10% of the total project price."]] },
-    { number: "03", title: "Communication & delivery", intro: "Timely feedback protects your slot and keeps the production calendar moving.", items: [["Response window", "Please respond to updates and approval requests within three calendar days."], ["Inactivity", "Fourteen days without communication may be treated as abandonment and the slot may reopen."], ["File storage", "Final high-resolution files remain available through cloud storage for six months."], ["Availability", "Only three active and two reserved semi-realistic commissions are open at a time. Reservations are contacted first when a slot opens."]] },
-    { number: "04", title: "Cancellation", intro: "Refund eligibility changes as time and labor are invested.", items: [["Grace period", "Cancellation within seven days of booking is eligible for a full refund."], ["Mid-production", "After the grace period, cancellation ends production; 12% of the downpayment is refunded with the latest work-in-progress export."], ["Non-payment", "Missing the midpoint or final payment deadlines may terminate the project and forfeit the slot."], ["Force majeure", "For emergencies or technical delays, a revised timeline or cancellation option will be discussed."]] },
-  ];
   return (
     <main id="main-content" tabIndex={-1} className="page-main guide-page">
       <section className="page-hero wrap">
         <p className="kicker">Kyuu commission guide</p>
-        <h1>Good art starts with <em>clear expectations.</em></h1>
-        <p>Everything you need to know before booking a commission with Inkyuu.</p>
+        <h1>Commission <em>Terms & Guidelines.</em></h1>
+        <p>Please review the complete terms below before securing a commission slot.</p>
       </section>
       <section className="wrap guide-sections">
-        {sections.map((section) => (
-          <article key={section.number}>
-            <div className="guide-title">
-              <span>{section.number}</span>
-              <div>
-                <p className="kicker">Commission policy</p>
-                <h2>{section.title}</h2>
-                <p>{section.intro}</p>
-              </div>
-            </div>
-            <div className="guide-items">
-              {section.items.map(([title, text]) => (
-                <div key={title}>
-                  <h3>{title}</h3>
-                  <p>{text}</p>
-                </div>
-              ))}
-            </div>
-          </article>
-        ))}
+        <article className="guide-section-card">
+          <div className="guide-section-heading"><span>I.</span><h2>RULES & REGULATIONS</h2></div>
+          <div className="guide-topic-grid">
+            <section className="guide-topic-card">
+              <h3>A. NSFW CONTENTS</h3>
+              <p>Not Safe For Work content is NOT allowed, may the project be in PUBLIC or in PRIVATE. Any commission request that is judged to be NSFW or suggestive will not be accepted and will be rejected immediately.</p>
+              <p>The following will automatically be tagged as NSFW: pornography, nudity, heavy gore, depiction of bodily fluids (e.g., semen), violence, suggestive content, controversial content.</p>
+            </section>
+            <section className="guide-topic-card">
+              <h3>B. THEMES</h3>
+              <table className="guide-table guide-theme-table">
+                <thead><tr><th scope="col">Will Draw:</th><th scope="col">Won't Draw:</th></tr></thead>
+                <tbody><tr><td data-label="Will Draw:">ANGST, Fluff, Fanart (Ships amongst/with canon characters), Sticker(s), Meme(s)</td><td data-label="Won't Draw:">OC, Changing a canon character's design (e.g., race, major features), Furries, animals, Mecha, cars, etc., NSFW</td></tr></tbody>
+              </table>
+            </section>
+          </div>
+        </article>
+
+        <article className="guide-section-card">
+          <div className="guide-section-heading"><span>II.</span><h2>COPYRIGHTS</h2></div>
+          <div className="guide-topic-grid">
+            <section className="guide-topic-card"><h3>A. ARTIST RIGHTS</h3><p>Pursuant to Republic Act No. 8293 (The Intellectual Property Code of the Philippines), the copyright of the artwork inherently and permanently belongs to the artist. The artist retains all rights regarding the reproduction, distribution, and public display of the artwork for promotional, portfolio, and social media purposes.</p></section>
+            <section className="guide-topic-card"><h3>B. CLIENT RIGHTS</h3><p>Upon final payment, the client is granted a license to use the artwork for expected purposes. The artist must be clearly and visibly credited whenever the artwork is used or displayed publicly. The client may not alter, edit, or claim the artwork as their own creation[cite: 1, 2].</p></section>
+            <section className="guide-topic-card"><h3>C. AI & BLOCKCHAIN PROHIBITIONS</h3><p>Under no circumstances is the artwork permitted for use in Artificial Intelligence (AI) training databases, machine learning datasets, or any blockchain/NFT platforms. Any such utilization constitutes a direct violation of these terms and copyright law.</p></section>
+            <section className="guide-topic-card"><h3>D. TRANSFER OF OWNERSHIP</h3><p>Full copyright ownership remains with the artist unless a separate, formal agreement is signed/explicitly said by both parties to assign the copyright to the client or an organization. Copyright buyout fees will apply for such transfers.</p></section>
+          </div>
+        </article>
+
+        <article className="guide-section-card">
+          <div className="guide-section-heading"><span>III.</span><h2>CONTRACT & WORKFLOW TERMS</h2></div>
+          <p className="guide-intro">By securing a commission slot, both the artist and the client agree to the following parameters regarding the execution, payment, and legal boundaries of the commission.</p>
+          <div className="guide-topic-grid">
+            <section className="guide-topic-card"><h3>A. REVISIONS</h3><p>Once the final artwork is finished and presented for final approval, any requests for major modifications or revisions will incur mandatory additional charges depending on the weight of the adjustment. Work on these final alterations will only commence after the client has paid the required revision fee.</p></section>
+            <section className="guide-topic-card"><h3>B. DEADLINES</h3><p>Clients requiring an expected delivery can opt to designate their commission as a PRIORITY. Priority pieces are fast-tracked ahead of the standard production queue to ensure significantly quicker completion, which will incur an additional charge equivalent to 10% of the project's total price.</p></section>
+            <section className="guide-topic-card guide-topic-wide">
+              <h3>C. PAYMENT TERMS</h3>
+              <p>To ensure a secure and collaborative workflow, payments are broken down into milestone installations. No upfront cost is required to begin the initial drafting phase, but progress is strictly tied to the following payment schedule:</p>
+              <table className="guide-table">
+                <thead><tr><th scope="col">Milestone</th><th scope="col">Payment schedule</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">Initial Phase</th><td data-label="Payment schedule">The project will be initiated and developed up to the midpoint milestone without an upfront cost.</td></tr>
+                  <tr><th scope="row">Mid-Project Downpayment</th><td data-label="Payment schedule">Upon reaching the midpoint milestone (the finalization of the approved sketch), a mandatory 20% downpayment of the total project fee will be requested[cite: 3, 4].</td></tr>
+                  <tr><th scope="row">Final Settlement</th><td data-label="Payment schedule">The remaining balance must be paid in full within three (3) calendar days after the artwork is finished and presented. High-resolution—without any obstructive watermark—final deliverables will only be released once the full payment has cleared.</td></tr>
+                </tbody>
+              </table>
+            </section>
+            <section className="guide-topic-card">
+              <h3>D. CANCELLATION & REFUND POLICY</h3>
+              <p>Clients may change their minds or cancel the project within a specific window. However, because time and labor are invested into the project as it progresses, the refund policy changes depending on when the cancellation is requested:</p>
+              <ul>
+                <li>Standard Grace Period: The client is entitled to a 100% full cancellation and refund within one (1) week (7 days) of the initial project booking.</li>
+                <li>Mid-Project & Mid-Production: If no cancellation is requested within the first week, production automatically proceeds. If the client persists in canceling the project after the 1-week grace period has passed, the project will enter immediate termination. In this event, the client will only be refunded 12% of their total downpayment amount, and they will be given the latest work-in-progress export of the drawing as-is.</li>
+              </ul>
+            </section>
+            <section className="guide-topic-card">
+              <h3>E. TERMINATION POLICY</h3>
+              <p>The artist reserves the right to suspend work or permanently terminate the contract if the client breaches communication or payment deadlines. Forfeiting a slot due to non-payment will result in the cancellation of the project.</p>
+              <ul>
+                <li>Failure to Provide Downpayment: If the client refuses or fails to settle the 20% mid-project downpayment within one (1) week (7 days) of the initial payment request, production will be immediately halted, the commission will be terminated, and the slot will be forfeited.</li>
+                <li>Failure to Settle Final Balance: Failure to pay the remaining balance within the designated 3-day post-completion window will result in the immediate withholding of the final artwork, termination of future services, and potential blacklisting from subsequent commission openings.</li>
+              </ul>
+            </section>
+          </div>
+        </article>
+
+        <article className="guide-section-card">
+          <div className="guide-section-heading"><span>IV.</span><h2>COMMUNICATION & CLIENT RESPONSIVENESS</h2></div>
+          <div className="guide-topic-grid">
+            <section className="guide-topic-card"><h3>A. RESPONSE WINDOW</h3><p>Clients are expected to respond to milestone updates, feedback requests, or approvals within three (3) calendar days.</p></section>
+            <section className="guide-topic-card"><h3>B. INACTIVITY CLOSURE</h3><p>If a client fails to communicate or respond for more than fourteen (14) consecutive days without prior notice, the project will be considered abandoned. The contract will be terminated, the 20% downpayment (if paid) will be forfeited as a cancellation fee, and the slot will be reopened to the public.</p></section>
+            <section className="guide-topic-card guide-topic-wide">
+              <h3>C. FORCE MAJEURE</h3>
+              <p>The artist is not held liable for delays caused by emergency situations, illness, power outages, natural disasters, or technical failures. In the event of such a delay, the client will be notified immediately, and a revised timeline will be established.</p>
+              <p>If an operational delay occurs and the artist fails to respond to client inquiries or provide milestone updates for more than fourteen (14) consecutive days without prior notice, the client is granted the right to choose one of the following options:</p>
+              <ul>
+                <li>Immediate Project Cancellation: The client may cancel the contract and receive a 12% refund of the settled downpayment, along with the latest work-in-progress export of the artwork as-is.</li>
+                <li>Timeline Extension: The client may choose to maintain the commission slot under a newly negotiated, mutually agreed-upon delivery deadline.</li>
+              </ul>
+            </section>
+          </div>
+        </article>
+
+        <article className="guide-section-card">
+          <div className="guide-section-heading"><span>V.</span><h2>FILE STORAGE & DELIVERY MAINTENANCE</h2></div>
+          <section className="guide-topic-card">
+            <p>Final high-resolution files will be hosted on a cloud drive (e.g., Google Drive) and guaranteed to be accessible for six (6) months following final delivery. Clients are strongly advised to download and back up their files immediately upon receipt.</p>
+            <p>If a client loses their files or requires a new download link after the 6-month hosting period has expired, they may reach out to the artist directly. While the artist will make every effort to retrieve the artwork from their personal archives, recovery is not guaranteed if the data has been permanently cleared or archived.</p>
+          </section>
+        </article>
+
+        <article className="guide-section-card">
+          <div className="guide-section-heading"><span>SERVICE - I.</span><h2>SLOTS & AVAILABILITY</h2></div>
+          <section className="guide-topic-card">
+            <p>
+              <strong>Note on Work Availability:</strong> Please note that the active slots and reservation system described below apply strictly to semi-realistic works.</p>
+            <p>To ensure high-quality results and prevent any project delays, production capacity is strictly limited to exactly three (3) active slots at a time. Once these three active slots are filled, booking closes temporarily, and accepted commissions are worked on and prioritized sequentially in the exact order that the initial project parameters are confirmed.</p>
+            <p>When active slots are fully occupied, a dedicated reservation list is available so you can secure a guaranteed spot for future openings. Clients on this reservation list are given automatic priority, meaning that as soon as an active slot clears, individuals on this list will be contacted first to initiate their projects before openings are advertised to the general public.</p>
+          </section>
+        </article>
       </section>
-      <div className="wrap guide-pdf-link">
-        <a className="btn btn-outline" href={guidePdf} target="_blank" rel="noreferrer">Open Original PDF</a>
-      </div>
     </main>
   );
 }
@@ -1091,18 +1158,24 @@ function About({ go }: { go: (page: Page) => void }) {
           </div>
           <p>Connect with me directly through my verified studio social profiles.</p>
         </div>
-        <div className="medium-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
-          <a href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer" className="medium-card">
+        <div className="medium-grid official-contact-grid">
+          <a href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer" className="medium-card social-contact-card">
             <span>01</span>
             <Icon name="instagram" size={25} />
             <h3>Instagram</h3>
             <p>@jeii_ji · Daily sketches, client updates, and finished artwork portfolios.</p>
           </a>
-          <a href="https://www.facebook.com/christinejoy.morata02/" target="_blank" rel="noreferrer" className="medium-card">
+          <a href="https://www.facebook.com/christinejoy.morata02/" target="_blank" rel="noreferrer" className="medium-card social-contact-card">
             <span>02</span>
             <Icon name="facebook" size={25} />
             <h3>Facebook</h3>
             <p>Christine Joy Morata · Studio announcements, inquiries, and community posts.</p>
+          </a>
+          <a href="mailto:kyuukyuuji@gmail.com" className="medium-card social-contact-card">
+            <span>03</span>
+            <Icon name="mail" size={25} />
+            <h3>Email</h3>
+            <p>kyuukyuuji@gmail.com · Direct inquiries and commission questions.</p>
           </a>
         </div>
       </section>
