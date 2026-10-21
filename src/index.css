@@ -569,6 +569,9 @@ footer a:hover, footer button:hover { color: var(--gold); }
 .guide-table thead th { background: var(--cream); color: var(--ink); font-weight: 700; }
 .guide-table tbody th { width: 26%; background: color-mix(in srgb, var(--cream) 60%, white); }
 .guide-theme-table th { width: 50%; }
+.guide-theme-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.guide-theme-list li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.guide-theme-list li:last-child { border-bottom: 0; }
 @media (max-width: 650px) {
   .guide-topic-grid { grid-template-columns: minmax(0, 1fr); }
   .guide-topic-wide { grid-column: auto; }

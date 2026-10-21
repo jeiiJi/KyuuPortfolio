@@ -1043,14 +1043,17 @@ function Guide() {
           <div className="guide-topic-grid">
             <section className="guide-topic-card">
               <h3>A. NSFW CONTENTS</h3>
-              <p>Not Safe For Work content is NOT allowed, may the project be in PUBLIC or in PRIVATE. Any commission request that is judged to be NSFW or suggestive will not be accepted and will be rejected immediately.</p>
-              <p>The following will automatically be tagged as NSFW: pornography, nudity, heavy gore, depiction of bodily fluids (e.g., semen), violence, suggestive content, controversial content.</p>
+              <p><strong>Not Safe For Work content is NOT allowed,</strong> may the project be in PUBLIC or in PRIVATE. Any commission request that is judged to be NSFW or suggestive will not be accepted and will be rejected immediately.</p>
+              <p>The following will automatically be tagged as NSFW: <em>pornography, nudity, heavy gore, depiction of bodily fluids (e.g., semen), violence, suggestive content, controversial content.</em></p>
             </section>
             <section className="guide-topic-card">
               <h3>B. THEMES</h3>
               <table className="guide-table guide-theme-table">
                 <thead><tr><th scope="col">Will Draw:</th><th scope="col">Won't Draw:</th></tr></thead>
-                <tbody><tr><td data-label="Will Draw:">ANGST, Fluff, Fanart (Ships amongst/with canon characters), Sticker(s), Meme(s)</td><td data-label="Won't Draw:">OC, Changing a canon character's design (e.g., race, major features), Furries, animals, Mecha, cars, etc., NSFW</td></tr></tbody>
+                <tbody><tr>
+                  <td data-label="Will Draw:"><ul className="guide-theme-list"><li>OC</li><li>Fictional Characters</li><li>Character Ships</li><li>Nonsexual Nudity</li></ul></td>
+                  <td data-label="Won't Draw:"><ul className="guide-theme-list"><li>NSFW</li><li>Real People without their consent</li><li>Changing a canon character's design (e.g., race, major features)</li><li>Mecha, Cars, etc.</li></ul></td>
+                </tr></tbody>
               </table>
             </section>
           </div>
