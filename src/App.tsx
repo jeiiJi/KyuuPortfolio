@@ -17,6 +17,7 @@ type CommissionRequest = {
 type PublishedItem = {
   id: number; title: string; description: string; image: string; category: string;
   scope?: string; service?: string; colorFinish?: string;
+  imageCount?: number; dateMade?: string; tools?: string; format?: string;
   price?: number; publishedAt: string;
 };
 type GallerySelection = { category: "Chibi" | "Semi-Realistic"; facet: "Scope" | "Services" | "Color Finish"; value: string };
@@ -28,6 +29,8 @@ type AdminLibraryItem = {
   id: number; title: string; description: string; image?: string; bannerImage?: string;
   category?: string; requirementType?: string; percentage?: number;
   publishedAt?: string; price?: number; code?: string; startDate?: string; endDate?: string;
+  artStyle?: string; scope?: string; service?: string; colorFinish?: string;
+  dateMade?: string; tools?: string; format?: string; imageCount?: number; images?: string[];
 };
 type IconName =
   | "arrow"
@@ -41,6 +44,7 @@ type IconName =
   | "facebook"
   | "mail"
   | "menu"
+  | "more"
   | "pen"
   | "plus"
   | "spark"
@@ -61,6 +65,7 @@ const Icon = ({ name, size = 18 }: { name: IconName; size?: number }) => {
     facebook: ( <><circle cx="12" cy="12" r="9" /><path d="M13.5 19v-6h2l.3-2.3h-2.3V9.2c0-.7.2-1.1 1.2-1.1H16V6.1c-.2 0-.9-.1-1.8-.1-1.8 0-3.1 1.1-3.1 3.2v1.5H9v2.3h2.1v6h2.4Z" fill="currentColor" stroke="none"/></>),
     mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>,
     menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+    more: <><circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" /><circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none" /></>,
     pen: <><path d="m15 5 4 4L8 20H4v-4L15 5Z" /><path d="m13 7 4 4" /></>,
     plus: <path d="M12 5v14M5 12h14" />,
     spark: <><path d="m12 3 1.3 4.2L17 9l-3.7 1.8L12 15l-1.3-4.2L7 9l3.7-1.8L12 3Z" /><path d="m19 15 .7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7L19 15Z" /></>,
@@ -80,8 +85,8 @@ const artItems = [
   { id: 6, title: "Orange Club", type: "Chibi", desc: "A playful character set made for stickers.", art: "orange", size: "tall", tags: ["sticker", "chibi", "collection"] },
 ];
 
-const Btn = ({ children, kind = "primary", onClick, type = "button", className = "", style }: { children: React.ReactNode; kind?: "primary" | "outline" | "ghost"; onClick?: () => void; type?: "button" | "submit"; className?: string; style?: React.CSSProperties }) => (
-  <button type={type} className={`btn btn-${kind} ${className}`} onClick={onClick} style={style}><span className="btn-label">{children}</span></button>
+const Btn = ({ children, kind = "primary", onClick, type = "button", className = "", style, disabled }: { children: React.ReactNode; kind?: "primary" | "outline" | "ghost"; onClick?: () => void; type?: "button" | "submit"; className?: string; style?: React.CSSProperties; disabled?: boolean }) => (
+  <button type={type} className={`btn btn-${kind} ${className}`} onClick={onClick} style={style} disabled={disabled}><span className="btn-label">{children}</span></button>
 );
 
 const apiRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
@@ -322,13 +327,82 @@ type GalleryItem =
       type: string;
       desc: string;
       image: string;
+      imageCount?: number;
       size: string;
       tags: string[];
       publishedAt: string;
       scope?: string;
       service?: string;
       colorFinish?: string;
+      tools?: string;
+      format?: string;
     };
+
+function ImageCarousel({ images, title }: { images: string[]; title: string }) {
+  const [index, setIndex] = useState(0);
+  const touchStart = useRef<number | null>(null);
+  const total = images.length;
+
+  useEffect(() => { setIndex(0); }, [images]);
+
+  const step = (delta: number) => setIndex((current) => (current + delta + total) % total);
+
+  useEffect(() => {
+    if (total < 2) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft") setIndex((current) => (current - 1 + total) % total);
+      if (event.key === "ArrowRight") setIndex((current) => (current + 1) % total);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [total]);
+
+  if (total === 0) {
+    return <div className="project-image"><ArtVisual art="placeholder" label={title} /></div>;
+  }
+
+  return (
+    <div
+      className="project-image carousel"
+      role={total > 1 ? "group" : undefined}
+      aria-roledescription={total > 1 ? "carousel" : undefined}
+      aria-label={total > 1 ? `${title}, ${total} images` : undefined}
+      onTouchStart={(event) => { touchStart.current = event.touches[0].clientX; }}
+      onTouchEnd={(event) => {
+        if (touchStart.current === null || total < 2) return;
+        const distance = event.changedTouches[0].clientX - touchStart.current;
+        touchStart.current = null;
+        if (Math.abs(distance) > 45) step(distance < 0 ? 1 : -1);
+      }}
+    >
+      <img className="gallery-real-image" src={images[index]} alt={total > 1 ? `${title}, image ${index + 1} of ${total}` : title} />
+
+      {total > 1 && (
+        <>
+          <button type="button" className="carousel-btn prev" aria-label="Previous image" onClick={() => step(-1)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+          </button>
+          <button type="button" className="carousel-btn next" aria-label="Next image" onClick={() => step(1)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+          </button>
+          <div className="carousel-dots" role="group" aria-label="Choose an image">
+            {images.map((_, position) => (
+              <button
+                key={position}
+                type="button"
+                className={position === index ? "on" : ""}
+                aria-label={`Show image ${position + 1} of ${total}`}
+                aria-current={position === index}
+                onClick={() => setIndex(position)}
+              />
+            ))}
+          </div>
+          <p className="sr-only" aria-live="polite">Image {index + 1} of {total}</p>
+        </>
+      )}
+    </div>
+  );
+}
 
 function Gallery({ selection }: { selection: GallerySelection | null }) {
   const [filter, setFilter] = useState<"Chibi" | "Semi-Realistic">(selection?.category || "Chibi");
@@ -348,15 +422,19 @@ function Gallery({ selection }: { selection: GallerySelection | null }) {
     type: item.category?.startsWith("Semi-Realistic") ? "Semi-Realistic" : "Chibi",
     desc: item.description,
     image: item.image,
+    imageCount: item.imageCount,
     size: "medium",
     tags: ["published", item.category || "Chibi", item.scope, item.service || item.category?.match(/\(([^)]+)\)/)?.[1], item.colorFinish].filter((tag): tag is string => Boolean(tag)),
     publishedAt: item.publishedAt,
     scope: item.scope,
     service: item.service || item.category?.match(/\(([^)]+)\)/)?.[1],
     colorFinish: item.colorFinish,
+    tools: item.tools,
+    format: item.format,
   }));
 
   const [selected, setSelected] = useState<GalleryItem | null>(null);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const scopeOptions = filter === "Chibi"
     ? ["Headshot", "Fullbody"]
     : ["Headshot", "Bust-up", "Waist-up", "Thigh-up"];
@@ -384,6 +462,24 @@ function Gallery({ selection }: { selection: GallerySelection | null }) {
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setSelected(null); };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
+  }, [selected]);
+
+  // Cards only carry the cover image. When an artwork opens, show the cover right away and
+  // fetch the rest of its set (if it has one) in the background.
+  useEffect(() => {
+    if (!selected || !("image" in selected)) {
+      setSelectedImages([]);
+      return;
+    }
+    setSelectedImages(selected.image ? [selected.image] : []);
+    if (!selected.imageCount || selected.imageCount < 2) return;
+    let active = true;
+    apiRequest<{ images: string[] }>(`/api/gallery/${selected.id}/images`)
+      .then((data) => {
+        if (active && Array.isArray(data.images) && data.images.length) setSelectedImages(data.images);
+      })
+      .catch((loadError) => console.error("Failed to load the full image set:", loadError));
+    return () => { active = false; };
   }, [selected]);
 
   return (
@@ -443,7 +539,7 @@ function Gallery({ selection }: { selection: GallerySelection | null }) {
         <div className="modal-backdrop" onMouseDown={() => setSelected(null)}>
           <div className="project-modal" role="dialog" aria-modal="true" aria-labelledby="project-title" onMouseDown={(e) => e.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="Close artwork details" autoFocus onClick={() => setSelected(null)}><Icon name="close" /></button>
-            <div className="project-image">{visual(selected)}</div>
+            <ImageCarousel key={selected.id} images={selectedImages} title={selected.title} />
             <div className="project-copy">
               <p className="kicker">{selected.type} · Featured project</p>
               <h2 id="project-title">{selected.title}</h2>
@@ -451,8 +547,8 @@ function Gallery({ selection }: { selection: GallerySelection | null }) {
               <div className="tags">{selected.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
               <div className="project-meta">
                 <span>Published<strong>{"publishedAt" in selected ? selected.publishedAt : "2025"}</strong></span>
-                <span>Tools<strong>Procreate</strong></span>
-                <span>Format<strong>Digital art</strong></span>
+                {"tools" in selected && selected.tools && <span>Tools<strong>{selected.tools}</strong></span>}
+                {"format" in selected && selected.format && <span>Format<strong>{selected.format}</strong></span>}
               </div>
             </div>
           </div>
@@ -461,6 +557,10 @@ function Gallery({ selection }: { selection: GallerySelection | null }) {
     </main>
   );
 }
+
+const ChalkField = ({ label, hint, children }: { label: React.ReactNode; hint?: string; children: React.ReactNode }) => (
+  <label className="field"><span>{label}</span>{hint && <small>{hint}</small>}<span className="chalk-input">{children}</span></label>
+);
 
 const Field = ({ label, hint, children }: { label: React.ReactNode; hint?: string; children: React.ReactNode }) => <label className="field"><span>{label}</span>{hint && <small>{hint}</small>}{children}</label>;
 
@@ -1260,27 +1360,262 @@ function About({ go }: { go: (page: Page) => void }) {
   );
 }
 
-function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }) {
+type LibraryMode = "gallery" | "products" | "discounts";
+type FilterKind = "scope" | "service" | "colorFinish";
+type ActiveTag = { kind: FilterKind; value: string };
+
+const ART_STYLES = ["Chibi", "Semi-Realistic"];
+const SCOPES_BY_STYLE: Record<string, string[]> = {
+  "Chibi": ["Headshot", "Fullbody"],
+  "Semi-Realistic": ["Headshot", "Bust-up", "Waist-up", "Thigh-up"],
+};
+const CHIBI_SERVICES = ["Solo Deals", "Sticker set", "Acrylic Merch", "Badges/Pins/Pfp Design", "Character Reference sheet", "2D Model character sheet", "YCH", "Alternate outfits/expressions"];
+const COLOR_FINISHES = ["Rendered", "Plain", "Monochrome"];
+const TOOL_PRESETS = ["Clip Studio Paint", "Procreate", "Adobe Photoshop", "Krita", "Paint Tool SAI", "MediBang Paint", "Ibis Paint X", "Adobe Illustrator"];
+const FORMAT_PRESETS = ["Digital illustration", "Digital print", "Sticker sheet", "Acrylic merch", "Pin / Badge", "Photocard", "Reference sheet", "2D model sheet"];
+const KIND_LABEL: Record<FilterKind, string> = { scope: "Scope", service: "Service", colorFinish: "Finish" };
+
+const dateMadePresets = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  return [now.toLocaleDateString("en-US", { month: "short", year: "numeric" }), String(year), String(year - 1), String(year - 2), String(year - 3)];
+};
+
+// Old rows were saved before artStyle/service existed, so fall back to the legacy fields.
+const itemArtStyle = (item: AdminLibraryItem) => {
+  if (item.artStyle) return item.artStyle;
+  const source = `${item.category || ""} ${item.requirementType || ""}`;
+  if (/semi/i.test(source)) return "Semi-Realistic";
+  if (/chibi/i.test(source)) return "Chibi";
+  return "";
+};
+const itemService = (item: AdminLibraryItem) => item.service || item.category?.match(/\(([^)]+)\)/)?.[1] || "";
+
+const matchesFilters = (item: AdminLibraryItem, mode: LibraryMode, artStyle: string, tags: ActiveTag[]) => {
+  if (artStyle) {
+    const style = itemArtStyle(item);
+    // Discounts with no specific style (e.g. "Any Commission") apply to everything, so keep them.
+    if (style ? style !== artStyle : mode !== "discounts") return false;
+  }
+  for (const kind of ["scope", "service", "colorFinish"] as FilterKind[]) {
+    const picked = tags.filter((tag) => tag.kind === kind).map((tag) => tag.value);
+    if (!picked.length) continue;
+    const value = kind === "scope" ? item.scope : kind === "service" ? itemService(item) : item.colorFinish;
+    if (!value || !picked.includes(value)) return false;
+  }
+  return true;
+};
+
+// One gallery entry may hold up to 10 MB of images in total, however many images that is.
+const MAX_ENTRY_BYTES = 10 * 1024 * 1024;
+const ENTRY_LIMIT_LABEL = `${MAX_ENTRY_BYTES / (1024 * 1024)} MB`;
+// Each stored image is resized to fit comfortably inside one database row (a D1 row tops out at 2 MB).
+const MAX_STORED_IMAGE_BYTES = 1_500_000;
+
+// Real size of an image: a data URL decodes to roughly 3/4 of its base64 length. Anything else counts by text length.
+const dataUrlBytes = (src: string) => {
+  const comma = src.indexOf(",");
+  if (!src.startsWith("data:") || comma === -1) return src.length;
+  const base64 = src.slice(comma + 1);
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.floor((base64.length * 3) / 4) - padding;
+};
+const formatMB = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+const pad2 = (value: number) => String(value).padStart(2, "0");
+
+// Local calendar date as yyyy-mm-dd (toISOString() would be a day behind in the morning in UTC+8).
+const todayInput = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+};
+
+const toInputDate = (value?: string) => {
+  if (!value) return todayInput();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? todayInput() : `${parsed.getFullYear()}-${pad2(parsed.getMonth() + 1)}-${pad2(parsed.getDate())}`;
+};
+
+// Stored in the same readable style the older rows already use, e.g. "Oct 21, 2026".
+const formatPublishedDate = (iso: string) => {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+};
+
+// Draws the image at the given size and encodes it (WebP, or JPEG where the browser can't encode WebP).
+const encodeImage = (img: HTMLImageElement, maxSize: number, quality: number): string | null => {
+  const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(img.width * scale));
+  canvas.height = Math.max(1, Math.round(img.height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  context.drawImage(img, 0, 0, canvas.width, canvas.height);
+  let data = canvas.toDataURL("image/webp", quality);
+  if (!data.startsWith("data:image/webp")) {
+    // Older Safari can’t encode WebP: fall back to JPEG with a white background behind transparent areas.
+    context.globalCompositeOperation = "destination-over";
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    data = canvas.toDataURL("image/jpeg", quality);
+  }
+  return data;
+};
+
+// Prepares an upload for storage. There is no cap on the original file: it is resized (largest side 1600 px first,
+// then smaller only if it is still too detailed) until it fits in one database row.
+const compressImage = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const attempts: Array<[number, number]> = [[1600, 0.85], [1600, 0.72], [1280, 0.72], [1000, 0.65], [800, 0.6]];
+      for (const [maxSize, quality] of attempts) {
+        const data = encodeImage(img, maxSize, quality);
+        if (!data) {
+          reject(new Error("This browser can’t resize images."));
+          return;
+        }
+        if (dataUrlBytes(data) <= MAX_STORED_IMAGE_BYTES) {
+          resolve(data);
+          return;
+        }
+      }
+      reject(new Error(`${file.name} is too detailed to store even after resizing. Try a simpler version of it.`));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error(`${file.name} couldn’t be read as an image.`));
+    };
+    img.src = url;
+  });
+
+function ActionMenu({ label, onEdit, onDelete }: { label: string; onEdit: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent) => { if (!ref.current?.contains(event.target as Node)) setOpen(false); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  return (
+    <div className="kebab" ref={ref}>
+      <button type="button" className="kebab-btn" aria-label={`Actions for ${label}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
+        <Icon name="more" />
+      </button>
+      {open && (
+        <div className="kebab-menu" role="menu">
+          <button type="button" role="menuitem" onClick={() => { setOpen(false); onEdit(); }}><Icon name="pen" size={16} /> Edit</button>
+          <button type="button" role="menuitem" className="danger" onClick={() => { setOpen(false); onDelete(); }}><Icon name="trash" size={16} /> Delete</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LibraryFilterBar({ artStyle, tags, onArtStyle, onToggleTag, onClear }: {
+  artStyle: string; tags: ActiveTag[]; onArtStyle: (value: string) => void;
+  onToggleTag: (tag: ActiveTag) => void; onClear: () => void;
+}) {
+  const [drawer, setDrawer] = useState<"scope" | "service" | null>(null);
+  const scopeOptions = artStyle ? SCOPES_BY_STYLE[artStyle] : Array.from(new Set(Object.values(SCOPES_BY_STYLE).flat()));
+  const serviceLabel = artStyle === "Chibi" ? "Service" : artStyle === "Semi-Realistic" ? "Color Finish" : "Service / Color Finish";
+  const serviceGroups: { kind: FilterKind; label: string; options: string[] }[] = [];
+  if (artStyle !== "Semi-Realistic") serviceGroups.push({ kind: "service", label: "Service (Chibi)", options: CHIBI_SERVICES });
+  if (artStyle !== "Chibi") serviceGroups.push({ kind: "colorFinish", label: "Color Finish (Semi-Realistic)", options: COLOR_FINISHES });
+
+  const isOn = (kind: FilterKind, value: string) => tags.some((tag) => tag.kind === kind && tag.value === value);
+  const toggleDrawer = (name: "scope" | "service") => setDrawer((current) => (current === name ? null : name));
+  const pill = (kind: FilterKind, value: string) => (
+    <button key={`${kind}:${value}`} type="button" className={`chalk-pill ${isOn(kind, value) ? "on" : ""}`} aria-pressed={isOn(kind, value)} onClick={() => onToggleTag({ kind, value })}>
+      {value}
+    </button>
+  );
+
+  return (
+    <div className="library-filter">
+      <div className="library-filter-row">
+        <strong className="sub-filter-label">Filter</strong>
+        <label className="sub-filter-select">
+          <span className="sr-only">Art Style</span>
+          <select value={artStyle} onChange={(event) => { setDrawer(null); onArtStyle(event.target.value); }}>
+            <option value="">Art Style</option>
+            {ART_STYLES.map((style) => <option key={style} value={style}>{style}</option>)}
+          </select>
+        </label>
+        <button type="button" className={`chalk-pill-btn ${drawer === "scope" ? "open" : ""}`} aria-expanded={drawer === "scope"} aria-controls="filter-drawer" onClick={() => toggleDrawer("scope")}>
+          Scope <span aria-hidden="true">{drawer === "scope" ? "▴" : "▾"}</span>
+        </button>
+        <button type="button" className={`chalk-pill-btn ${drawer === "service" ? "open" : ""}`} aria-expanded={drawer === "service"} aria-controls="filter-drawer" onClick={() => toggleDrawer("service")}>
+          {serviceLabel} <span aria-hidden="true">{drawer === "service" ? "▴" : "▾"}</span>
+        </button>
+        {tags.length > 0 && <button type="button" className="sub-filter-clear" onClick={onClear}>Clear filters</button>}
+      </div>
+
+      {drawer && (
+        <div className="library-filter-drawer" id="filter-drawer">
+          {drawer === "scope" && scopeOptions.map((value) => pill("scope", value))}
+          {drawer === "service" && serviceGroups.map((group) => (
+            <div className="filter-group" key={group.kind}>
+              {serviceGroups.length > 1 && <span className="filter-group-label">{group.label}</span>}
+              {group.options.map((value) => pill(group.kind, value))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="library-filter-tray" aria-live="polite">
+        {tags.length === 0 && <span className="tray-empty">No filters selected</span>}
+        {tags.map((tag) => (
+          <span className="chalk-tag" key={`${tag.kind}:${tag.value}`}>
+            <small>{KIND_LABEL[tag.kind]}</small> {tag.value}
+            <button type="button" aria-label={`Remove ${tag.value} filter`} onClick={() => onToggleTag(tag)}><Icon name="close" size={12} /></button>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PublishManager({ mode }: { mode: LibraryMode }) {
+  const emptyDraft = (target: LibraryMode) => ({
+    title: "",
+    description: "",
+    category: target === "products" ? "Pins" : target === "discounts" ? "Chibi Only" : "",
+    artStyle: target === "gallery" ? "Chibi" : "",
+    subCategory: target === "gallery" ? "Sticker set" : "",
+    scope: target === "gallery" ? "Headshot" : "",
+    colorFinish: "",
+    price: "", percentage: "", startDate: "", endDate: "", code: "",
+    image: "", bannerImage: "",
+    images: [] as string[],
+    dateMade: "", tools: "", format: "",
+    publishedDate: todayInput()
+  });
+
   const [items, setItems] = useState<AdminLibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState({ 
-    title: "", 
-    description: "", 
-    category: mode === "gallery" ? "Chibi" : mode === "products" ? "Pins" : "Chibi Only", 
-    subCategory: "Sticker set", 
-    scope: "Headshot",
-    colorFinish: "Rendered",
-    price: "", 
-    percentage: "", 
-    requirementType: "Any", 
-    startDate: "", 
-    endDate: "", 
-    code: "", 
-    image: "", 
-    bannerImage: "" 
-  });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminLibraryItem | null>(null);
+  const [artStyleFilter, setArtStyleFilter] = useState("");
+  const [tags, setTags] = useState<ActiveTag[]>([]);
+  const [draft, setDraft] = useState(emptyDraft(mode));
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [formError, setFormError] = useState("");
+  const [processing, setProcessing] = useState(false);
+  const [progress, setProgress] = useState("");
+  const [loadingSet, setLoadingSet] = useState(false);   // fetching the other images of a set being edited
+  const [lockSave, setLockSave] = useState(false);       // set when that fetch failed, so a partial set is never saved
+  const editRequest = useRef(0);                         // ignores answers that arrive after the editor was closed
 
   const loadItems = async () => {
     setLoading(true);
@@ -1298,51 +1633,254 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
     }
   };
 
+  // The same component instance is reused when switching admin tabs, so reset everything per mode.
   useEffect(() => {
+    setItems([]);
+    setArtStyleFilter("");
+    setTags([]);
+    setEditingId(null);
+    setDraft(emptyDraft(mode));
+    setPreviewIndex(0);
+    setFormError("");
     void loadItems();
   }, [mode]);
 
-  const upload = (file?: File, isBanner = false) => { 
-    if (!file) return; 
-    const reader = new FileReader(); 
-    reader.onload = () => setDraft(prev => ({ ...prev, [isBanner ? "bannerImage" : "image"]: String(reader.result) })); 
-    reader.readAsDataURL(file); 
+  const visible = useMemo(() => items.filter((item) => matchesFilters(item, mode, artStyleFilter, tags)), [items, mode, artStyleFilter, tags]);
+
+  // Changing Art Style wipes every sub-filter (Scope, Service, Color Finish).
+  const changeArtStyleFilter = (value: string) => { setArtStyleFilter(value); setTags([]); };
+  const toggleTag = (tag: ActiveTag) => setTags((current) =>
+    current.some((existing) => existing.kind === tag.kind && existing.value === tag.value)
+      ? current.filter((existing) => !(existing.kind === tag.kind && existing.value === tag.value))
+      : [...current, tag]
+  );
+
+  // Single-image modes (shop product, discount banner): the picked file replaces the current image.
+  const uploadSingle = async (file?: File, isBanner = false) => {
+    if (!file) return;
+    setFormError("");
+    setProcessing(true);
+    try {
+      const data = await compressImage(file);
+      setDraft((prev) => ({ ...prev, [isBanner ? "bannerImage" : "image"]: data }));
+    } catch (uploadError) {
+      setFormError(uploadError instanceof Error ? uploadError.message : String(uploadError));
+    } finally {
+      setProcessing(false);
+    }
   };
+
+  // Gallery mode: any number of images can be picked at once and become one set (the first is the cover).
+  // The only limit is the combined stored size of the entry (10 MB), checked as each image is added.
+  const addImages = async (picked: File[]) => {
+    const files = picked.filter((file) => file.type.startsWith("image/"));
+    if (!files.length) {
+      setFormError("Please choose image files.");
+      return;
+    }
+    setFormError("");
+    setProcessing(true);
+    let running = draft.images.reduce((total, src) => total + dataUrlBytes(src), 0);
+    const added: string[] = [];
+    const problems: string[] = [];
+    let leftOut = 0;
+    try {
+      for (let index = 0; index < files.length; index++) {
+        setProgress(`Processing ${index + 1} of ${files.length}…`);
+        let data: string;
+        try {
+          data = await compressImage(files[index]);
+        } catch (uploadError) {
+          problems.push(uploadError instanceof Error ? uploadError.message : String(uploadError));
+          continue;
+        }
+        const bytes = dataUrlBytes(data);
+        if (running + bytes > MAX_ENTRY_BYTES) {
+          leftOut = files.length - index;
+          break;
+        }
+        running += bytes;
+        added.push(data);
+      }
+      if (added.length) setDraft((prev) => ({ ...prev, images: [...prev.images, ...added] }));
+      if (leftOut) problems.push(`Added ${added.length} of ${files.length} images. The other ${leftOut} would go over the ${ENTRY_LIMIT_LABEL} limit for one entry.`);
+      if (problems.length) setFormError(problems.join(" "));
+    } finally {
+      setProgress("");
+      setProcessing(false);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setDraft((prev) => ({ ...prev, images: prev.images.filter((_, position) => position !== index) }));
+    setPreviewIndex((current) => Math.max(0, Math.min(current, draft.images.length - 2)));
+  };
+
+  const moveImage = (index: number, delta: number) => {
+    const target = index + delta;
+    if (target < 0 || target >= draft.images.length) return;
+    setDraft((prev) => {
+      const next = [...prev.images];
+      [next[index], next[target]] = [next[target], next[index]];
+      return { ...prev, images: next };
+    });
+    setPreviewIndex(target);
+  };
+
+  const changeDraftStyle = (style: string) => setDraft((prev) => ({
+    ...prev,
+    artStyle: style,
+    scope: mode === "gallery" && style ? SCOPES_BY_STYLE[style][0] : "",
+    subCategory: mode === "gallery" && style === "Chibi" ? "Sticker set" : "",
+    colorFinish: mode === "gallery" && style === "Semi-Realistic" ? "Rendered" : "",
+  }));
+
+  const openAdd = () => {
+    setEditingId(null);
+    setDraft(emptyDraft(mode)); // Date Published defaults to today each time the form opens
+    setPreviewIndex(0);
+    setFormError("");
+    editRequest.current += 1;
+    setLoadingSet(false);
+    setLockSave(false);
+    setOpen(true);
+  };
+
+  const closeModal = () => {
+    editRequest.current += 1;
+    setLoadingSet(false);
+    setLockSave(false);
+    setOpen(false);
+    setEditingId(null);
+    setDraft(emptyDraft(mode));
+    setPreviewIndex(0);
+    setFormError("");
+  };
+
+  const startEdit = (item: AdminLibraryItem) => {
+    const style = itemArtStyle(item) || (mode === "gallery" ? "Chibi" : "");
+    setDraft({
+      ...emptyDraft(mode),
+      title: item.title,
+      description: item.description || "",
+      category: mode === "discounts" ? item.requirementType || "Any" : mode === "products" ? item.category || "Pins" : "",
+      artStyle: style,
+      subCategory: itemService(item) || (mode === "gallery" && style === "Chibi" ? "Sticker set" : ""),
+      scope: item.scope || (mode === "gallery" && style ? SCOPES_BY_STYLE[style][0] : ""),
+      colorFinish: item.colorFinish || (mode === "gallery" && style === "Semi-Realistic" ? "Rendered" : ""),
+      price: item.price !== undefined ? String(item.price) : "",
+      percentage: item.percentage !== undefined ? String(item.percentage) : "",
+      startDate: item.startDate || "", endDate: item.endDate || "", code: item.code || "",
+      image: item.image && item.image !== placeholder ? item.image : "",
+      bannerImage: item.bannerImage && item.bannerImage !== placeholder ? item.bannerImage : "",
+      images: mode === "gallery" && item.image && item.image !== placeholder ? [item.image] : [],
+      dateMade: item.dateMade || "", tools: item.tools || "", format: item.format || "",
+      publishedDate: toInputDate(item.publishedAt)
+    });
+    setPreviewIndex(0);
+    setFormError("");
+    setEditingId(item.id);
+    setOpen(true);
+
+    // The list only carries each entry's cover, so fetch the rest of its set. Saving stays disabled until it arrives.
+    const token = ++editRequest.current;
+    setLockSave(false);
+    setLoadingSet(false);
+    if (mode === "gallery" && (item.imageCount ?? 1) > 1) {
+      setLoadingSet(true);
+      apiRequest<{ images: string[] }>(`/api/gallery/${item.id}/images`)
+        .then((data) => {
+          if (token !== editRequest.current) return;
+          if (!Array.isArray(data.images) || !data.images.length) throw new Error("the server returned no images");
+          setDraft((prev) => ({ ...prev, images: data.images.filter((image) => image && image !== placeholder) }));
+        })
+        .catch((loadError) => {
+          if (token !== editRequest.current) return;
+          setLockSave(true);
+          setFormError(`Couldn’t load this set’s images (${loadError instanceof Error ? loadError.message : String(loadError)}). Close the editor and try again so nothing gets lost.`);
+        })
+        .finally(() => {
+          if (token === editRequest.current) setLoadingSet(false);
+        });
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await apiRequest<{ success: boolean }>(`/api/${mode}/${deleteTarget.id}`, { method: "DELETE" });
+      setItems((current) => current.filter((existing) => existing.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (deleteError) {
+      const message = deleteError instanceof Error ? deleteError.message : String(deleteError);
+      setError(message);
+      console.error(`Failed to delete ${mode} item from D1:`, deleteError);
+      alert(`Failed to delete: ${message}`);
+    }
+  };
+
+  const setSize = draft.images.reduce((total, src) => total + dataUrlBytes(src), 0);
+  const overBudget = setSize > MAX_ENTRY_BYTES;
+  const usedPercent = Math.min(100, Math.round((setSize / MAX_ENTRY_BYTES) * 100));
 
   const publish = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalCategory = draft.category === "Chibi" ? `Chibi (${draft.subCategory})` : draft.category;
+    if (loadingSet || lockSave) return;
+    setFormError("");
+
+    if (mode === "gallery") {
+      if (!draft.images.length) { setFormError("Add at least one image to publish."); return; }
+      if (overBudget) {
+        setFormError(`These images total ${formatMB(setSize)}, over the ${ENTRY_LIMIT_LABEL} limit for one entry. Remove a few and try again.`);
+        return;
+      }
+    } else if (mode === "products" && !draft.image) {
+      setFormError("Choose an image for this product.");
+      return;
+    } else if (mode === "discounts" && !draft.bannerImage) {
+      setFormError("Choose a banner image for this discount.");
+      return;
+    }
+
+    const style = draft.artStyle;
+    const service = style === "Chibi" ? draft.subCategory : "";
+    const colorFinish = style === "Semi-Realistic" ? draft.colorFinish : "";
+    const scope = style ? draft.scope : "";
+    const publishedAt = formatPublishedDate(draft.publishedDate || todayInput());
+    const common = { id: editingId ?? Date.now(), title: draft.title, description: draft.description, artStyle: style, scope, service, colorFinish };
 
     const item: AdminLibraryItem = mode === "discounts"
       ? {
-        id: Date.now(),
-        title: draft.title,
+        ...common,
         percentage: Number(draft.percentage),
         requirementType: draft.category,
-        description: draft.description,
         startDate: draft.startDate,
         endDate: draft.endDate,
         code: draft.code || "PROMO",
-        bannerImage: draft.bannerImage || placeholder
+        bannerImage: draft.bannerImage
       }
-      : {
-        id: Date.now(),
-        title: draft.title,
-        description: draft.description,
-        category: finalCategory,
-        ...(mode === "gallery" ? {
-          scope: draft.scope,
-          service: draft.category === "Chibi" ? draft.subCategory : undefined,
-          colorFinish: draft.category === "Semi-Realistic" ? draft.colorFinish : undefined,
-        } : {}),
-        price: Number(draft.price || 0),
-        image: draft.image || placeholder,
-        publishedAt: new Date().toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })
-      };
+      : mode === "gallery"
+        ? {
+          ...common,
+          // Keep the legacy "Chibi (Service)" category string: the public gallery still reads it.
+          category: style === "Chibi" ? `Chibi (${service})` : style,
+          image: draft.images[0],
+          images: draft.images,
+          tools: draft.tools, format: draft.format,
+          publishedAt
+        }
+        : {
+          ...common,
+          category: draft.category,
+          price: Number(draft.price || 0),
+          image: draft.image,
+          dateMade: draft.dateMade, tools: draft.tools, format: draft.format,
+          publishedAt
+        };
 
     try {
-      await apiRequest<{ success: boolean }>(`/api/${mode}`, {
-        method: "POST",
+      await apiRequest<{ success: boolean }>(editingId !== null ? `/api/${mode}/${editingId}` : `/api/${mode}`, {
+        method: editingId !== null ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(item)
       });
@@ -1350,14 +1888,24 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
     } catch (publishError) {
       const message = publishError instanceof Error ? publishError.message : String(publishError);
       setError(message);
-      console.error(`Failed to publish ${mode} item to D1:`, publishError);
-      alert(`Failed to publish: ${message}`);
+      console.error(`Failed to save ${mode} item to D1:`, publishError);
+      alert(`Failed to save: ${message}`);
       return;
     }
-
-    setDraft({ title: "", description: "", category: mode === "gallery" ? "Chibi" : mode === "products" ? "Pins" : "Chibi Only", subCategory: "Sticker set", scope: "Headshot", colorFinish: "Rendered", price: "", percentage: "", requirementType: "Any", startDate: "", endDate: "", code: "", image: "", bannerImage: "" });
-    setOpen(false);
+    closeModal();
   };
+
+  const noun = mode === "gallery" ? "artwork" : mode === "products" ? "product" : "discount";
+  const previewSrc = mode === "gallery" ? draft.images[previewIndex] : mode === "discounts" ? draft.bannerImage : draft.image;
+  const replaceLabel = processing
+    ? progress || "Processing…"
+    : loadingSet
+      ? "Loading images…"
+      : mode === "gallery"
+      ? draft.images.length ? "Add more images" : "Choose images"
+      : mode === "discounts"
+        ? draft.bannerImage ? "Replace banner" : "Choose banner"
+        : draft.image ? "Replace image" : "Choose image";
 
   return (
     <div className="admin-panel media-manager">
@@ -1366,145 +1914,216 @@ function PublishManager({ mode }: { mode: "gallery" | "products" | "discounts" }
           <p>PUBLISHED LIBRARY</p>
           <h2>{mode === "gallery" ? "Gallery images" : mode === "products" ? "Shop merchandise" : "Discounts"}</h2>
         </div>
-        <button className="admin-plus" onClick={() => setOpen(true)}>
-          <Icon name="plus" /> Add {mode === "gallery" ? "artwork" : mode === "products" ? "product" : "discount"}
+        <button className="admin-plus" onClick={openAdd}>
+          <Icon name="plus" /> Add {noun}
         </button>
       </div>
+
+      <LibraryFilterBar artStyle={artStyleFilter} tags={tags} onArtStyle={changeArtStyleFilter} onToggleTag={toggleTag} onClear={() => setTags([])} />
 
       <div className="media-list">
         {loading && <p className="empty-row">Loading from D1…</p>}
         {error && <p className="empty-row" role="alert">Unable to load or update data: {error}</p>}
-        {items.map((item) => (
-          <article key={item.id}>
-            <img src={item.image || item.bannerImage || placeholder} alt={item.title} />
-            <div>
-              <span>{item.category || item.requirementType || `${item.percentage}% OFF`}</span>
-              <h3>{item.title}</h3>
-              <p>{item.description}</p>
-              <small>{mode === "discounts" ? `Code: ${item.code} | ${item.startDate} to ${item.endDate}` : `Published ${item.publishedAt}`}</small>
-            </div>
-            <button aria-label={`Delete ${item.title}`} onClick={async () => {
-              try {
-                await apiRequest<{ success: boolean }>(`/api/${mode}/${item.id}`, { method: "DELETE" });
-                setItems((current) => current.filter((existing) => existing.id !== item.id));
-              } catch (deleteError) {
-                const message = deleteError instanceof Error ? deleteError.message : String(deleteError);
-                setError(message);
-                console.error(`Failed to delete ${mode} item from D1:`, deleteError);
-                alert(`Failed to delete: ${message}`);
-              }
-            }}><Icon name="trash" /></button>
-          </article>
-        ))}
+        {visible.map((item) => {
+          const imageCount = item.imageCount ?? 1;
+          const metaParts = [mode === "products" ? item.dateMade : "", item.tools, item.format].filter(Boolean);
+          return (
+            <article key={item.id}>
+              <img src={item.image || item.bannerImage || placeholder} alt={item.title} />
+              <div>
+                <span>{item.category || item.requirementType || `${item.percentage}% OFF`}</span>
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
+                <small>
+                  {mode === "discounts" ? `Code: ${item.code} | ${item.startDate} to ${item.endDate}` : `Published ${item.publishedAt}`}
+                  {mode === "gallery" && imageCount > 1 ? ` · Set of ${imageCount} images` : ""}
+                </small>
+                {mode !== "discounts" && metaParts.length > 0 && (
+                  <small className="media-meta">{metaParts.join(" · ")}</small>
+                )}
+              </div>
+              <ActionMenu label={item.title} onEdit={() => startEdit(item)} onDelete={() => setDeleteTarget(item)} />
+            </article>
+          );
+        })}
         {!loading && !error && items.length === 0 && <div className="empty-row">Nothing published yet. Use the plus button to add the first item.</div>}
+        {!loading && !error && items.length > 0 && visible.length === 0 && <div className="empty-row">No items match these filters.</div>}
       </div>
 
+      {deleteTarget && (
+        <div className="modal-backdrop" onMouseDown={() => setDeleteTarget(null)}>
+          <div className="confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-delete-title" onMouseDown={(e) => e.stopPropagation()}>
+            <h2 id="confirm-delete-title">Delete this {noun}?</h2>
+            <p>“{deleteTarget.title}” will be removed from the database. This can’t be undone.</p>
+            <div className="confirm-actions">
+              <Btn kind="outline" onClick={() => setDeleteTarget(null)}>Cancel</Btn>
+              <Btn onClick={confirmDelete}>Delete</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
       {open && (
-        <div className="modal-backdrop" onMouseDown={() => setOpen(false)}>
+        <div className="modal-backdrop" onMouseDown={closeModal}>
           <form className="publish-modal" onSubmit={publish} onMouseDown={(e) => e.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={() => setOpen(false)}><Icon name="close" /></button>
+            <button type="button" className="modal-close" aria-label="Close editor" onClick={closeModal}><Icon name="close" /></button>
+
             <div className="publish-preview">
-              <img src={draft.image || draft.bannerImage || placeholder} alt="Upload preview" />
-              <label>
-                <Icon name="plus" /> Choose {mode === "discounts" ? "banner" : "image"}
-                <input required={!draft.image && !draft.bannerImage} type="file" accept="image/*" onChange={(e) => upload(e.target.files?.[0], mode === "discounts")} />
+              <img src={previewSrc || placeholder} alt="Upload preview" />
+
+              {mode === "gallery" && draft.images.length > 0 && (
+                <>
+                  <ul className="set-thumbs" aria-label="Images in this set">
+                    {draft.images.map((src, index) => (
+                      <li key={`${index}-${src.length}`}>
+                        <button type="button" className={`set-thumb ${index === previewIndex ? "on" : ""}`} aria-pressed={index === previewIndex} aria-label={`Show image ${index + 1}${index === 0 ? " (cover)" : ""}`} onClick={() => setPreviewIndex(index)}>
+                          <img src={src} alt="" />
+                          {index === 0 && <b>Cover</b>}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="set-actions">
+                    <button type="button" aria-label="Move image earlier" disabled={previewIndex === 0} onClick={() => moveImage(previewIndex, -1)}>←</button>
+                    <button type="button" aria-label="Move image later" disabled={previewIndex >= draft.images.length - 1} onClick={() => moveImage(previewIndex, 1)}>→</button>
+                    <button type="button" className="danger" onClick={() => removeImage(previewIndex)}><Icon name="trash" size={14} /> Remove</button>
+                  </div>
+                  <div className="set-meter" aria-hidden="true"><i className={overBudget ? "over" : ""} style={{ width: `${usedPercent}%` }} /></div>
+                  <small className={`set-size ${overBudget ? "over" : ""}`}>
+                    {draft.images.length} {draft.images.length === 1 ? "image" : "images"} · {formatMB(setSize)} of {ENTRY_LIMIT_LABEL}
+                  </small>
+                </>
+              )}
+
+              <label className={`publish-replace ${processing || loadingSet ? "busy" : ""}`}>
+                <Icon name="plus" /> {replaceLabel}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple={mode === "gallery"}
+                  disabled={processing || loadingSet}
+                  onChange={(e) => {
+                    const input = e.target;
+                    const picked = Array.from(input.files || []); // copy first: clearing the input empties the live FileList
+                    input.value = "";
+                    if (mode === "gallery") void addImages(picked);
+                    else void uploadSingle(picked[0], mode === "discounts");
+                  }}
+                />
               </label>
             </div>
 
             <div className="publish-fields">
-              <p className="kicker">New {mode === "gallery" ? "gallery artwork" : mode === "products" ? "shop merchandise" : "discount offer"}</p>
-              <h2>Publish something new</h2>
-              
-              <Field label="Title">
+              <p className="kicker">{editingId !== null ? "Editing" : "New"} {mode === "gallery" ? "gallery artwork" : mode === "products" ? "shop merchandise" : "discount offer"}</p>
+              <h2>{editingId !== null ? "Edit details" : "Publish something new"}</h2>
+
+              <ChalkField label="Title">
                 <input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder={mode === "discounts" ? "Summer Promo" : "Item title"} />
-              </Field>
+              </ChalkField>
 
-              <Field label="Description">
+              <ChalkField label="Description">
                 <textarea required rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Write a brief description..." />
-              </Field>
+              </ChalkField>
 
-              <Field label="Category">
-                <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value, scope: "Headshot" })}>
-                  {mode === "gallery" && (
-                    <>
-                      <option value="Chibi">Chibi</option>
-                      <option value="Semi-Realistic">Semi-Realistic</option>
-                    </>
-                  )}
-                  {mode === "products" && (
-                    <>
-                      <option value="Pins">Pins</option>
-                      <option value="Prints">Prints</option>
-                      <option value="Photocard">Photocard</option>
-                      <option value="Chibi">Chibi</option>
-                    </>
-                  )}
-                  {mode === "discounts" && (
-                    <>
-                      <option value="Chibi Only">Chibi Only</option>
-                      <option value="Semi-Realistic Only">Semi-Realistic Only</option>
-                      <option value="Any">Any Commission</option>
-                      <option value="Commercial Use">Commercial Use</option>
-                    </>
-                  )}
+              {mode === "products" && (
+                <ChalkField label="Product type">
+                  <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>
+                    {["Pins", "Prints", "Photocard", "Chibi"].map((type) => <option key={type} value={type}>{type}</option>)}
+                  </select>
+                </ChalkField>
+              )}
+
+              {mode === "discounts" && (
+                <ChalkField label="Requirement">
+                  <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>
+                    <option value="Chibi Only">Chibi Only</option>
+                    <option value="Semi-Realistic Only">Semi-Realistic Only</option>
+                    <option value="Any">Any Commission</option>
+                    <option value="Commercial Use">Commercial Use</option>
+                  </select>
+                </ChalkField>
+              )}
+
+              <ChalkField label="Art Style">
+                <select value={draft.artStyle} onChange={(e) => changeDraftStyle(e.target.value)}>
+                  {mode !== "gallery" && <option value="">None / any</option>}
+                  {ART_STYLES.map((style) => <option key={style} value={style}>{style}</option>)}
                 </select>
-              </Field>
+              </ChalkField>
 
-              {mode === "gallery" && (
-                <Field label="Scope">
+              {draft.artStyle && (
+                <ChalkField label="Scope">
                   <select value={draft.scope} onChange={(e) => setDraft({ ...draft, scope: e.target.value })}>
-                    {(draft.category === "Chibi" ? ["Headshot", "Fullbody"] : ["Headshot", "Bust-up", "Waist-up", "Thigh-up"]).map((scope) => <option key={scope} value={scope}>{scope}</option>)}
+                    {mode !== "gallery" && <option value="">None</option>}
+                    {SCOPES_BY_STYLE[draft.artStyle].map((scope) => <option key={scope} value={scope}>{scope}</option>)}
                   </select>
-                </Field>
+                </ChalkField>
               )}
 
-              {(draft.category === "Chibi" || (mode !== "gallery" && draft.category === "Chibi Only")) && (
-                <Field label="Chibi Service / Type">
+              {draft.artStyle === "Chibi" && (
+                <ChalkField label="Service">
                   <select value={draft.subCategory} onChange={(e) => setDraft({ ...draft, subCategory: e.target.value })}>
-                    <option value="Solo Deals">Solo Deals</option>
-                    <option value="Sticker set">Sticker set</option>
-                    <option value="Acrylic Merch">Acrylic Merch</option>
-                    <option value="Badges/Pins/Pfp Design">Badges/Pins/Pfp Design</option>
-                    <option value="Character Reference sheet">Character Reference sheet</option>
-                    <option value="2D Model character sheet">2D Model character sheet</option>
-                    <option value="YCH">YCH (Your Character Here)</option>
-                    <option value="Alternate outfits/expressions">Alternate outfits/expressions</option>
+                    {mode !== "gallery" && <option value="">None</option>}
+                    {CHIBI_SERVICES.map((service) => <option key={service} value={service}>{service === "YCH" ? "YCH (Your Character Here)" : service}</option>)}
                   </select>
-                </Field>
+                </ChalkField>
               )}
 
-              {mode === "gallery" && draft.category === "Semi-Realistic" && (
-                <Field label="Color Finish">
+              {draft.artStyle === "Semi-Realistic" && (
+                <ChalkField label="Color Finish">
                   <select value={draft.colorFinish} onChange={(e) => setDraft({ ...draft, colorFinish: e.target.value })}>
-                    <option value="Rendered">Rendered</option>
-                    <option value="Plain">Plain Color</option>
-                    <option value="Monochrome">Monochrome</option>
+                    {mode !== "gallery" && <option value="">None</option>}
+                    {COLOR_FINISHES.map((finish) => <option key={finish} value={finish}>{finish === "Plain" ? "Plain Color" : finish}</option>)}
                   </select>
-                </Field>
+                </ChalkField>
+              )}
+
+              {mode !== "discounts" && (
+                <>
+                  {mode === "products" && (
+                    <ChalkField label="Date Made" hint="Type your own or pick a preset">
+                      <input list={`${mode}-datemade-list`} autoComplete="off" value={draft.dateMade} onChange={(e) => setDraft({ ...draft, dateMade: e.target.value })} placeholder="e.g. Oct 2026" />
+                      <datalist id={`${mode}-datemade-list`}>{dateMadePresets().map((value) => <option key={value} value={value} />)}</datalist>
+                    </ChalkField>
+                  )}
+                  <ChalkField label="Tools" hint="Type your own or pick a preset">
+                    <input list={`${mode}-tools-list`} autoComplete="off" value={draft.tools} onChange={(e) => setDraft({ ...draft, tools: e.target.value })} placeholder="e.g. Clip Studio Paint" />
+                    <datalist id={`${mode}-tools-list`}>{TOOL_PRESETS.map((value) => <option key={value} value={value} />)}</datalist>
+                  </ChalkField>
+                  <ChalkField label="Format" hint="Type your own or pick a preset">
+                    <input list={`${mode}-format-list`} autoComplete="off" value={draft.format} onChange={(e) => setDraft({ ...draft, format: e.target.value })} placeholder="e.g. Digital illustration" />
+                    <datalist id={`${mode}-format-list`}>{FORMAT_PRESETS.map((value) => <option key={value} value={value} />)}</datalist>
+                  </ChalkField>
+                  <ChalkField label="Date Published" hint="Defaults to today. Pick another date if you need to.">
+                    <input type="date" required value={draft.publishedDate} onChange={(e) => setDraft({ ...draft, publishedDate: e.target.value })} />
+                  </ChalkField>
+                </>
               )}
 
               {mode === "products" && (
-                <Field label="Price in PHP">
+                <ChalkField label="Price in PHP">
                   <input required type="number" min="0" value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value })} placeholder="250" />
-                </Field>
+                </ChalkField>
               )}
 
               {mode === "discounts" && (
                 <>
-                  <Field label="Discount Percentage (%)">
+                  <ChalkField label="Discount Percentage (%)">
                     <input required type="number" min="1" max="100" value={draft.percentage} onChange={(e) => setDraft({ ...draft, percentage: e.target.value })} placeholder="15" />
-                  </Field>
-                  <Field label="Discount Code">
+                  </ChalkField>
+                  <ChalkField label="Discount Code">
                     <input required value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} placeholder="CHIBIPROMO" />
-                  </Field>
+                  </ChalkField>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                    <Field label="Start Date"><input required type="date" value={draft.startDate} onChange={(e) => setDraft({ ...draft, startDate: e.target.value })} /></Field>
-                    <Field label="End Date"><input required type="date" value={draft.endDate} onChange={(e) => setDraft({ ...draft, endDate: e.target.value })} /></Field>
+                    <ChalkField label="Start Date"><input required type="date" value={draft.startDate} onChange={(e) => setDraft({ ...draft, startDate: e.target.value })} /></ChalkField>
+                    <ChalkField label="End Date"><input required type="date" value={draft.endDate} onChange={(e) => setDraft({ ...draft, endDate: e.target.value })} /></ChalkField>
                   </div>
                 </>
               )}
 
-              <Btn type="submit">Publish <Icon name="arrow" /></Btn>
+              {formError && <p className="form-error" role="alert">{formError}</p>}
+
+              <Btn type="submit" disabled={processing || loadingSet || lockSave}>{editingId !== null ? "Save changes" : "Publish"} <Icon name="arrow" /></Btn>
             </div>
           </form>
         </div>
@@ -2297,7 +2916,12 @@ export default function App() {
     if (!isAdminAuth) {
       return <Login onLogin={() => setIsAdminAuth(true)} go={go} />;
     }
-    return content.admin;
+    return (
+      <div className="chalk-theme">
+        <ChalkDefs />
+        {content.admin}
+      </div>
+    );
   }
 
   return (

@@ -784,7 +784,7 @@ footer a:hover, footer button:hover { color: var(--gold); }
 /* ==========================================================================
    2. Chalk & sketchbook theme
    Scoped to .chalk-theme, which App.tsx applies to every public page.
-   Admin and Login render outside that wrapper and keep their original styling.
+   Admin is wrapped in .chalk-theme too (see App.tsx); only Login keeps its original styling.
    ========================================================================== */
 .chalk-defs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 
@@ -1198,4 +1198,217 @@ footer a { overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) {
   .chalk-theme *, .chalk-theme *::before, .chalk-theme *::after { animation: none !important; transition-duration: .01ms !important; }
   .chalk-theme .scroll-reveal { filter: none; rotate: 0deg; }
+}
+
+/* =====================================================================
+   ADMIN PANEL ADDITIONS
+   Admin chalk theme, full-width media list, kebab menu, filter bar,
+   chalk pills/tags, delete confirmation.
+   ===================================================================== */
+
+/* ---- Chalk theme for the whole admin (needs the .chalk-theme wrapper from App.tsx) ---- */
+.chalk-theme .admin-shell { background: transparent; }
+.chalk-theme .admin-nav { background-image: var(--chalk-dust-soft); background-size: 260px; }
+.chalk-theme :is(.admin-panel, .stats-grid article, .media-list article) {
+  position: relative; border-color: transparent; border-radius: 12px;
+  background-color: var(--paper); background-image: var(--chalk-grain); background-size: 240px;
+}
+.chalk-theme :is(.admin-panel, .stats-grid article, .media-list article)::after {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  border: 2px solid currentColor; border-radius: 12px; filter: url(#chalk-edge-fine); transition: border-color .3s ease;
+}
+.chalk-theme .media-list article:hover::after { border-color: var(--gold); }
+.chalk-theme .media-list article > img { border-radius: 10px 0 0 10px; }
+.chalk-theme :is(.publish-modal, .confirm-modal) {
+  background-color: var(--paper); background-image: var(--chalk-grain); background-size: 240px;
+  outline: 2px dashed color-mix(in srgb, currentColor 30%, transparent); outline-offset: -10px;
+  animation: chalk-dust-in .6s var(--chalk-ease) backwards;
+}
+.chalk-theme .publish-preview { background: transparent; }
+
+/* ---- Media list: full width of its manager ---- */
+.media-manager .media-list { width: 100%; grid-template-columns: 1fr; }
+.media-manager .media-list article { grid-template-columns: 100px minmax(0, 1fr) 44px; position: relative; }
+.media-manager .media-list article:has(.kebab-menu) { z-index: 40; }
+.media-list .media-meta { display: block; margin-top: 4px; }
+@media (max-width: 680px) { .media-manager .media-list article { grid-template-columns: 80px minmax(0, 1fr) 40px; } }
+
+/* ---- Kebab (three dots) menu ---- */
+.kebab { position: relative; justify-self: center; }
+.kebab-btn { width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; transition: background .2s, color .2s; }
+.kebab-btn:hover, .kebab-btn[aria-expanded="true"] { background: var(--cream); color: var(--ink); }
+.kebab-btn:focus-visible, .kebab-menu button:focus-visible { outline: 3px dashed var(--orange-deep); outline-offset: 2px; }
+.kebab-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; min-width: 168px; padding: 6px;
+  display: flex; flex-direction: column; gap: 2px; border-radius: 12px;
+  background-color: var(--paper); background-image: var(--chalk-grain); background-size: 240px;
+  box-shadow: 0 16px 32px rgb(55 55 55 / .2); animation: kebab-in .18s ease-out;
+}
+.kebab-menu::after { content: ""; position: absolute; inset: 0; border: 2px solid var(--ink); border-radius: 12px; filter: url(#chalk-edge-fine); pointer-events: none; }
+.kebab-menu button { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 16px; text-align: left; cursor: pointer; }
+.kebab-menu button:hover { background: var(--cream); }
+.kebab-menu button.danger { color: #a8321f; }
+@keyframes kebab-in { from { opacity: 0; translate: 0 -6px; } to { opacity: 1; translate: 0 0; } }
+
+/* ---- Chalk pills + active tags (hand-drawn outline) ---- */
+.chalk-pill, .chalk-pill-btn, .chalk-tag {
+  position: relative; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 999px;
+  padding: 7px 15px; font: inherit; font-size: 16px; color: var(--ink);
+  background-color: var(--paper); background-image: var(--chalk-grain); background-size: 240px;
+}
+.chalk-pill, .chalk-pill-btn { cursor: pointer; transition: background-color .2s, color .2s; }
+.chalk-pill::after, .chalk-pill-btn::after, .chalk-tag::after {
+  content: ""; position: absolute; inset: 0; border: 1.5px solid currentColor; border-radius: 999px;
+  filter: url(#chalk-edge-fine); pointer-events: none; transition: border-color .25s ease;
+}
+.chalk-pill:hover::after, .chalk-pill-btn:hover::after { border-color: var(--orange-deep); }
+.chalk-pill.on, .chalk-pill-btn.open { background-color: var(--cream); color: var(--orange-deep); }
+.chalk-pill.on::after, .chalk-pill-btn.open::after { border-width: 2px; border-color: var(--orange-deep); }
+.chalk-pill:focus-visible, .chalk-pill-btn:focus-visible { outline: 3px dashed var(--orange-deep); outline-offset: 3px; }
+.chalk-tag { padding: 5px 6px 5px 14px; background-color: var(--cream); color: var(--orange-deep); }
+.chalk-tag small { color: var(--muted); font-size: 16px; }
+.chalk-tag button { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+.chalk-tag button:hover { background: rgb(184 67 12 / .14); }
+.chalk-tag button:focus-visible { outline: 2px dashed currentColor; outline-offset: 1px; }
+
+/* ---- Filter bar: Filter | Art Style | Scope | Service/Color Finish, drawer, tag tray ---- */
+.library-filter { display: flex; flex-direction: column; gap: 12px; padding-top: 18px; }
+.library-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.library-filter .sub-filter-select { flex: 0 1 210px; }
+.library-filter-drawer {
+  position: relative; display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 12px;
+  background-color: var(--cream); animation: drawer-in .22s ease-out;
+  outline: 1.5px dashed color-mix(in srgb, var(--ink) 30%, transparent); outline-offset: -6px;
+}
+.library-filter-drawer:not(:has(.filter-group)) { flex-direction: row; flex-wrap: wrap; gap: 10px; }
+.filter-group { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.filter-group-label { flex-basis: 100%; color: var(--muted); font-size: 16px; }
+.library-filter-tray { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 36px; }
+.tray-empty { color: var(--muted); font-size: 16px; }
+@keyframes drawer-in { from { opacity: 0; translate: 0 -6px; } to { opacity: 1; translate: 0 0; } }
+
+/* ---- Delete confirmation ---- */
+.confirm-modal { position: relative; width: min(440px, 100%); padding: 34px 30px 28px; display: flex; flex-direction: column; gap: 10px; background: var(--paper); box-shadow: 0 30px 80px rgb(0 0 0 / .25); }
+.confirm-modal h2 { margin: 0; font: 26px "DM Serif Display", serif; }
+.confirm-modal p { margin: 0; color: var(--muted); }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 14px; }
+
+@media (prefers-reduced-motion: reduce) { .kebab-menu, .library-filter-drawer { animation: none; } }
+
+/* =====================================================================
+   STICKY ADMIN EDITOR · IMAGE SETS · GALLERY CAROUSEL
+   ===================================================================== */
+
+/* ---- Admin add/edit modal: preview, Replace button and Close stay pinned while the form scrolls ---- */
+.publish-modal { overscroll-behavior: contain; }
+.publish-modal > .publish-preview {
+  grid-column: 1; grid-row: 1; position: sticky; top: 0; z-index: 3; align-self: start;
+  min-height: 0; max-height: min(90vh, 780px); overflow-y: auto; justify-content: flex-start; gap: 12px;
+}
+.publish-modal > .publish-fields { grid-column: 2; grid-row: 1; }
+.publish-modal > .modal-close {
+  grid-column: 2; grid-row: 1; position: sticky; top: 14px; right: auto; z-index: 6;
+  align-self: start; justify-self: end; margin: 14px 14px 0 0; background: white;
+}
+.publish-preview > img { max-height: 44vh; }
+.chalk-theme .publish-modal > .publish-preview { background-color: var(--cream); }
+
+/* The whole Replace / Add button is the file input, so it works with the keyboard too */
+.publish-preview .publish-replace { position: relative; margin-top: 4px; flex: 0 0 auto; }
+.publish-preview .publish-replace.busy { opacity: .6; cursor: progress; }
+.publish-preview .publish-replace:focus-within { outline: 3px dashed var(--orange-deep); outline-offset: 3px; }
+.publish-preview input[type="file"] { display: block; position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 0; }
+.publish-preview input[type="file"]:disabled { cursor: progress; }
+
+/* ---- Image set strip inside the preview ---- */
+.set-thumbs { list-style: none; margin: 0; padding: 4px 2px; display: flex; gap: 8px; width: 100%; overflow-x: auto; }
+.set-thumbs li { flex: 0 0 auto; }
+.set-thumb { position: relative; width: 60px; height: 60px; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: #eff1f3; cursor: pointer; display: block; }
+.set-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.set-thumb.on { border-color: var(--orange); }
+.set-thumb:focus-visible { outline: 3px dashed var(--orange-deep); outline-offset: 2px; }
+.set-thumb b { position: absolute; inset: auto 0 0 0; padding: 1px 0; background: rgb(55 55 55 / .8); color: white; font-size: 12px; font-weight: 700; text-align: center; }
+.set-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: 100%; }
+.set-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; min-height: 40px; padding: 0 14px; border: 1px solid var(--ink); border-radius: 999px; background: white; color: var(--ink); font: inherit; font-size: 16px; cursor: pointer; }
+.set-actions button:hover:not(:disabled) { background: var(--cream); }
+.set-actions button:disabled { opacity: .4; cursor: not-allowed; }
+.set-actions button:focus-visible { outline: 3px dashed var(--orange-deep); outline-offset: 2px; }
+.set-actions .danger { color: #a8321f; border-color: #a8321f; }
+.set-size { color: var(--muted); font-size: 16px; text-align: center; }
+.set-size.over { color: #a8321f; font-weight: 700; }
+.form-error { margin: 0; padding: 10px 14px; border-radius: 10px; background: #fdece8; color: #a8321f; font-size: 16px; }
+
+/* ---- Mobile: keep one column, but pin the (compact) preview and the close button to the top ---- */
+@media (max-width: 760px) {
+  .publish-modal { display: block; }
+  .publish-modal > .publish-preview { position: sticky; top: 0; max-height: 40vh; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .publish-modal > .publish-preview > img { aspect-ratio: auto; height: 16vh; max-height: 16vh; }
+  .publish-modal > .modal-close { display: grid; position: sticky; top: 8px; margin: 8px 8px -52px auto; }
+}
+
+/* ---- Public gallery: multi-image carousel in the artwork modal ---- */
+.project-image.carousel { position: relative; overflow: hidden; }
+.carousel-btn {
+  position: absolute; top: 50%; translate: 0 -50%; z-index: 3; width: 46px; height: 46px; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 50%; background: rgb(255 255 255 / .92); color: var(--ink); cursor: pointer;
+  box-shadow: 0 6px 18px rgb(0 0 0 / .18); transition: color .2s ease, scale .2s ease;
+}
+.carousel-btn.prev { left: 14px; }
+.carousel-btn.next { right: 14px; }
+.carousel-btn:hover { color: var(--orange-deep); scale: 1.06; }
+.carousel-btn:focus-visible { outline: 3px dashed var(--orange-deep); outline-offset: 3px; }
+.carousel-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+.carousel-dots {
+  position: absolute; left: 50%; bottom: 16px; translate: -50% 0; z-index: 3; display: flex; align-items: center; gap: 2px;
+  padding: 4px 8px; border-radius: 999px; background: rgb(255 255 255 / .82); backdrop-filter: blur(4px);
+}
+.carousel-dots button { width: 22px; height: 22px; padding: 0; border: 0; background: transparent; display: grid; place-items: center; cursor: pointer; }
+.carousel-dots button::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #8c8c8c; transition: background .2s ease, scale .2s ease; }
+.carousel-dots button:hover::before { background: #6f6f6f; }
+.carousel-dots button.on::before { background: var(--orange); scale: 1.25; }
+.carousel-dots button.on:hover::before { background: var(--orange); }
+.carousel-dots button:focus-visible { outline: 3px dashed var(--orange-deep); outline-offset: 1px; border-radius: 50%; }
+
+.project-meta { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 14px 18px; }
+
+@media (max-width: 760px) {
+  .carousel-btn { width: 40px; height: 40px; }
+  .carousel-btn.prev { left: 10px; }
+  .carousel-btn.next { right: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .carousel-btn, .carousel-dots button::before { transition: none; }
+}
+
+/* =====================================================================
+   CHALK OUTLINE ON ADMIN FORM FIELDS
+   (text inputs, dropdowns, date pickers, textareas in the add/edit modal)
+   Inputs can't draw a pseudo-element, so each one sits in a .chalk-input frame (see ChalkField in App.tsx).
+   ===================================================================== */
+.chalk-theme .chalk-input {
+  position: relative; display: block; border-radius: 8px 13px 7px 12px / 12px 7px 13px 8px;
+  transition: box-shadow .25s ease;
+}
+.chalk-theme .chalk-input::after {
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  border: 1.5px solid currentColor; border-radius: inherit; filter: url(#chalk-edge-fine);
+  transition: border-color .25s ease, border-width .15s ease;
+}
+.chalk-theme .chalk-input :is(input, select, textarea) {
+  position: relative; z-index: 1; display: block; width: 100%; border: 0; border-radius: inherit;
+  background-color: var(--paper); background-image: var(--chalk-grain); background-size: 240px;
+  box-shadow: none; outline: none;
+}
+.chalk-theme .chalk-input :is(input, select, textarea):focus,
+.chalk-theme .chalk-input :is(input, select, textarea):focus-visible { border: 0; box-shadow: none; outline: none; }
+.chalk-theme .chalk-input:hover::after { border-color: var(--orange-deep); }
+/* Focus stays clearly visible: thicker orange chalk line plus a soft glow around the whole frame */
+.chalk-theme .chalk-input:focus-within { box-shadow: 0 0 0 3px rgb(254 157 60 / .35); }
+.chalk-theme .chalk-input:focus-within::after { border-color: var(--orange-deep); border-width: 2px; }
+.chalk-theme .chalk-input textarea { resize: vertical; min-height: 84px; }
+.chalk-theme .chalk-input input[type="date"] { min-height: 48px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .chalk-theme .chalk-input, .chalk-theme .chalk-input::after { transition: none; }
 }
