@@ -3,6 +3,7 @@ import logo from "./assets/inkdrop-logo.png";
 import brandName from "./assets/brand-name.png";
 import placeholder from "./assets/placeholder.svg";
 import heroArtwork from "./assets/Untitled200_20261016201217.png";
+import chibiReference from "./assets/Untitled201_20261021205439.png";
 
 const API_URL = "https://kyuu.my-eportfolio.workers.dev";
 
@@ -949,7 +950,9 @@ function Commission({ go }: { go: (page: Page) => void }) {
                         aria-pressed={form.artStyle === name}
                         onClick={() => setValue("artStyle", name)}
                       >
-                        <ArtVisual art={art} label={`${name} example artwork`} />
+                        {name === "Chibi"
+                          ? <div className="art-visual art-chibi-reference"><img src={chibiReference} alt="Chibi style example artwork" /></div>
+                          : <ArtVisual art={art} label={`${name} example artwork`} />}
                         <span className="art-style-copy"><strong>{name}</strong><small>{description}</small></span>
                       </button>
                     ))}
