@@ -1239,8 +1239,8 @@ function Guide() {
         <article className="guide-section-card">
           <div className="guide-section-heading"><span>II.</span><h2>COPYRIGHTS</h2></div>
           <div className="guide-topic-grid">
-            <section className="guide-topic-card"><h3>A. ARTIST RIGHTS</h3><p>Pursuant to Republic Act No. 8293 (The Intellectual Property Code of the Philippines), the copyright of the artwork inherently and permanently belongs to the artist. The artist retains all rights regarding the reproduction, distribution, and public display of the artwork for promotional, portfolio, and social media purposes.</p></section>
-            <section className="guide-topic-card"><h3>B. CLIENT RIGHTS</h3><p>Upon final payment, the client is granted a license to use the artwork for expected purposes. The artist must be clearly and visibly credited whenever the artwork is used or displayed publicly. The client may not alter, edit, or claim the artwork as their own creation[cite: 1, 2].</p></section>
+            <section className="guide-topic-card"><h3>A. ARTIST RIGHTS</h3><p><strong>Pursuant to Republic Act No. 8293 (The Intellectual Property Code of the Philippines), the copyright of the artwork inherently and permanently belongs to the artist.</strong> The artist retains all rights regarding the reproduction, distribution, and public display of the artwork for promotional, portfolio, and social media purposes.</p></section>
+            <section className="guide-topic-card"><h3>B. CLIENT RIGHTS</h3><p>Upon final payment, the client is granted a license to use the artwork for expected purposes. The artist must be clearly and visibly credited whenever the artwork is used or displayed publicly. The client may not alter, edit, or claim the artwork as their own creation.</p></section>
             <section className="guide-topic-card"><h3>C. AI & BLOCKCHAIN PROHIBITIONS</h3><p>Under no circumstances is the artwork permitted for use in Artificial Intelligence (AI) training databases, machine learning datasets, or any blockchain/NFT platforms. Any such utilization constitutes a direct violation of these terms and copyright law.</p></section>
             <section className="guide-topic-card"><h3>D. TRANSFER OF OWNERSHIP</h3><p>Full copyright ownership remains with the artist unless a separate, formal agreement is signed/explicitly said by both parties to assign the copyright to the client or an organization. Copyright buyout fees will apply for such transfers.</p></section>
           </div>
@@ -1259,7 +1259,7 @@ function Guide() {
                 <thead><tr><th scope="col">Milestone</th><th scope="col">Payment schedule</th></tr></thead>
                 <tbody>
                   <tr><th scope="row">Initial Phase</th><td data-label="Payment schedule">The project will be initiated and developed up to the midpoint milestone without an upfront cost.</td></tr>
-                  <tr><th scope="row">Mid-Project Downpayment</th><td data-label="Payment schedule">Upon reaching the midpoint milestone (the finalization of the approved sketch), a mandatory 20% downpayment of the total project fee will be requested[cite: 3, 4].</td></tr>
+                  <tr><th scope="row">Mid-Project Downpayment</th><td data-label="Payment schedule">Upon reaching the midpoint milestone (the finalization of the approved sketch), a mandatory 20% downpayment of the total project fee will be requested.</td></tr>
                   <tr><th scope="row">Final Settlement</th><td data-label="Payment schedule">The remaining balance must be paid in full within three (3) calendar days after the artwork is finished and presented. High-resolution—without any obstructive watermark—final deliverables will only be released once the full payment has cleared.</td></tr>
                 </tbody>
               </table>
@@ -1293,8 +1293,8 @@ function Guide() {
               <p>The artist is not held liable for delays caused by emergency situations, illness, power outages, natural disasters, or technical failures. In the event of such a delay, the client will be notified immediately, and a revised timeline will be established.</p>
               <p>If an operational delay occurs and the artist fails to respond to client inquiries or provide milestone updates for more than fourteen (14) consecutive days without prior notice, the client is granted the right to choose one of the following options:</p>
               <ul>
-                <li>Immediate Project Cancellation: The client may cancel the contract and receive a 12% refund of the settled downpayment, along with the latest work-in-progress export of the artwork as-is.</li>
-                <li>Timeline Extension: The client may choose to maintain the commission slot under a newly negotiated, mutually agreed-upon delivery deadline.</li>
+                <li><strong>Immediate Project Cancellation:</strong> The client may cancel the contract and receive a 12% refund of the settled downpayment, along with the latest work-in-progress export of the artwork as-is.</li>
+                <li><strong>Timeline Extension:</strong> The client may choose to maintain the commission slot under a newly negotiated, mutually agreed-upon delivery deadline.</li>
               </ul>
             </section>
           </div>
