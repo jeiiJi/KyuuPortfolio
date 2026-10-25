@@ -1417,3 +1417,9 @@ footer a { overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) {
   .chalk-theme .chalk-input, .chalk-theme .chalk-input::after { transition: none; }
 }
+
+/* ---- Admin: log out button (under "Back to website") ---- */
+.admin-nav .logout-btn { border: 0; background: transparent; color: #bbb; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 5px; font-size: 16px; cursor: pointer; text-align: left; transition: color .2s ease, background .2s ease; }
+.admin-nav .logout-btn:hover { color: white; background: rgb(255 255 255 / .08); }
+.admin-nav .logout-btn:focus-visible { outline: 3px dashed var(--orange); outline-offset: 2px; }
+@media (max-width: 900px) { .admin-nav .logout-btn { font-size: 0; justify-content: center; } }

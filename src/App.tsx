@@ -5,7 +5,8 @@ import placeholder from "./assets/placeholder.svg";
 import heroArtwork from "./assets/Untitled200_20261016201217.png";
 import chibiReference from "./assets/Untitled201_20261021205439.png";
 
-const API_URL = "https://kyuu.my-eportfolio.workers.dev";
+// The website and the API are served from the same address, so requests use relative paths like "/api/gallery".
+const API_URL = "";
 
 type Page = "home" | "gallery" | "shop" | "guide" | "about" | "commission" | "admin";
 type CommissionRequest = {
@@ -46,6 +47,7 @@ type IconName =
   | "mail"
   | "menu"
   | "more"
+  | "logout"
   | "pen"
   | "plus"
   | "spark"
@@ -66,6 +68,7 @@ const Icon = ({ name, size = 18 }: { name: IconName; size?: number }) => {
     facebook: ( <><circle cx="12" cy="12" r="9" /><path d="M13.5 19v-6h2l.3-2.3h-2.3V9.2c0-.7.2-1.1 1.2-1.1H16V6.1c-.2 0-.9-.1-1.8-.1-1.8 0-3.1 1.1-3.1 3.2v1.5H9v2.3h2.1v6h2.4Z" fill="currentColor" stroke="none"/></>),
     mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>,
     menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+    logout: <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />,
     more: <><circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" /><circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none" /></>,
     pen: <><path d="m15 5 4 4L8 20H4v-4L15 5Z" /><path d="m13 7 4 4" /></>,
     plus: <path d="M12 5v14M5 12h14" />,
@@ -91,7 +94,8 @@ const Btn = ({ children, kind = "primary", onClick, type = "button", className =
 );
 
 const apiRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(`${API_URL}${path}`, init);
+  const response = await fetch(`${API_URL}${path}`, { credentials: "same-origin", ...init });
+  if (response.status === 401) window.dispatchEvent(new Event("inkyuu:signed-out"));
   const text = await response.text();
   let data: unknown;
 
@@ -2371,7 +2375,7 @@ function RequestDetail({ request, close }: { request: CommissionRequest; close: 
   );
 }
 
-function Admin({ go }: { go: (page: Page) => void }) {
+function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => void }) {
   const [tab, setTab] = useState("overview");
   const [requests, setRequests] = useState<CommissionRequest[]>([]);
   const [selected, setSelected] = useState<CommissionRequest | null>(null);
@@ -2519,6 +2523,7 @@ function Admin({ go }: { go: (page: Page) => void }) {
         <button className="admin-brand" onClick={() => go("home")}><img src={logo} alt="" /><img src={brandName} alt="Inkyuu" /></button>
         <nav>{adminLinks.map(([id, icon, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}><Icon name={icon as IconName} />{label}</button>)}</nav>
         <button className="back-site" onClick={() => go("home")}><Icon name="arrow" /> Back to website</button>
+        <button className="logout-btn" onClick={onLogout}><Icon name="logout" /> Log out</button>
       </aside>
       <section className="admin-main">
         <header><div><p>STUDIO DASHBOARD</p><h1>{adminLinks.find(([id]) => id === tab)?.[2]}</h1></div></header>
@@ -2677,15 +2682,26 @@ function Admin({ go }: { go: (page: Page) => void }) {
 function Login({ onLogin, go }: { onLogin: () => void; go: (page: Page) => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  // The username and password are checked on the server. Nothing secret exists in this file.
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username === "admin" && password === "kyuukyuuji@12_36729") {
-      sessionStorage.setItem("inkyuu_admin_auth", "true");
+    setBusy(true);
+    setError("");
+    try {
+      await apiRequest<{ success: boolean }>("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      setPassword("");
       onLogin();
-    } else {
-      setError(true);
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : "Unable to log in. Please try again.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -2696,31 +2712,33 @@ function Login({ onLogin, go }: { onLogin: () => void; go: (page: Page) => void 
       </button>
       <div className="login-card">
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
-          <img src={logo} alt="" style={{ width: "72px", height: "auto", display: "block", margin: "0 auto" }} />          
+          <img src={logo} alt="" style={{ width: "72px", height: "auto", display: "block", margin: "0 auto" }} />
           <img className="login-wordmark" src={brandName} alt="Inkyuu" style={{ display: "block", margin: "-7px auto 0" }} />
         </div>
         <p>Studio Admin Access</p>
         <form onSubmit={handleLogin}>
           <Field label="Username">
-            <input 
-              type="text" 
-              required 
-              value={username} 
-              onChange={(e) => { setUsername(e.target.value); setError(false); }} 
-              placeholder="Enter username..." 
+            <input
+              type="text"
+              required
+              autoComplete="username"
+              value={username}
+              onChange={(e) => { setUsername(e.target.value); setError(""); }}
+              placeholder="Enter username..."
             />
           </Field>
           <Field label="Password">
-            <input 
-              type="password" 
-              required 
-              value={password} 
-              onChange={(e) => { setPassword(e.target.value); setError(false); }} 
-              placeholder="Enter password..." 
+            <input
+              type="password"
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => { setPassword(e.target.value); setError(""); }}
+              placeholder="Enter password..."
             />
           </Field>
-          {error && <span className="login-error">Invalid username or password. Please try again.</span>}
-          <Btn type="submit">Log in <Icon name="arrow" /></Btn>
+          {error && <span className="login-error" role="alert">{error}</span>}
+          <Btn type="submit" disabled={busy}>{busy ? "Checking…" : "Log in"} <Icon name="arrow" /></Btn>
         </form>
         <small>Protected studio route</small>
       </div>
@@ -2863,7 +2881,43 @@ export default function App() {
   const [page, setPage] = useState<Page>(getPage);
   const [promo, setPromo] = useState(false);
   const [promoAvailable, setPromoAvailable] = useState(false);
-  const [isAdminAuth, setIsAdminAuth] = useState(() => sessionStorage.getItem("inkyuu_admin_auth") === "true");
+  const [isAdminAuth, setIsAdminAuth] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  const checkAdminSession = async () => {
+    try {
+      const session = await apiRequest<{ authenticated: boolean }>("/api/admin/session");
+      setIsAdminAuth(Boolean(session.authenticated));
+    } catch {
+      setIsAdminAuth(false);
+    } finally {
+      setAuthChecked(true);
+    }
+  };
+
+  // Check the login whenever the admin page is opened, and drop back to the login form if the server ever says 401.
+  useEffect(() => {
+    if (page === "admin") {
+      setAuthChecked(false);
+      void checkAdminSession();
+    }
+  }, [page]);
+
+  useEffect(() => {
+    const onSignedOut = () => setIsAdminAuth(false);
+    window.addEventListener("inkyuu:signed-out", onSignedOut);
+    return () => window.removeEventListener("inkyuu:signed-out", onSignedOut);
+  }, []);
+
+  const logout = async () => {
+    try {
+      await apiRequest<{ success: boolean }>("/api/admin/logout", { method: "POST" });
+    } catch (logoutError) {
+      console.error("Log out request failed (the login still expires by itself):", logoutError);
+    }
+    setIsAdminAuth(false);
+    go("home");
+  };
 
   useEffect(() => {
     let active = true;
@@ -2880,9 +2934,6 @@ export default function App() {
       .catch((error) => console.error("Unable to check D1 discounts for the promo modal:", error));
     const onHash = () => {
       setPage(getPage());
-      if (window.location.hash.replace("#", "") === "admin") {
-        setIsAdminAuth(sessionStorage.getItem("inkyuu_admin_auth") === "true");
-      }
     };
     window.addEventListener("hashchange", onHash);
     return () => {
@@ -2913,9 +2964,12 @@ export default function App() {
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
   };
-  const content = { home: <Home go={go} openPromo={() => setPromo(true)} />, gallery: <Gallery selection={getGallerySelection()} />, shop: <Shop go={go} />, guide: <Guide />, about: <About go={go} />, commission: <Commission go={go} />, admin: <Admin go={go} /> };
+  const content = { home: <Home go={go} openPromo={() => setPromo(true)} />, gallery: <Gallery selection={getGallerySelection()} />, shop: <Shop go={go} />, guide: <Guide />, about: <About go={go} />, commission: <Commission go={go} />, admin: <Admin go={go} onLogout={logout} /> };
   
   if (page === "admin") {
+    if (!authChecked) {
+      return <main className="login-page" aria-busy="true"><p role="status">Checking access…</p></main>;
+    }
     if (!isAdminAuth) {
       return <Login onLogin={() => setIsAdminAuth(true)} go={go} />;
     }
