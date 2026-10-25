@@ -577,7 +577,7 @@ function Commission({ go }: { go: (page: Page) => void }) {
   const [step, setStep] = useState(1);
   useEffect(() => {
       const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
+      window.scrollTo({ top: 300, behavior: calm ? "auto" : "smooth" });
     }, [step]);
 
   const [form, setForm] = useState({
