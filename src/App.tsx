@@ -53,7 +53,9 @@ type IconName =
   | "spark"
   | "trash"
   | "user"
-  | "clock";
+  | "clock"
+  | "eye"
+  | "eye-off";
 
 const Icon = ({ name, size = 18 }: { name: IconName; size?: number }) => {
   const paths: Record<IconName, React.ReactNode> = {
@@ -75,7 +77,9 @@ const Icon = ({ name, size = 18 }: { name: IconName; size?: number }) => {
     spark: <><path d="m12 3 1.3 4.2L17 9l-3.7 1.8L12 15l-1.3-4.2L7 9l3.7-1.8L12 3Z" /><path d="m19 15 .7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7L19 15Z" /></>,
     trash: <><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14" /><path d="M10 11v6M14 11v6" /></>,
     user: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
-    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></>
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></>,
+    eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>,
+    "eye-off": <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><path d="M1 1l22 22" /></>,
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 };
@@ -2687,10 +2691,10 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
 function Login({ onLogin, go }: { onLogin: () => void; go: (page: Page) => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // The username and password are checked on the server. Nothing secret exists in this file.
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -2732,16 +2736,39 @@ function Login({ onLogin, go }: { onLogin: () => void; go: (page: Page) => void 
               placeholder="Enter username..."
             />
           </Field>
+          
           <Field label="Password">
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => { setPassword(e.target.value); setError(""); }}
-              placeholder="Enter password..."
-            />
+            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                placeholder="Enter password..."
+                style={{ width: "100%", paddingRight: "44px" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                style={{
+                  position: "absolute",
+                  right: "10px",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "grid",
+                  placeItems: "center",
+                  padding: "4px",
+                  color: "var(--muted)"
+                }}
+              >
+                <Icon name={showPassword ? "eye-off" : "eye"} size={18} />
+              </button>
+            </div>
           </Field>
+
           {error && <span className="login-error" role="alert">{error}</span>}
           <Btn type="submit" disabled={busy}>{busy ? "Checking…" : "Log in"} <Icon name="arrow" /></Btn>
         </form>
