@@ -571,6 +571,11 @@ const Field = ({ label, hint, children }: { label: React.ReactNode; hint?: strin
 
 function Commission({ go }: { go: (page: Page) => void }) {
   const [step, setStep] = useState(1);
+  useEffect(() => {
+      const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
+    }, [step]);
+
   const [form, setForm] = useState({
     name: "",
     email: "",
