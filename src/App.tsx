@@ -1338,16 +1338,6 @@ function Guide() {
             <p>If a client loses their files or requires a new download link after the 6-month hosting period has expired, they may reach out to the artist directly. While the artist will make every effort to retrieve the artwork from their personal archives, recovery is not guaranteed if the data has been permanently cleared or archived.</p>
           </section>
         </article>
-
-        <article className="guide-section-card">
-          <div className="guide-section-heading"><span>SERVICE - I.</span><h2>SLOTS & AVAILABILITY</h2></div>
-          <section className="guide-topic-card">
-            <p>
-              <strong>Note on Work Availability:</strong> Please note that the active slots and reservation system described below apply strictly to semi-realistic works.</p>
-            <p>To ensure high-quality results and prevent any project delays, production capacity is strictly limited to exactly three (3) active slots at a time. Once these three active slots are filled, booking closes temporarily, and accepted commissions are worked on and prioritized sequentially in the exact order that the initial project parameters are confirmed.</p>
-            <p>When active slots are fully occupied, a dedicated reservation list is available so you can secure a guaranteed spot for future openings. Clients on this reservation list are given automatic priority, meaning that as soon as an active slot clears, individuals on this list will be contacted first to initiate their projects before openings are advertised to the general public.</p>
-          </section>
-        </article>
       </section>
     </main>
   );
