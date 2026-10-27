@@ -1,0 +1,125 @@
+-- migrations/0001_init.sql
+
+CREATE TABLE IF NOT EXISTS commissions (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  social TEXT,
+  type TEXT NOT NULL,
+  finish TEXT,
+  characters INTEGER,
+  background TEXT,
+  commercial BOOLEAN,
+  priority BOOLEAN,
+  dueDate TEXT,
+  notes TEXT,
+  "references" TEXT, -- Store JSON stringified array of images
+  totalPhp INTEGER,
+  submittedAt TEXT,
+  stage INTEGER,
+  discountCode TEXT,
+  discountName TEXT,
+  discountAmount INTEGER,
+  historyType TEXT,
+  submittedToHistoryAt TEXT
+);
+
+CREATE TABLE IF NOT EXISTS gallery (
+  id INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  image TEXT,
+  category TEXT,
+  scope TEXT,
+  service TEXT,
+  colorFinish TEXT,
+  publishedAt TEXT
+);
+
+CREATE TABLE IF NOT EXISTS products (
+  id INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  image TEXT,
+  category TEXT,
+  price REAL,
+  publishedAt TEXT
+);
+
+CREATE TABLE IF NOT EXISTS discounts (
+  id INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,
+  percentage INTEGER,
+  requirementType TEXT,
+  description TEXT,
+  startDate TEXT,
+  endDate TEXT,
+  bannerImage TEXT,
+  code TEXT
+);
+
+-- migrations/0002_media_fields.sql
+-- Save as: migrations/0002_media_fields.sql
+-- Run once with:  pnpm exec wrangler d1 migrations apply inkyuu-db --remote
+-- (SQLite has no "ADD COLUMN IF NOT EXISTS", so this file must only run once. Wrangler tracks that for you.)
+
+-- gallery already has scope, service, colorFinish
+ALTER TABLE gallery ADD COLUMN artStyle TEXT;
+ALTER TABLE gallery ADD COLUMN dateMade TEXT;
+ALTER TABLE gallery ADD COLUMN tools TEXT;
+ALTER TABLE gallery ADD COLUMN format TEXT;
+
+ALTER TABLE products ADD COLUMN artStyle TEXT;
+ALTER TABLE products ADD COLUMN scope TEXT;
+ALTER TABLE products ADD COLUMN service TEXT;
+ALTER TABLE products ADD COLUMN colorFinish TEXT;
+ALTER TABLE products ADD COLUMN dateMade TEXT;
+ALTER TABLE products ADD COLUMN tools TEXT;
+ALTER TABLE products ADD COLUMN format TEXT;
+
+ALTER TABLE discounts ADD COLUMN artStyle TEXT;
+ALTER TABLE discounts ADD COLUMN scope TEXT;
+ALTER TABLE discounts ADD COLUMN service TEXT;
+ALTER TABLE discounts ADD COLUMN colorFinish TEXT;
+
+-- Backfill existing rows so old items show up under the new filters
+UPDATE gallery SET artStyle = CASE WHEN category LIKE 'Semi%' THEN 'Semi-Realistic' ELSE 'Chibi' END WHERE artStyle IS NULL;
+UPDATE gallery SET service = substr(category, instr(category, '(') + 1, length(category) - instr(category, '(') - 1)
+  WHERE (service IS NULL OR service = '') AND category LIKE 'Chibi (%)';
+UPDATE products SET artStyle = 'Chibi' WHERE artStyle IS NULL AND category = 'Chibi';
+UPDATE discounts SET artStyle = 'Chibi' WHERE artStyle IS NULL AND requirementType = 'Chibi Only';
+UPDATE discounts SET artStyle = 'Semi-Realistic' WHERE artStyle IS NULL AND requirementType = 'Semi-Realistic Only';
+
+-- migrations/0003_gallery_image_sets.sql
+-- Save as: migrations/0003_gallery_image_sets.sql
+-- Run once with:  pnpm exec wrangler d1 migrations apply inkyuu-db --remote
+--
+-- extraImages holds a JSON array (text) of the additional images in a gallery set.
+-- The cover/first image stays in the existing `image` column, so old rows keep working unchanged.
+ALTER TABLE gallery ADD COLUMN extraImages TEXT;
+
+-- migrations/0004_gallery_images_table.sql
+-- Stores additional gallery set images separately so each image stays within D1's row-size limit.
+CREATE TABLE IF NOT EXISTS gallery_images (
+  galleryId INTEGER NOT NULL,
+  position INTEGER NOT NULL,
+  data TEXT NOT NULL,
+  bytes INTEGER NOT NULL,
+  PRIMARY KEY (galleryId, position),
+  FOREIGN KEY (galleryId) REFERENCES gallery(id) ON DELETE CASCADE
+);
+
+
+-- migrations/0005_login_attempts.sql
+-- Save as: migrations/0005_login_attempts.sql
+-- Run once with:  pnpm exec wrangler d1 migrations apply inkyuu-db --remote
+--
+-- Remembers failed admin logins per IP address, so the login can lock out password guessing
+-- (5 wrong attempts => 15 minute pause). Old rows are cleaned up automatically by the worker.
+CREATE TABLE IF NOT EXISTS login_attempts (
+  ip TEXT NOT NULL,
+  at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts (ip, at);
+
