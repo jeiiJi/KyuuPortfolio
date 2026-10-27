@@ -4,8 +4,6 @@ import brandName from "./assets/brand-name.png";
 import placeholder from "./assets/placeholder.svg";
 import heroArtwork from "./assets/Untitled200_20261016201217.png";
 import chibiReference from "./assets/Untitled201_20261021205439.png";
-
-// The website and the API are served from the same address, so requests use relative paths like "/api/gallery".
 const API_URL = "";
 
 type Page = "home" | "gallery" | "shop" | "guide" | "about" | "commission" | "admin";
@@ -84,15 +82,6 @@ const Icon = ({ name, size = 18 }: { name: IconName; size?: number }) => {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 };
 
-const artItems = [
-  { id: 1, title: "Golden Hour", type: "Semi-Realistic", desc: "A study in soft light, quiet confidence, and warm summer color.", art: "sunset", size: "tall", tags: ["portrait", "warm light", "digital"] },
-  { id: 2, title: "Tea Break", type: "Chibi", desc: "A tiny afternoon ritual with an oversized cup and extra joy.", art: "tea", size: "short", tags: ["chibi", "character", "cozy"] },
-  { id: 3, title: "Koi Dreams", type: "Semi-Realistic", desc: "Dreamlike currents inspired by koi ponds and silk.", art: "koi", size: "medium", tags: ["fantasy", "water", "editorial"] },
-  { id: 4, title: "Lucky Scout", type: "Chibi", desc: "A pocket-sized adventurer ready for the next quest.", art: "scout", size: "medium", tags: ["chibi", "game art", "cute"] },
-  { id: 5, title: "Flora", type: "Semi-Realistic", desc: "Botanical shapes meet expressive portraiture.", art: "flora", size: "short", tags: ["nature", "portrait", "green"] },
-  { id: 6, title: "Orange Club", type: "Chibi", desc: "A playful character set made for stickers.", art: "orange", size: "tall", tags: ["sticker", "chibi", "collection"] },
-];
-
 const Btn = ({ children, kind = "primary", onClick, type = "button", className = "", style, disabled }: { children: React.ReactNode; kind?: "primary" | "outline" | "ghost"; onClick?: () => void; type?: "button" | "submit"; className?: string; style?: React.CSSProperties; disabled?: boolean }) => (
   <button type={type} className={`btn btn-${kind} ${className}`} onClick={onClick} style={style} disabled={disabled}><span className="btn-label">{children}</span></button>
 );
@@ -153,12 +142,26 @@ const money = (php: number) => `₱${php.toLocaleString()}`;
 
 function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
   const [open, setOpen] = useState(false);
+
+  // Lock body scroll when mobile nav drawer is open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
+
   const links: { label: string; page: Page }[] = [
     { label: "Home", page: "home" },
     { label: "Gallery", page: "gallery" },
@@ -166,18 +169,45 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
     { label: "Guide", page: "guide" },
     { label: "About", page: "about" },
   ];
+
   return (
     <header className="navbar">
       <div className="nav-inner">
-        <button className="brand" onClick={() => go("home")} aria-label="Inkyuu home">
-          <img className="brand-symbol" src={logo} alt="" /><img className="brand-wordmark" src={brandName} alt="Inkyuu" />
-        </button>
-        <nav id="primary-nav" className={open ? "nav-links open" : "nav-links"} aria-label="Main navigation">
-          {links.map((link) => <button key={link.page} className={page === link.page ? "active" : ""} aria-current={page === link.page ? "page" : undefined} onClick={() => { go(link.page); setOpen(false); }}>{link.label}</button>)}
-        </nav>
-        <div className="nav-actions">
-          <button type="button" className="menu-button" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} aria-controls="primary-nav" onClick={() => setOpen(!open)}><Icon name={open ? "close" : "menu"} /></button>
+        <div className="nav-actions left-action">
+          <button
+            type="button"
+            className="menu-button"
+            aria-label={open ? "Close menu" : "Open menu"}
+            aria-expanded={open}
+            aria-controls="primary-nav"
+            onClick={() => setOpen(!open)}
+          >
+            <Icon name={open ? "close" : "menu"} />
+          </button>
         </div>
+
+        <button className="brand" onClick={() => { go("home"); setOpen(false); }} aria-label="Inkyuu home">
+          <img className="brand-symbol" src={logo} alt="" />
+          <img className="brand-wordmark" src={brandName} alt="Inkyuu" />
+        </button>
+
+        {/* Backdrop positioned below the navbar */}
+        {open && (
+          <div className="nav-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
+        )}
+
+        <nav id="primary-nav" className={open ? "nav-links open" : "nav-links"} aria-label="Main navigation">
+          {links.map((link) => (
+            <button
+              key={link.page}
+              className={page === link.page ? "active" : ""}
+              aria-current={page === link.page ? "page" : undefined}
+              onClick={() => { go(link.page); setOpen(false); }}
+            >
+              {link.label}
+            </button>
+          ))}
+        </nav>
       </div>
     </header>
   );
@@ -188,7 +218,7 @@ function ArtVisual({ art, label }: { art: string; label: string }) {
 }
 
 function PromoModal({ close, go }: { close: () => void; go: (page: Page) => void }) {
-  const { items: discounts, error } = useApiData<DiscountItem>("/api/discounts");
+  const { items: discounts } = useApiData<DiscountItem>("/api/discounts");
   const activeDiscount = discounts[0] || {
     title: "Your idea deserves to be drawn.",
     percentage: 15,
@@ -219,7 +249,6 @@ function PromoModal({ close, go }: { close: () => void; go: (page: Page) => void
             <div className="eyebrow"><Icon name="spark" size={15} /> Special Offer</div>
             <h2 id="promo-title">{activeDiscount.title}</h2>
             <p>{activeDiscount.description}</p>
-            {error && <p role="alert">Offer details could not be loaded from the server: {error}</p>}
             <div className="promo-code"><span>Discount Code</span><strong>{activeDiscount.code || "PROMO"}</strong></div>
             <Btn onClick={() => { close(); go("commission"); }}>Start a commission <Icon name="arrow" /></Btn>
             <button className="text-link" onClick={close}>Maybe later</button>
@@ -231,22 +260,20 @@ function PromoModal({ close, go }: { close: () => void; go: (page: Page) => void
 }
 
 function Home({ go, openPromo }: { go: (page: Page, selection?: GallerySelection) => void; openPromo: () => void }) {
-  const { items: discounts, error: discountError } = useApiData<DiscountItem>("/api/discounts");
-  const { items: requests, error: requestError } = useApiData<CommissionRequest>("/api/commissions");
-  const activeSemiRequests = requests.filter((request) => !request.historyType && request.type.startsWith("Semi-Realistic"));
-  const activeCount = Math.min(3, activeSemiRequests.length);
-  const reservedCount = Math.max(0, Math.min(2, activeSemiRequests.length - 3));
+  const { items: discounts } = useApiData<DiscountItem>("/api/discounts");
+  const { items: published } = useApiData<PublishedItem>("/api/gallery");
+  
   const canvasCards: { icon: IconName; title: string; desc: string; selection: GallerySelection }[] = [
     { icon: "brush", title: "Character art", desc: "Originals, fan art & portraits", selection: { category: "Semi-Realistic", facet: "Scope", value: "Headshot" } },
     { icon: "pen", title: "Chibi cuties", desc: "Tiny style, big personality", selection: { category: "Chibi", facet: "Scope", value: "Headshot" } },
     { icon: "spark", title: "Merch design", desc: "Stickers, cards & keepsakes", selection: { category: "Chibi", facet: "Services", value: "Sticker set" } },
     { icon: "grid", title: "Visual stories", desc: "Covers, scenes & key art", selection: { category: "Semi-Realistic", facet: "Color Finish", value: "Rendered" } },
   ];
+
   return (
     <>
       <main id="main-content" tabIndex={-1}>
         <section className="hero wrap">
-          {/* Copy appears first */}
           <div className="hero-copy">
             <div className="eyebrow"><span className="eyebrow-line" /> Digital artist & illustrator</div>
             <h1>Small moments,<br /><em>boldly drawn.</em></h1>
@@ -255,8 +282,6 @@ function Home({ go, openPromo }: { go: (page: Page, selection?: GallerySelection
               <Btn onClick={() => go("gallery")}>Explore my work <Icon name="arrow" /></Btn>
             </div>
           </div>
-
-          {/* Canvas/Artwork appears as a clean background element with transparent asset blending */}
           <div className="hero-canvas">
             <div className="art-visual art-hero">
               <img src={heroArtwork} alt="Featured artwork" />
@@ -265,23 +290,6 @@ function Home({ go, openPromo }: { go: (page: Page, selection?: GallerySelection
         </section>
 
         <ChalkDivider />
-
-        <section className="section wrap featured">
-          <div className="section-heading">
-            <div><p className="kicker">Fresh from the sketchbook</p><h2>This month's favorites</h2></div>
-            <p>Pieces I loved bringing to life lately. Tap through to see the process and story behind each one.</p>
-          </div>
-          <div className="featured-grid">
-            {artItems.slice(0, 3).map((item, index) => (
-              <a className="featured-card" key={item.id} href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer">
-                <div className="featured-number">0{index + 1}</div>
-                <ArtVisual art={item.art} label={item.title} />
-                <div className="card-copy"><span>{item.type}</span><h3>{item.title}</h3><p>{item.desc}</p><b>View social post <Icon name="arrow" size={16} /><span className="sr-only"> (opens in a new tab)</span></b></div>
-              </a>
-            ))}
-          </div>
-          <div className="center"><Btn kind="outline" onClick={() => go("gallery")}>There's more <Icon name="arrow" /></Btn></div>
-        </section>
 
         <section className="about-strip">
           <div className="wrap intro-grid">
@@ -295,23 +303,40 @@ function Home({ go, openPromo }: { go: (page: Page, selection?: GallerySelection
           </div>
         </section>
 
+        <section className="section wrap featured">
+          <div className="section-heading">
+            <div><p className="kicker">My Latest Works</p><h2>This month's favorites</h2></div>
+          </div>
+          <div className="featured-grid">
+            {published.slice(0, 4).map((item, index) => (
+              <div className="featured-card" key={item.id}>
+                <div className="featured-number">0{index + 1}</div>
+                <div className="art-visual">
+                  <img src={item.image || placeholder} alt={item.title} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="center"><Btn kind="outline" onClick={() => go("gallery")}>There's more <Icon name="arrow" /></Btn></div>
+        </section>
+
         <section className="section wrap">
-          <div className="section-heading compact"><div><p className="kicker">Ways I make magic</p><h2>Pick your canvas</h2></div></div>
+          <div className="section-heading compact"><div><p className="kicker">My Offers</p><h2>Pick your canvas</h2></div></div>
           <div className="medium-grid">
             {canvasCards.map(({ icon, title, desc, selection }, i) => <button key={title} onClick={() => go("gallery", selection)} className="medium-card"><span>0{i + 1}</span><Icon name={icon} size={25} /><h3>{title}</h3><p>{desc}</p><b><Icon name="arrow" /></b></button>)}
           </div>
           {discounts.length > 0 && (
             <div className="promo-banner"><div><span>SPECIAL OFFER</span><h2>{discounts[0].title}</h2><p>{discounts[0].description}</p></div><Btn kind="outline" onClick={openPromo}>Reveal my offer <Icon name="spark" /></Btn></div>
           )}
-          {(discountError || requestError) && <p role="alert">Live offer or availability data could not be loaded: {discountError || requestError}</p>}
         </section>
-        <section className="wrap guide-status home-guide-status" aria-label="Commission availability">
-          <div><span>Status</span><strong><i /> {activeCount >= 3 && reservedCount >= 2 ? "Fully Booked" : "Open"}</strong></div>
-          <div><span>Active slots</span><strong>{activeCount} / 3</strong></div>
-          <div><span>Reserved</span><strong>{reservedCount} / 2</strong></div>
-          <div><span>Contact hours</span><strong>10 AM–9 PM UTC+8</strong></div>
+
+        <section className="home-commission-cta">
+          <div className="wrap">
+            <h2>Ready to bring your idea to life?</h2>
+            <p>Tell me what you’re imagining and receive a personalized quote.</p>
+            <Btn onClick={() => go("commission")}>Commission now <Icon name="arrow" /></Btn>
+          </div>
         </section>
-        <section className="home-commission-cta"><div className="wrap"><p className="kicker">Three active slots only</p><h2>Ready to bring your idea to life?</h2><p>Tell me what you’re imagining and receive a personalized quote.</p><Btn onClick={() => go("commission")}>Commission now <Icon name="arrow" /></Btn></div></section>
       </main>
     </>
   );
@@ -417,7 +442,7 @@ function Gallery({ selection }: { selection: GallerySelection | null }) {
   const [filter, setFilter] = useState<"Chibi" | "Semi-Realistic">(selection?.category || "Chibi");
   const [scopeValue, setScopeValue] = useState(selection?.facet === "Scope" ? selection.value : "");
   const [contextValue, setContextValue] = useState(selection?.facet !== "Scope" ? selection?.value || "" : "");
-  const { items: published, error: galleryError } = useApiData<PublishedItem>("/api/gallery");
+  const { items: published } = useApiData<PublishedItem>("/api/gallery");
 
   useEffect(() => {
     setFilter(selection?.category || "Chibi");
@@ -473,8 +498,6 @@ function Gallery({ selection }: { selection: GallerySelection | null }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [selected]);
 
-  // Cards only carry the cover image. When an artwork opens, show the cover right away and
-  // fetch the rest of its set (if it has one) in the background.
   useEffect(() => {
     if (!selected || !("image" in selected)) {
       setSelectedImages([]);
@@ -530,7 +553,6 @@ function Gallery({ selection }: { selection: GallerySelection | null }) {
       </div>
 
       <section className="wrap gallery-grid">
-        {galleryError && <p role="alert" style={{ gridColumn: "1 / -1" }}>Gallery data could not be loaded from the server: {galleryError}</p>}
         {visible.map((item) => (
           <button className={`gallery-card gallery-image-only ${item.size}`} key={item.id} onClick={() => setSelected(item)} aria-label={`View ${item.title} details`}>
             {visual(item)}
@@ -1393,7 +1415,6 @@ const dateMadePresets = () => {
   return [now.toLocaleDateString("en-US", { month: "short", year: "numeric" }), String(year), String(year - 1), String(year - 2), String(year - 3)];
 };
 
-// Old rows were saved before artStyle/service existed, so fall back to the legacy fields.
 const itemArtStyle = (item: AdminLibraryItem) => {
   if (item.artStyle) return item.artStyle;
   const source = `${item.category || ""} ${item.requirementType || ""}`;
@@ -1418,10 +1439,8 @@ const matchesFilters = (item: AdminLibraryItem, mode: LibraryMode, artStyle: str
   return true;
 };
 
-// One gallery entry may hold up to 10 MB of images in total, however many images that is.
 const MAX_ENTRY_BYTES = 10 * 1024 * 1024;
 const ENTRY_LIMIT_LABEL = `${MAX_ENTRY_BYTES / (1024 * 1024)} MB`;
-// Each stored image is resized to fit comfortably inside one database row (a D1 row tops out at 2 MB).
 const MAX_STORED_IMAGE_BYTES = 1_500_000;
 
 // Real size of an image: a data URL decodes to roughly 3/4 of its base64 length. Anything else counts by text length.
@@ -1436,7 +1455,6 @@ const formatMB = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
 const pad2 = (value: number) => String(value).padStart(2, "0");
 
-// Local calendar date as yyyy-mm-dd (toISOString() would be a day behind in the morning in UTC+8).
 const todayInput = () => {
   const now = new Date();
   return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
@@ -1449,13 +1467,11 @@ const toInputDate = (value?: string) => {
   return Number.isNaN(parsed.getTime()) ? todayInput() : `${parsed.getFullYear()}-${pad2(parsed.getMonth() + 1)}-${pad2(parsed.getDate())}`;
 };
 
-// Stored in the same readable style the older rows already use, e.g. "Oct 21, 2026".
 const formatPublishedDate = (iso: string) => {
   const [year, month, day] = iso.split("-").map(Number);
   return new Date(year, month - 1, day).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 };
 
-// Draws the image at the given size and encodes it (WebP, or JPEG where the browser can't encode WebP).
 const encodeImage = (img: HTMLImageElement, maxSize: number, quality: number): string | null => {
   const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
   const canvas = document.createElement("canvas");
@@ -1475,8 +1491,6 @@ const encodeImage = (img: HTMLImageElement, maxSize: number, quality: number): s
   return data;
 };
 
-// Prepares an upload for storage. There is no cap on the original file: it is resized (largest side 1600 px first,
-// then smaller only if it is still too detailed) until it fits in one database row.
 const compressImage = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -2586,25 +2600,25 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
                   placeholder="Search by customer name..." 
                   value={searchQuery} 
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ width: "100%", padding: "8px 12px", border: "1px solid var(--line)", background: "var(--paper)", fontSize: "12px", borderRadius: "4px" }}
+                  style={{ width: "100%", padding: "8px 12px", border: "1px solid var(--line)", background: "var(--cream)", fontSize: "12px", borderRadius: "4px" }}
                 />
               </div>
               <div>
-                <select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid var(--line)", background: "var(--paper)", fontSize: "12px", borderRadius: "4px" }}>
+                <select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid var(--line)", background: "var(--cream)", fontSize: "12px", borderRadius: "4px" }}>
                   <option value="all">All Priorities</option>
                   <option value="priority">Priority Only</option>
                   <option value="normal">Normal Only</option>
                 </select>
               </div>
               <div>
-                <select value={filterStyle} onChange={(e) => setFilterStyle(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid var(--line)", background: "var(--paper)", fontSize: "12px", borderRadius: "4px" }}>
+                <select value={filterStyle} onChange={(e) => setFilterStyle(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid var(--line)", background: "var(--cream)", fontSize: "12px", borderRadius: "4px" }}>
                   <option value="all">All Art Styles</option>
                   <option value="Chibi">Chibi</option>
                   <option value="Semi-Realistic">Semi-Realistic</option>
                 </select>
               </div>
               <div>
-                <select value={filterSlotStatus} onChange={(e) => setFilterSlotStatus(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid var(--line)", background: "var(--paper)", fontSize: "12px", borderRadius: "4px" }}>
+                <select value={filterSlotStatus} onChange={(e) => setFilterSlotStatus(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid var(--line)", background: "var(--cream)", fontSize: "12px", borderRadius: "4px" }}>
                   <option value="all">All Slot Status</option>
                   <option value="active">Active Slots (Semi)</option>
                   <option value="reserved">Reserved Slots (Semi)</option>
@@ -2831,15 +2845,21 @@ function ChalkDivider() {
   return (
     <div className="chalk-divider" aria-hidden="true">
       <svg viewBox="0 0 1440 170" preserveAspectRatio="none" focusable="false">
-        <path className="cd-dust" d={art.dust} filter="url(#chalk-rough-strong)" />
-        <g filter="url(#chalk-soft)">
+        
+        {/*
+         <path className="cd-dust" d={art.dust} filter="url(#chalk-rough-strong)" />
+
+         <g filter="url(#chalk-soft)">
           <path className="cd-stroke cd-stroke-a" d={art.strokeA} />
           <path className="cd-stroke cd-stroke-b" d={art.strokeB} />
-        </g>
+         </g>
+        */}
         <path className="cd-paper" d={art.paper} filter="url(#chalk-edge)" />
-        <g className="cd-flecks">
+        {/* 
+         <g className="cd-flecks">
           {art.flecks.map((fleck, index) => <ellipse key={index} className={fleck.gold ? "cd-fleck-gold" : undefined} cx={fleck.x.toFixed(1)} cy={fleck.y.toFixed(1)} rx={(fleck.r * 1.5).toFixed(1)} ry={fleck.r.toFixed(1)} />)}
         </g>
+        */}
       </svg>
     </div>
   );
@@ -2871,11 +2891,11 @@ function ChalkDefs() {
           <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.4 0 0 0 -.05" result="speckle" />
           <feComposite in="bent" in2="speckle" operator="in" />
         </filter>
-        <filter id="chalk-edge" x="-2%" y="-10%" width="104%" height="120%" colorInterpolationFilters="sRGB">
+        <filter id="chalk-edge" x="-2%" y="-10%" width="104%" height="160%" colorInterpolationFilters="sRGB">
           <feTurbulence type="fractalNoise" baseFrequency="0.03 0.08" numOctaves="3" seed="17" result="warp" />
           <feDisplacementMap in="SourceGraphic" in2="warp" scale="7" xChannelSelector="R" yChannelSelector="G" />
         </filter>
-        <filter id="chalk-edge-fine" x="-4%" y="-20%" width="108%" height="140%" colorInterpolationFilters="sRGB">
+        <filter id="chalk-edge-fine" x="-4%" y="-20%" width="108%" height="180%" colorInterpolationFilters="sRGB">
           <feTurbulence type="fractalNoise" baseFrequency="0.05 0.12" numOctaves="2" seed="23" result="warp" />
           <feDisplacementMap in="SourceGraphic" in2="warp" scale="2.6" xChannelSelector="R" yChannelSelector="G" />
         </filter>

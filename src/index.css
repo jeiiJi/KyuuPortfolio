@@ -104,7 +104,6 @@ h1 em, h2 em { color: var(--orange); }
 .featured-card { position: relative; border: 1px solid var(--line); background: white; transition: transform .3s, border .3s, box-shadow .3s; }
 .featured-card:hover { transform: translateY(-8px); border-color: var(--gold); box-shadow: 0 18px 40px rgb(55 55 55 / .09); }
 .featured-card .art-visual { aspect-ratio: .95; }
-.featured-card:nth-child(2) { margin-top: 40px; }
 .featured-number { position: absolute; z-index: 2; top: 12px; left: 12px; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: white; font-size: 16px; font-weight: bold; }
 .card-copy { padding: 24px; }
 .card-copy > span, .gallery-copy > span { color: var(--orange); font-size: 16px; letter-spacing: .13em; text-transform: uppercase; font-weight: 700; }
@@ -740,19 +739,13 @@ footer a:hover, footer button:hover { color: var(--gold); }
   .sub-filter-select select { padding: 9px 20px 9px 8px; font-size: 16px; text-overflow: ellipsis; }
 }
 .form-section-accent { border-top: 6px solid var(--orange); }
-
-/* Button label wrapper: same flex + gap as .btn, so layout is identical everywhere (including Admin) */
 .btn-label { display: inline-flex; align-items: center; justify-content: center; gap: 9px; }
 
-/* ==========================================================================
-   1. Tokens: chalk textures, AA-safe oranges, fluid spacing and type scale
-   ========================================================================== */
+/* Chalk textures, AA-safe oranges, fluid spacing and type scale */
 :root {
-  /* The original --orange stays for decoration and large graphics.
-     These two deeper shades of the same hue are used wherever orange carries text. */
-  --orange-deep: #b8430c;     /* 5.4:1 on paper, 5.1:1 on cream, 5.5:1 behind white text */
-  --orange-display: #d4570f;  /* 3.9:1 on paper: large display text only (24px+) */
-  --field-line: color-mix(in srgb, var(--ink) 62%, white); /* 3.7:1 on paper: input and control borders */
+  --orange-deep: #b8430c;
+  --orange-display: #d4570f;
+  --field-line: color-mix(in srgb, var(--ink) 62%, white);
 
   --nav-h: 78px;
   --chalk-ink: color-mix(in srgb, var(--ink) 66%, transparent);
@@ -771,13 +764,8 @@ footer a:hover, footer button:hover { color: var(--gold); }
   --fs-card: clamp(1.45rem, 1.25rem + .7vw, 1.75rem);
   --fs-h2: clamp(2.1rem, 1.5rem + 2.4vw, 3.5rem);
 
-  /* Fine dark grain for light surfaces */
   --chalk-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .22 0 0 0 0 .22 0 0 0 0 .22 0 0 0 .75 -.34'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-
-  /* Soft, very fine, low-opacity chalk dust for dark and coloured surfaces */
   --chalk-dust-soft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='d' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1 .9' numOctaves='2' seed='31' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .96 0 0 0 0 .9 0 0 0 .26 -.08'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23d)'/%3E%3C/svg%3E");
-
-  /* Chalk specks laid over text. Kept faint so text stays above AA contrast. */
   --chalk-speck-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='t' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9 .55' numOctaves='3' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .99 0 0 0 0 .97 0 0 0 .6 -.24'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E");
   --chalk-speck-ink: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='t' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9 .55' numOctaves='3' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .16 0 0 0 0 .16 0 0 0 0 .16 0 0 0 .6 -.26'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E");
 }
@@ -786,11 +774,7 @@ footer a:hover, footer button:hover { color: var(--gold); }
   :root { --nav-h: 68px; }
 }
 
-/* ==========================================================================
-   2. Chalk & sketchbook theme
-   Scoped to .chalk-theme, which App.tsx applies to every public page.
-   Admin is wrapped in .chalk-theme too (see App.tsx); only Login keeps its original styling.
-   ========================================================================== */
+/* Chalk & sketchbook theme */
 .chalk-defs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 
 .chalk-theme {
@@ -1042,7 +1026,6 @@ img, svg { max-width: 100%; }
   .estimate-card-desktop { display: none; }
   .estimate-card-mobile { display: block; position: static; grid-row: auto; margin-top: 4px; }
   .section-heading { grid-template-columns: minmax(0, 1fr); }
-  .featured-card:nth-child(2) { margin-top: 0; }
 }
 @media (max-width: 760px) {
   .project-modal, .publish-modal { grid-template-columns: minmax(0, 1fr); }
@@ -1112,7 +1095,7 @@ img, svg { max-width: 100%; }
 @media (max-width: 650px) {
   .menu-button { display: grid; }
   .nav-actions { justify-self: end; }
-  .chalk-theme .nav-links.open { top: var(--nav-h); left: var(--gutter); right: var(--gutter); background-color: var(--paper); background-image: var(--chalk-grain); background-size: 240px; border: 0; border-radius: 12px; padding: 8px 20px; box-shadow: 0 12px 30px rgb(55 55 55 / .15); }
+  .chalk-theme .nav-links.open { top: var(--nav-h); right: var(--gutter); background-color: var(--paper); background-image: var(--chalk-grain); background-size: 240px; border: 0; border-radius: 12px; padding: 8px 20px; box-shadow: 0 12px 30px rgb(55 55 55 / .15); }
   .chalk-theme .nav-links.open button { min-height: 48px; padding: 12px 0; text-align: left; border-bottom: 1px solid color-mix(in srgb, currentColor 30%, transparent); }
   .chalk-theme .nav-links.open button:last-child { border-bottom: 0; }
 }
@@ -1429,3 +1412,175 @@ footer a { overflow-wrap: anywhere; }
 .admin-nav .logout-btn:hover { color: white; background: rgb(255 255 255 / .08); }
 .admin-nav .logout-btn:focus-visible { outline: 3px dashed var(--orange); outline-offset: 2px; }
 @media (max-width: 900px) { .admin-nav .logout-btn { font-size: 0; justify-content: center; } }
+
+
+
+
+
+/* ==========================================================
+   Desktop / Base Navigation & Borderless Menu Button Rules
+   ========================================================== */
+
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 76px;
+}
+
+.nav-actions.left-action {
+  display: none; /* Hidden on desktop view */
+}
+
+/* Borderless Menu / Toggle Button (Clean appearance with preserved hover/focus) */
+.menu-button {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 8px;
+  cursor: pointer;
+  display: none; 
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+/* Remove any pseudo-element borders on the toggle button */
+.menu-button::after,
+.menu-button::before {
+  display: none !important;
+}
+
+.menu-button:hover {
+  color: var(--orange-deep);
+  transform: scale(1.05);
+}
+
+.menu-button:focus-visible {
+  outline: 2px dashed var(--ink);
+  outline-offset: 4px;
+}
+
+/* Brand left-aligned by default on desktop */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+
+/* ==========================================================
+   Mobile & Small Screen Media Query Rules (max-width: 650px)
+   ========================================================== */
+
+@media (max-width: 650px) {
+  .nav-inner {
+    height: 68px;
+    display: grid;
+    grid-template-columns: 48px 1fr 48px;
+    align-items: center;
+    padding: 0 16px;
+  }
+
+  .nav-actions.left-action {
+    display: flex;
+    justify-self: start;
+  }
+
+  .menu-button {
+    display: grid; /* Displayed on mobile screens */
+  }
+
+  /* Cleanly centered logo ONLY on mobile/small screens */
+  .brand {
+    justify-self: center;
+    margin: 0 auto;
+    font-size: 21px;
+  }
+
+  .brand img {
+    width: 38px;
+    height: 38px;
+  }
+
+  /* Backdrop Overlay below the navbar */
+  .nav-backdrop {
+    position: fixed;
+    top: 68px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 98;
+    background: rgba(55, 55, 55, 0.45);
+    backdrop-filter: blur(4px);
+    animation: chalk-dust-in 0.25s ease-out;
+  }
+
+  /* Full-width slide-in drawer below the navbar */
+  .nav-links {
+    position: fixed;
+    top: 68px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 99;
+    width: 100%;
+    height: calc(100vh - 68px);
+    height: calc(100dvh - 68px);
+    display: flex;
+    flex-direction: column;
+    padding: 32px 24px;
+    background-color: var(--paper);
+    background-image: var(--chalk-grain);
+    background-size: 240px;
+    border: none;
+    box-shadow: none;
+    transform: translateX(-100%);
+    transition: transform 0.35s cubic-bezier(0.22, 0.9, 0.3, 1);
+  }
+
+  .nav-links.open {
+    transform: translateX(0);
+  }
+
+  /* Remove pseudo-element borders from mobile drawer panel */
+  .nav-links::after,
+  .nav-links::before {
+    display: none !important;
+  }
+
+  /* Vertical navigation links inside mobile drawer */
+  .nav-links button {
+    min-height: 52px;
+    padding: 14px 12px;
+    text-align: left;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+    transition: color 0.2s ease, padding-left 0.2s ease;
+  }
+
+  .nav-links button:hover,
+  .nav-links button.active {
+    color: var(--orange-deep);
+    padding-left: 18px;
+  }
+
+  .nav-links button::after,
+  .nav-links button::before {
+    display: none !important;
+  }
+}

@@ -2,8 +2,6 @@ const MEDIA = {
   products: ["title", "description", "image", "category", "price", "publishedAt", "artStyle", "scope", "service", "colorFinish", "dateMade", "tools", "format"],
   discounts: ["title", "percentage", "requirementType", "description", "startDate", "endDate", "bannerImage", "code", "artStyle", "scope", "service", "colorFinish"],
 };
-// Gallery entries have their own handler below: the cover image lives in gallery.image and the rest of the set
-// lives one-per-row in gallery_images, so an entry can total 10 MB even though a D1 row tops out at 2 MB.
 const GALLERY_COLS = ["title", "description", "image", "category", "scope", "service", "colorFinish", "publishedAt", "artStyle", "dateMade", "tools", "format"];
 
 const NUMERIC = new Set(["price", "percentage"]);
@@ -11,11 +9,10 @@ const DEFAULTS = { requirementType: "Any" };
 const clean = (col, value) =>
   NUMERIC.has(col) ? Number(value) || 0 : value ?? DEFAULTS[col] ?? "";
 
-const MAX_ENTRY_BYTES = 10 * 1024 * 1024; // all images of one gallery entry, combined
-const MAX_IMAGE_BYTES = 1_900_000;        // a single image still has to fit in one D1 row (2 MB)
-const ROWS_PER_INSERT = 4;                // keeps every statement small
+const MAX_ENTRY_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 1_900_000;
+const ROWS_PER_INSERT = 4;
 
-// Real size of a data URL (what base64 decodes to). Anything else counts by its text length.
 const imageBytes = (src) => {
   const comma = src.indexOf(",");
   if (!src.startsWith("data:") || comma === -1) return src.length;
@@ -25,7 +22,6 @@ const imageBytes = (src) => {
 };
 const megabytes = (bytes) => (bytes / (1024 * 1024)).toFixed(1);
 
-// Returns an error message, or "" when the set is fine.
 const checkImages = (images) => {
   if (!Array.isArray(images) || images.length === 0) return "Add at least one image.";
   let total = 0;
@@ -43,7 +39,6 @@ const checkImages = (images) => {
   return "";
 };
 
-// INSERT statements for the extra images (position 1 and up; the cover is position 0 and lives in gallery.image).
 const extraImageInserts = (env, galleryId, images) => {
   const extras = images.slice(1);
   const statements = [];
@@ -58,15 +53,10 @@ const extraImageInserts = (env, galleryId, images) => {
   return statements;
 };
 
-// ---------------------------------------------------------------------------------------------
-// ADMIN SECURITY
-// The username, password hash and signing key live in Cloudflare secrets (never in the website code):
-//   ADMIN_USERNAME, ADMIN_PASSWORD_HASH, SESSION_SECRET   (set with `wrangler secret put`)
-// ---------------------------------------------------------------------------------------------
 const SESSION_COOKIE = "inkyuu_session";
-const SESSION_SECONDS = 8 * 60 * 60;   // an admin login lasts 8 hours
-const MAX_FAILED_LOGINS = 5;           // wrong attempts allowed per IP address...
-const LOCKOUT_SECONDS = 15 * 60;       // ...within this window
+const SESSION_SECONDS = 8 * 60 * 60;
+const MAX_FAILED_LOGINS = 5;
+const LOCKOUT_SECONDS = 15 * 60;
 const MAX_BODY_BYTES = 16 * 1024 * 1024;
 
 const encoder = new TextEncoder();
@@ -88,7 +78,6 @@ const fromBase64Url = (text) => {
   return Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
 };
 
-// Compares two byte arrays without stopping at the first difference (avoids timing leaks).
 const timingSafeEqual = (a, b) => {
   if (a.length !== b.length) return false;
   let difference = 0;
@@ -149,8 +138,6 @@ const hasAdminSession = async (request, env) => {
 const sessionCookie = (token, maxAge) =>
   `${SESSION_COOKIE}=${token}; Max-Age=${maxAge}; Path=/api; HttpOnly; Secure; SameSite=Strict`;
 
-// Everything that changes data or exposes customer details needs an admin session.
-// Public: reading the gallery/shop/discounts, and sending a commission request from the website form.
 const needsAdmin = (method, path) => {
   if (method === "POST" && /^\/api\/commissions\/?$/.test(path)) return false;
   if (path.startsWith("/api/commissions")) return true;
@@ -169,9 +156,8 @@ const readJson = async (request) => {
   }
 };
 
-// ---- public commission form: validate and clamp everything the visitor sends ----
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAX_REFERENCES_BYTES = 1_900_000; // the references column is a single D1 row
+const MAX_REFERENCES_BYTES = 1_900_000;
 const text = (value, max) => String(value ?? "").slice(0, max);
 const number = (value, min, max, fallback) => {
   const parsed = Number(value);
@@ -220,7 +206,6 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // The website and this API share one address, so no CORS headers are sent: other websites cannot call the API from a browser.
     const corsHeaders = { "X-Content-Type-Options": "nosniff" };
     if (path.startsWith("/api/admin") || path.startsWith("/api/commissions")) corsHeaders["Cache-Control"] = "no-store";
 
@@ -229,13 +214,11 @@ export default {
         return new Response(null, { status: 204, headers: corsHeaders });
       }
 
-      // Reject state-changing requests that were started by another website.
       const origin = request.headers.get("Origin");
       if (origin && origin !== url.origin && !["GET", "HEAD"].includes(request.method)) {
         throw new HttpError(403, "Cross-site requests are not allowed.");
       }
 
-      // --- ADMIN LOGIN / SESSION ---
       if (path === "/api/admin/session" && request.method === "GET") {
         return Response.json({ authenticated: await hasAdminSession(request, env) }, { headers: corsHeaders });
       }
@@ -260,7 +243,6 @@ export default {
         const username = text(body.username, 256);
         const password = text(body.password, 256);
 
-        // Direct credential check (bypasses environment secret parsing errors)
         const userOk = username === "kyuuji";
         const passwordOk = password === "kYu9j1@36t2P";
 
@@ -274,18 +256,15 @@ export default {
 
         await env.DB.prepare("DELETE FROM login_attempts WHERE ip = ?").bind(ip).run();
         
-        // Use environment SESSION_SECRET if available, otherwise use a safe fallback
         const sessionTokenEnv = { SESSION_SECRET: env.SESSION_SECRET || "fallback-session-secret-key-12345" };
         const token = await createSessionToken(sessionTokenEnv);
         return Response.json({ success: true }, { headers: { ...corsHeaders, "Set-Cookie": sessionCookie(token, SESSION_SECONDS) } });
       }
 
-      // Everything below that changes data (or lists customer requests) needs a logged-in admin.
       if (needsAdmin(request.method, path) && !(await hasAdminSession(request, env))) {
         return Response.json({ error: "Please log in as admin to do that." }, { status: 401, headers: corsHeaders });
       }
 
-      // --- COMMISSIONS ---
       if (path === "/api/commissions" && request.method === "GET") {
         const { results } = await env.DB.prepare("SELECT * FROM commissions ORDER BY submittedAt DESC").all();
         const formatted = results.map((r) => {
@@ -296,7 +275,6 @@ export default {
         return Response.json(formatted, { headers: corsHeaders });
       }
 
-      // Public: the commission form on the website. Status fields are set here, never taken from the visitor.
       if (path === "/api/commissions" && request.method === "POST") {
         const c = cleanCommission(await readJson(request));
 
@@ -344,13 +322,11 @@ export default {
         return Response.json({ success: true }, { headers: corsHeaders });
       }
 
-      // --- GALLERY (cover + image set) ---
       const gallery = path.match(/^\/api\/gallery(?:\/(\d+)(\/images)?)?\/?$/);
       if (gallery) {
         const id = gallery[1] ? Number(gallery[1]) : null;
         const wantsImages = Boolean(gallery[2]);
 
-        // List: covers only, plus how many images each entry has. Full sets load on demand below.
         if (!id && request.method === "GET") {
           const { results } = await env.DB.prepare(
             "SELECT g.*, (SELECT COUNT(*) FROM gallery_images i WHERE i.galleryId = g.id) AS extraCount FROM gallery g ORDER BY g.id DESC"
@@ -362,7 +338,6 @@ export default {
           return Response.json(rows, { headers: corsHeaders });
         }
 
-        // Every image of one entry, in order (cover first).
         if (id && wantsImages && request.method === "GET") {
           const cover = await env.DB.prepare("SELECT image FROM gallery WHERE id = ?").bind(id).all();
           if (!cover.results.length) {
@@ -398,7 +373,6 @@ export default {
             if (problem) return Response.json({ error: problem }, { status: 413, headers: corsHeaders });
           }
 
-          // Only update the fields that were sent. When a new image set is sent, it also replaces the cover.
           const sent = GALLERY_COLS.filter((col) => col in item && !(replacing && col === "image"));
           const assignments = sent.map((col) => `${col} = ?`);
           const params = sent.map((col) => clean(col, item[col]));
@@ -428,10 +402,9 @@ export default {
         }
       }
 
-      // --- SHOP PRODUCTS + DISCOUNTS (shared CRUD) ---
       const media = path.match(/^\/api\/(products|discounts)(?:\/(\d+))?\/?$/);
       if (media) {
-        const table = media[1];          // safe: matched against a fixed whitelist by the regex
+        const table = media[1];
         const cols = MEDIA[table];
         const id = media[2] ? Number(media[2]) : null;
 
@@ -450,7 +423,6 @@ export default {
 
         if (id && request.method === "PUT") {
           const item = await readJson(request);
-          // Only update the fields that were actually sent, so nothing gets blanked by accident.
           const sent = cols.filter((col) => col in item);
           if (!sent.length) {
             return Response.json({ error: "Nothing to update" }, { status: 400, headers: corsHeaders });
@@ -475,7 +447,6 @@ export default {
       if (err instanceof HttpError) {
         return Response.json({ error: err.message }, { status: err.status, headers: corsHeaders });
       }
-      // Details go to the Cloudflare logs (`wrangler tail`). Visitors only see them when logged in as admin.
       console.error("API error:", err);
       const isAdmin = await hasAdminSession(request, env).catch(() => false);
       const message = isAdmin && err instanceof Error ? err.message : "Something went wrong on the server. Please try again.";
