@@ -6,31 +6,26 @@ import heroArtwork from "./assets/Untitled200_20261016201217.png";
 import chibiReference from "./assets/Untitled201_20261021205439.png";
 const API_URL = "";
 
-type Page = "home" | "gallery" | "shop" | "guide" | "about" | "commission" | "admin";
+type Page = "home" | "gallery" | "guide" | "about" | "commission" | "admin";
 type CommissionRequest = {
   id: number; name: string; email: string; social: string; type: string; finish: string;
   characters: number; background: string; commercial: boolean; priority: boolean;
   dueDate: string; notes: string; references: string[]; totalPhp: number;
-  submittedAt: string; stage: number; discountCode?: string; discountName?: string; discountAmount?: number;
+  submittedAt: string; stage: number;
   historyType?: "Finished" | "Cancelled"; submittedToHistoryAt?: string;
 };
 type PublishedItem = {
   id: number; title: string; description: string; image: string; category: string;
   scope?: string; service?: string; colorFinish?: string;
-  imageCount?: number; dateMade?: string; tools?: string; format?: string;
-  price?: number; publishedAt: string;
+  imageCount?: number; tools?: string; format?: string;
+  publishedAt: string;
 };
 type GallerySelection = { category: "Chibi" | "Semi-Realistic"; facet: "Scope" | "Services" | "Color Finish"; value: string };
-type DiscountItem = {
-  id: number; title: string; percentage: number; requirementType: string;
-  description: string; startDate: string; endDate: string; bannerImage: string; code: string;
-};
 type AdminLibraryItem = {
-  id: number; title: string; description: string; image?: string; bannerImage?: string;
-  category?: string; requirementType?: string; percentage?: number;
-  publishedAt?: string; price?: number; code?: string; startDate?: string; endDate?: string;
+  id: number; title: string; description: string; image?: string;
+  category?: string; publishedAt?: string;
   artStyle?: string; scope?: string; service?: string; colorFinish?: string;
-  dateMade?: string; tools?: string; format?: string; imageCount?: number; images?: string[];
+  tools?: string; format?: string; imageCount?: number; images?: string[];
 };
 type IconName =
   | "arrow"
@@ -165,7 +160,6 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
   const links: { label: string; page: Page }[] = [
     { label: "Home", page: "home" },
     { label: "Gallery", page: "gallery" },
-    { label: "Shop", page: "shop" },
     { label: "Guide", page: "guide" },
     { label: "About", page: "about" },
   ];
@@ -217,50 +211,7 @@ function ArtVisual({ art, label }: { art: string; label: string }) {
   return <div className={`art-visual art-${art}`}><img src={placeholder} alt={label} /></div>;
 }
 
-function PromoModal({ close, go }: { close: () => void; go: (page: Page) => void }) {
-  const { items: discounts } = useApiData<DiscountItem>("/api/discounts");
-  const activeDiscount = discounts[0] || {
-    title: "Your idea deserves to be drawn.",
-    percentage: 15,
-    description: "Book a commission this month and enjoy 15% off your first character illustration.",
-    code: "FIRSTDROP15",
-    bannerImage: ""
-  };
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [close]);
-
-  return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={close}>
-      <div className="promo-modal" role="dialog" aria-modal="true" aria-labelledby="promo-title" onMouseDown={(e) => e.stopPropagation()}>
-        <button type="button" className="modal-close" onClick={close} aria-label="Close offer" autoFocus><Icon name="close" /></button>
-        <div className="promo-layout">
-          <div className="promo-art">
-            {activeDiscount.bannerImage ? (
-              <img src={activeDiscount.bannerImage} alt={activeDiscount.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : (
-              <><img src={logo} alt="Inkyuu bottle logo" /><span>{activeDiscount.percentage}%</span></>
-            )}
-          </div>
-          <div className="promo-content">
-            <div className="eyebrow"><Icon name="spark" size={15} /> Special Offer</div>
-            <h2 id="promo-title">{activeDiscount.title}</h2>
-            <p>{activeDiscount.description}</p>
-            <div className="promo-code"><span>Discount Code</span><strong>{activeDiscount.code || "PROMO"}</strong></div>
-            <Btn onClick={() => { close(); go("commission"); }}>Start a commission <Icon name="arrow" /></Btn>
-            <button className="text-link" onClick={close}>Maybe later</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Home({ go, openPromo }: { go: (page: Page, selection?: GallerySelection) => void; openPromo: () => void }) {
-  const { items: discounts } = useApiData<DiscountItem>("/api/discounts");
+function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }) {
   const { items: published } = useApiData<PublishedItem>("/api/gallery");
   
   const canvasCards: { icon: IconName; title: string; desc: string; selection: GallerySelection }[] = [
@@ -325,9 +276,6 @@ function Home({ go, openPromo }: { go: (page: Page, selection?: GallerySelection
           <div className="medium-grid">
             {canvasCards.map(({ icon, title, desc, selection }, i) => <button key={title} onClick={() => go("gallery", selection)} className="medium-card"><span>0{i + 1}</span><Icon name={icon} size={25} /><h3>{title}</h3><p>{desc}</p><b><Icon name="arrow" /></b></button>)}
           </div>
-          {discounts.length > 0 && (
-            <div className="promo-banner"><div><span>SPECIAL OFFER</span><h2>{discounts[0].title}</h2><p>{discounts[0].description}</p></div><Btn kind="outline" onClick={openPromo}>Reveal my offer <Icon name="spark" /></Btn></div>
-          )}
         </section>
 
         <section className="home-commission-cta">
@@ -618,10 +566,8 @@ function Commission({ go }: { go: (page: Page) => void }) {
     confirm1: false,
     confirm2: false,
     confirm3: false,
-    discountCode: "",
   });
   const [references, setReferences] = useState<string[]>([]);
-  const { items: discounts, error: discountError } = useApiData<DiscountItem>("/api/discounts");
   const { items: requests, error: requestError, loading: requestsLoading } = useApiData<CommissionRequest>("/api/commissions");
 
   const setValue = (key: keyof typeof form, value: any) => {
@@ -737,28 +683,7 @@ function Commission({ go }: { go: (page: Page) => void }) {
 
   const dueDateRate = getDueDatePercentage();
   const priorityFee = form.dueDate ? Math.round(subtotal * dueDateRate) : 0;
-  const grossTotal = subtotal + commercialFee + priorityFee;
-
-  const currentDate = new Date();
-  const today = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(currentDate.getDate()).padStart(2, "0")}`;
-  const activeDiscounts = discounts.filter((discount) =>
-    (!discount.startDate || discount.startDate <= today) &&
-    (!discount.endDate || discount.endDate >= today)
-  );
-  const selectedDiscount = activeDiscounts.find((discount) =>
-    discount.code.trim().toLocaleUpperCase() === form.discountCode.trim().toLocaleUpperCase()
-  );
-  const selectedDiscountIsEligible = Boolean(selectedDiscount && (
-    (selectedDiscount.requirementType !== "Chibi Only" || form.artStyle === "Chibi") &&
-    (selectedDiscount.requirementType !== "Semi-Realistic Only" || form.artStyle === "Semi-Realistic") &&
-    (selectedDiscount.requirementType !== "Commercial Use" || form.usageType === "Commercial Use") &&
-    (selectedDiscount.requirementType !== "Personal Use" || form.usageType === "Personal Use")
-  ));
-  const discountAmount = selectedDiscount && selectedDiscountIsEligible
-    ? Math.round(grossTotal * (selectedDiscount.percentage / 100))
-    : 0;
-
-  const total = Math.max(0, grossTotal - discountAmount);
+  const total = subtotal + commercialFee + priorityFee;
   const estimateBreakdown = (
     <>
       <p><span>{form.artStyle ? `${form.artStyle} (${form.baseOption || "Select base"})` : "Base scope"}</span><b>{money(basePrice)}</b></p>
@@ -785,11 +710,6 @@ function Commission({ go }: { go: (page: Page) => void }) {
           {form.usageType === "Commercial Use" && <p><span>Commercial license</span><b>+{money(commercialFee)}</b></p>}
           {form.dueDate && <p><span>Priority due date fee ({dueDateRate === 0.1 ? "10%" : "18%"})</span><b>+{money(priorityFee)}</b></p>}
         </>
-      )}
-      {discountAmount > 0 && (
-        <p className="estimate-discount">
-          <span>Discount ({selectedDiscount?.title})</span><b>-{money(discountAmount)}</b>
-        </p>
       )}
     </>
   );
@@ -854,14 +774,11 @@ function Commission({ go }: { go: (page: Page) => void }) {
       commercial: form.usageType === "Commercial Use",
       priority: Boolean(form.dueDate),
       dueDate: form.dueDate,
-      notes: `Usage: ${form.usageType}\nService: ${form.chibiService || "N/A"}${form.chibiService === "Alternate outfits/expressions" ? ` (${form.alternativesCount} alternatives)` : ""}${form.ychTheme ? `\nYCH Theme: ${form.ychTheme}` : ""}\nBg Details: ${form.backgroundDetails}\nNotes: ${form.additionalDetails}\nDiscount Applied: ${selectedDiscount ? selectedDiscount.title : "None"}\nConfirmed all terms: Yes`,
+      notes: `Usage: ${form.usageType}\nService: ${form.chibiService || "N/A"}${form.chibiService === "Alternate outfits/expressions" ? ` (${form.alternativesCount} alternatives)` : ""}${form.ychTheme ? `\nYCH Theme: ${form.ychTheme}` : ""}\nBg Details: ${form.backgroundDetails}\nNotes: ${form.additionalDetails}\nConfirmed all terms: Yes`,
       references,
       totalPhp: total,
       submittedAt: new Date().toISOString(),
       stage: 0,
-      discountCode: selectedDiscount?.code,
-      discountName: selectedDiscount?.title,
-      discountAmount,
     };
 
     try {
@@ -888,7 +805,7 @@ function Commission({ go }: { go: (page: Page) => void }) {
         <h1>Let's make something <em>yours.</em></h1>
         <p>Step-by-step studio commission intake modeled after live Google Forms.</p>
       </section>
-      {(discountError || requestError) && <p className="wrap" role="alert">Live commission data could not be loaded: {discountError || requestError}</p>}
+      {requestError && <p className="wrap" role="alert">Live commission data could not be loaded: {requestError}</p>}
 
       <div className={`wrap commission-layout ${step > 2 && step < 5 ? "has-estimate" : "without-estimate"}`}>
         <div className="commission-form">
@@ -1143,7 +1060,7 @@ function Commission({ go }: { go: (page: Page) => void }) {
               <div>
                 <h2>Review & Checkout</h2>
                 <p style={{ fontSize: "14px", color: "var(--muted)", lineHeight: "1.6", marginTop: "6px" }}>
-                  Review your total, select applicable active discounts, and submit your request.
+                  Review your total and submit your request.
                 </p>
               </div>
               
@@ -1155,27 +1072,6 @@ function Commission({ go }: { go: (page: Page) => void }) {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "20px" }}>
-                <Field label="Discount Code" hint={
-                  selectedDiscount && selectedDiscountIsEligible
-                    ? `${selectedDiscount.title} · ${selectedDiscount.percentage}% off`
-                    : selectedDiscount
-                      ? `This code requires ${selectedDiscount.requirementType}.`
-                      : "Type a discount code or choose a suggestion."
-                }>
-                  <input
-                    type="text"
-                    value={form.discountCode}
-                    onChange={(event) => setValue("discountCode", event.target.value)}
-                    list="active-discount-codes"
-                    autoComplete="off"
-                    placeholder="Enter discount code"
-                  />
-                  <datalist id="active-discount-codes">
-                    {activeDiscounts.map((discount) => <option key={discount.id} value={discount.code} label={`${discount.title} · ${discount.percentage}% off`} />)}
-                  </datalist>
-                </Field>
-                {form.discountCode && !selectedDiscount && <p className="discount-feedback">No active discount matches this code.</p>}
-
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "10px" }}>
                   <Btn type="button" kind="outline" onClick={() => setStep(2)}>Edit General Info</Btn>
                   <Btn type="button" kind="outline" onClick={() => setStep(3)}>Edit Scope & Options</Btn>
@@ -1229,12 +1125,6 @@ function Commission({ go }: { go: (page: Page) => void }) {
       </div>
     </main>
   );
-}
-
-function Shop({ go }: { go: (page: Page) => void }) {
-  const { items: products, error } = useApiData<PublishedItem>("/api/products");
-  return <main id="main-content" tabIndex={-1} className="page-main">
-    <section className="page-hero wrap"><p className="kicker">The tiny shop</p><h1>Art made to <em>hold.</em></h1><p>Stickers, prints, and little pieces of joy from the Inkyuu studio.</p></section>{error && <p className="wrap" role="alert">Shop data could not be loaded from the server: {error}</p>}{products.length > 0 ? <section className="wrap product-grid">{products.map((product) => <article key={product.id}><img src={product.image || placeholder} alt={product.title} /><div><span>{product.category}</span><h2>{product.title}</h2><p>{product.description}</p><strong>{money(product.price || 0)}</strong><small>Published {product.publishedAt}</small></div></article>)}</section> : !error && <section className="empty-shop wrap"><div className="shop-art"><span className="shop-sun" /><img src={placeholder} alt="Artwork placeholder" /></div><div className="shop-copy"><h2>Shop is still unavailable</h2><p>I'm putting the finishing touches on a cheerful collection of stickers, posters, photocards, portraits, and sticker sets.</p><button className="text-link" onClick={() => go("gallery")}>Browse the gallery while you wait <Icon name="arrow" /></button></div></section>}</main>;
 }
 
 function Guide() {
@@ -1349,7 +1239,7 @@ function About({ go }: { go: (page: Page) => void }) {
       <section className="about-hero wrap"><div><p className="kicker">The person behind the pixels</p><h1>Making art feel <em>personal.</em></h1><p>I'm Kyuu, an independent digital artist exploring softness, character, and playful visual storytelling.</p><Btn onClick={() => go("commission")}>Work with me <Icon name="arrow" /></Btn></div><div className="about-portrait"><ArtVisual art="artist" label="Artist portrait" /><div className="portrait-note">Based in the Philippines<br />Creating worldwide</div></div></section>
       <section className="wrap story-grid"><div><p className="kicker">My story</p><h2>From notebook margins to a studio of my own.</h2></div><div><p>What started as doodles between classes became a way to connect with people around the world. My work lives somewhere between gentle realism and joyful exaggeration.</p><p>I believe good art feels like recognition: a character that finally looks the way you imagined, or a gift that says what words could not.</p></div></section>
       <section className="expertise-section"><div className="wrap"><p className="kicker">Core expertise</p><h2>What I bring to the canvas</h2><ul className="expertise-grid">{["Character illustration", "Chibi design", "Portrait commissions", "Merchandise artwork", "Visual storytelling", "Color direction"].map((item, i) => <li key={item}><span aria-hidden="true">0{i + 1}</span><Icon name={i % 2 ? "spark" : "pen"} /><h3>{item}</h3></li>)}</ul></div></section>
-      <section className="wrap timeline-section"><div><p className="kicker">Along the way</p><h2>Milestones & art events</h2><p>A few memorable stops in an always-growing creative practice.</p></div><div className="timeline">{[["2021", "First 100 commissions", "Reached a joyful little milestone with clients across eight countries."], ["2022", "Komiket Manila", "Debuted an original sticker and mini-print collection."], ["2023", "Graphika Art Fair", "Joined a community showcase celebrating independent illustrators."], ["2025", "Inkyuu studio", "Opened a dedicated online home for art, commissions, and shop drops."]].map(([year, title, desc]) => <div key={year}><span>{year}</span><article><h3>{title}</h3><p>{desc}</p></article></div>)}</div></section>
+      <section className="wrap timeline-section"><div><p className="kicker">Along the way</p><h2>Milestones & art events</h2><p>A few memorable stops in an always-growing creative practice.</p></div><div className="timeline">{[["2021", "First 100 commissions", "Reached a joyful little milestone with clients across eight countries."], ["2022", "Komiket Manila", "Debuted an original sticker and mini-print collection."], ["2023", "Graphika Art Fair", "Joined a community showcase celebrating independent illustrators."], ["2025", "Inkyuu studio", "Opened a dedicated online home for art and commissions."]].map(([year, title, desc]) => <div key={year}><span>{year}</span><article><h3>{title}</h3><p>{desc}</p></article></div>)}</div></section>
       <section className="wrap collaborators"><p className="kicker">Featured collaborators</p><h2>Good things made together</h2><div>{["Cloud Nine Café", "Daydream Press", "Mori Studio", "Sunday Club"].map((name) => <span key={name}>{name}</span>)}</div></section>
       <section className="wrap official-contacts-section" style={{ paddingBottom: "100px" }}>
         <div className="section-heading compact channels">
@@ -1384,7 +1274,6 @@ function About({ go }: { go: (page: Page) => void }) {
   );
 }
 
-type LibraryMode = "gallery" | "products" | "discounts";
 type FilterKind = "scope" | "service" | "colorFinish";
 type ActiveTag = { kind: FilterKind; value: string };
 
@@ -1399,27 +1288,16 @@ const TOOL_PRESETS = ["Clip Studio Paint", "Procreate", "Adobe Photoshop", "Krit
 const FORMAT_PRESETS = ["Digital illustration", "Digital print", "Sticker sheet", "Acrylic merch", "Pin / Badge", "Photocard", "Reference sheet", "2D model sheet"];
 const KIND_LABEL: Record<FilterKind, string> = { scope: "Scope", service: "Service", colorFinish: "Finish" };
 
-const dateMadePresets = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  return [now.toLocaleDateString("en-US", { month: "short", year: "numeric" }), String(year), String(year - 1), String(year - 2), String(year - 3)];
-};
-
 const itemArtStyle = (item: AdminLibraryItem) => {
   if (item.artStyle) return item.artStyle;
-  const source = `${item.category || ""} ${item.requirementType || ""}`;
-  if (/semi/i.test(source)) return "Semi-Realistic";
-  if (/chibi/i.test(source)) return "Chibi";
+  if (/semi/i.test(item.category || "")) return "Semi-Realistic";
+  if (/chibi/i.test(item.category || "")) return "Chibi";
   return "";
 };
 const itemService = (item: AdminLibraryItem) => item.service || item.category?.match(/\(([^)]+)\)/)?.[1] || "";
 
-const matchesFilters = (item: AdminLibraryItem, mode: LibraryMode, artStyle: string, tags: ActiveTag[]) => {
-  if (artStyle) {
-    const style = itemArtStyle(item);
-    // Discounts with no specific style (e.g. "Any Commission") apply to everything, so keep them.
-    if (style ? style !== artStyle : mode !== "discounts") return false;
-  }
+const matchesFilters = (item: AdminLibraryItem, artStyle: string, tags: ActiveTag[]) => {
+  if (artStyle && itemArtStyle(item) !== artStyle) return false;
   for (const kind of ["scope", "service", "colorFinish"] as FilterKind[]) {
     const picked = tags.filter((tag) => tag.kind === kind).map((tag) => tag.value);
     if (!picked.length) continue;
@@ -1600,19 +1478,16 @@ function LibraryFilterBar({ artStyle, tags, onArtStyle, onToggleTag, onClear }: 
   );
 }
 
-function PublishManager({ mode }: { mode: LibraryMode }) {
-  const emptyDraft = (target: LibraryMode) => ({
+function PublishManager() {
+  const emptyDraft = () => ({
     title: "",
     description: "",
-    category: target === "products" ? "Pins" : target === "discounts" ? "Chibi Only" : "",
-    artStyle: target === "gallery" ? "Chibi" : "",
-    subCategory: target === "gallery" ? "Sticker set" : "",
-    scope: target === "gallery" ? "Headshot" : "",
+    artStyle: "Chibi",
+    subCategory: "Sticker set",
+    scope: "Headshot",
     colorFinish: "",
-    price: "", percentage: "", startDate: "", endDate: "", code: "",
-    image: "", bannerImage: "",
     images: [] as string[],
-    dateMade: "", tools: "", format: "",
+    tools: "", format: "",
     publishedDate: todayInput()
   });
 
@@ -1624,7 +1499,7 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
   const [deleteTarget, setDeleteTarget] = useState<AdminLibraryItem | null>(null);
   const [artStyleFilter, setArtStyleFilter] = useState("");
   const [tags, setTags] = useState<ActiveTag[]>([]);
-  const [draft, setDraft] = useState(emptyDraft(mode));
+  const [draft, setDraft] = useState(emptyDraft());
   const [previewIndex, setPreviewIndex] = useState(0);
   const [formError, setFormError] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -1637,31 +1512,23 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
     setLoading(true);
     setError("");
     try {
-      const data = await apiRequest<AdminLibraryItem[]>(`/api/${mode}`);
-      if (!Array.isArray(data)) throw new Error(`The server returned invalid ${mode} data.`);
+      const data = await apiRequest<AdminLibraryItem[]>("/api/gallery");
+      if (!Array.isArray(data)) throw new Error("The server returned invalid gallery data.");
       setItems(data);
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : String(loadError);
       setError(message);
-      console.error(`Failed to load ${mode} from D1:`, loadError);
+      console.error("Failed to load gallery from D1:", loadError);
     } finally {
       setLoading(false);
     }
   };
 
-  // The same component instance is reused when switching admin tabs, so reset everything per mode.
   useEffect(() => {
-    setItems([]);
-    setArtStyleFilter("");
-    setTags([]);
-    setEditingId(null);
-    setDraft(emptyDraft(mode));
-    setPreviewIndex(0);
-    setFormError("");
     void loadItems();
-  }, [mode]);
+  }, []);
 
-  const visible = useMemo(() => items.filter((item) => matchesFilters(item, mode, artStyleFilter, tags)), [items, mode, artStyleFilter, tags]);
+  const visible = useMemo(() => items.filter((item) => matchesFilters(item, artStyleFilter, tags)), [items, artStyleFilter, tags]);
 
   // Changing Art Style wipes every sub-filter (Scope, Service, Color Finish).
   const changeArtStyleFilter = (value: string) => { setArtStyleFilter(value); setTags([]); };
@@ -1671,22 +1538,7 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
       : [...current, tag]
   );
 
-  // Single-image modes (shop product, discount banner): the picked file replaces the current image.
-  const uploadSingle = async (file?: File, isBanner = false) => {
-    if (!file) return;
-    setFormError("");
-    setProcessing(true);
-    try {
-      const data = await compressImage(file);
-      setDraft((prev) => ({ ...prev, [isBanner ? "bannerImage" : "image"]: data }));
-    } catch (uploadError) {
-      setFormError(uploadError instanceof Error ? uploadError.message : String(uploadError));
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  // Gallery mode: any number of images can be picked at once and become one set (the first is the cover).
+  // Any number of images can be picked at once and become one set (the first is the cover).
   // The only limit is the combined stored size of the entry (10 MB), checked as each image is added.
   const addImages = async (picked: File[]) => {
     const files = picked.filter((file) => file.type.startsWith("image/"));
@@ -1746,14 +1598,14 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
   const changeDraftStyle = (style: string) => setDraft((prev) => ({
     ...prev,
     artStyle: style,
-    scope: mode === "gallery" && style ? SCOPES_BY_STYLE[style][0] : "",
-    subCategory: mode === "gallery" && style === "Chibi" ? "Sticker set" : "",
-    colorFinish: mode === "gallery" && style === "Semi-Realistic" ? "Rendered" : "",
+    scope: SCOPES_BY_STYLE[style][0],
+    subCategory: style === "Chibi" ? "Sticker set" : "",
+    colorFinish: style === "Semi-Realistic" ? "Rendered" : "",
   }));
 
   const openAdd = () => {
     setEditingId(null);
-    setDraft(emptyDraft(mode)); // Date Published defaults to today each time the form opens
+    setDraft(emptyDraft()); // Date Published defaults to today each time the form opens
     setPreviewIndex(0);
     setFormError("");
     editRequest.current += 1;
@@ -1768,29 +1620,23 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
     setLockSave(false);
     setOpen(false);
     setEditingId(null);
-    setDraft(emptyDraft(mode));
+    setDraft(emptyDraft());
     setPreviewIndex(0);
     setFormError("");
   };
 
   const startEdit = (item: AdminLibraryItem) => {
-    const style = itemArtStyle(item) || (mode === "gallery" ? "Chibi" : "");
+    const style = itemArtStyle(item) || "Chibi";
     setDraft({
-      ...emptyDraft(mode),
+      ...emptyDraft(),
       title: item.title,
       description: item.description || "",
-      category: mode === "discounts" ? item.requirementType || "Any" : mode === "products" ? item.category || "Pins" : "",
       artStyle: style,
-      subCategory: itemService(item) || (mode === "gallery" && style === "Chibi" ? "Sticker set" : ""),
-      scope: item.scope || (mode === "gallery" && style ? SCOPES_BY_STYLE[style][0] : ""),
-      colorFinish: item.colorFinish || (mode === "gallery" && style === "Semi-Realistic" ? "Rendered" : ""),
-      price: item.price !== undefined ? String(item.price) : "",
-      percentage: item.percentage !== undefined ? String(item.percentage) : "",
-      startDate: item.startDate || "", endDate: item.endDate || "", code: item.code || "",
-      image: item.image && item.image !== placeholder ? item.image : "",
-      bannerImage: item.bannerImage && item.bannerImage !== placeholder ? item.bannerImage : "",
-      images: mode === "gallery" && item.image && item.image !== placeholder ? [item.image] : [],
-      dateMade: item.dateMade || "", tools: item.tools || "", format: item.format || "",
+      subCategory: itemService(item) || (style === "Chibi" ? "Sticker set" : ""),
+      scope: item.scope || SCOPES_BY_STYLE[style][0],
+      colorFinish: item.colorFinish || (style === "Semi-Realistic" ? "Rendered" : ""),
+      images: item.image && item.image !== placeholder ? [item.image] : [],
+      tools: item.tools || "", format: item.format || "",
       publishedDate: toInputDate(item.publishedAt)
     });
     setPreviewIndex(0);
@@ -1802,7 +1648,7 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
     const token = ++editRequest.current;
     setLockSave(false);
     setLoadingSet(false);
-    if (mode === "gallery" && (item.imageCount ?? 1) > 1) {
+    if ((item.imageCount ?? 1) > 1) {
       setLoadingSet(true);
       apiRequest<{ images: string[] }>(`/api/gallery/${item.id}/images`)
         .then((data) => {
@@ -1824,13 +1670,13 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await apiRequest<{ success: boolean }>(`/api/${mode}/${deleteTarget.id}`, { method: "DELETE" });
+      await apiRequest<{ success: boolean }>(`/api/gallery/${deleteTarget.id}`, { method: "DELETE" });
       setItems((current) => current.filter((existing) => existing.id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (deleteError) {
       const message = deleteError instanceof Error ? deleteError.message : String(deleteError);
       setError(message);
-      console.error(`Failed to delete ${mode} item from D1:`, deleteError);
+      console.error("Failed to delete gallery item from D1:", deleteError);
       alert(`Failed to delete: ${message}`);
     }
   };
@@ -1844,17 +1690,9 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
     if (loadingSet || lockSave) return;
     setFormError("");
 
-    if (mode === "gallery") {
-      if (!draft.images.length) { setFormError("Add at least one image to publish."); return; }
-      if (overBudget) {
-        setFormError(`These images total ${formatMB(setSize)}, over the ${ENTRY_LIMIT_LABEL} limit for one entry. Remove a few and try again.`);
-        return;
-      }
-    } else if (mode === "products" && !draft.image) {
-      setFormError("Choose an image for this product.");
-      return;
-    } else if (mode === "discounts" && !draft.bannerImage) {
-      setFormError("Choose a banner image for this discount.");
+    if (!draft.images.length) { setFormError("Add at least one image to publish."); return; }
+    if (overBudget) {
+      setFormError(`These images total ${formatMB(setSize)}, over the ${ENTRY_LIMIT_LABEL} limit for one entry. Remove a few and try again.`);
       return;
     }
 
@@ -1865,37 +1703,18 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
     const publishedAt = formatPublishedDate(draft.publishedDate || todayInput());
     const common = { id: editingId ?? Date.now(), title: draft.title, description: draft.description, artStyle: style, scope, service, colorFinish };
 
-    const item: AdminLibraryItem = mode === "discounts"
-      ? {
-        ...common,
-        percentage: Number(draft.percentage),
-        requirementType: draft.category,
-        startDate: draft.startDate,
-        endDate: draft.endDate,
-        code: draft.code || "PROMO",
-        bannerImage: draft.bannerImage
-      }
-      : mode === "gallery"
-        ? {
-          ...common,
-          // Keep the legacy "Chibi (Service)" category string: the public gallery still reads it.
-          category: style === "Chibi" ? `Chibi (${service})` : style,
-          image: draft.images[0],
-          images: draft.images,
-          tools: draft.tools, format: draft.format,
-          publishedAt
-        }
-        : {
-          ...common,
-          category: draft.category,
-          price: Number(draft.price || 0),
-          image: draft.image,
-          dateMade: draft.dateMade, tools: draft.tools, format: draft.format,
-          publishedAt
-        };
+    const item: AdminLibraryItem = {
+      ...common,
+      // Keep the legacy "Chibi (Service)" category string: the public gallery still reads it.
+      category: style === "Chibi" ? `Chibi (${service})` : style,
+      image: draft.images[0],
+      images: draft.images,
+      tools: draft.tools, format: draft.format,
+      publishedAt
+    };
 
     try {
-      await apiRequest<{ success: boolean }>(editingId !== null ? `/api/${mode}/${editingId}` : `/api/${mode}`, {
+      await apiRequest<{ success: boolean }>(editingId !== null ? `/api/gallery/${editingId}` : "/api/gallery", {
         method: editingId !== null ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(item)
@@ -1904,34 +1723,29 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
     } catch (publishError) {
       const message = publishError instanceof Error ? publishError.message : String(publishError);
       setError(message);
-      console.error(`Failed to save ${mode} item to D1:`, publishError);
+      console.error("Failed to save gallery item to D1:", publishError);
       alert(`Failed to save: ${message}`);
       return;
     }
     closeModal();
   };
 
-  const noun = mode === "gallery" ? "artwork" : mode === "products" ? "product" : "discount";
-  const previewSrc = mode === "gallery" ? draft.images[previewIndex] : mode === "discounts" ? draft.bannerImage : draft.image;
+  const previewSrc = draft.images[previewIndex];
   const replaceLabel = processing
     ? progress || "Processing…"
     : loadingSet
       ? "Loading images…"
-      : mode === "gallery"
-      ? draft.images.length ? "Add more images" : "Choose images"
-      : mode === "discounts"
-        ? draft.bannerImage ? "Replace banner" : "Choose banner"
-        : draft.image ? "Replace image" : "Choose image";
+      : draft.images.length ? "Add more images" : "Choose images";
 
   return (
     <div className="admin-panel media-manager">
       <div className="panel-head">
         <div>
           <p>PUBLISHED LIBRARY</p>
-          <h2>{mode === "gallery" ? "Gallery images" : mode === "products" ? "Shop merchandise" : "Discounts"}</h2>
+          <h2>Gallery images</h2>
         </div>
         <button className="admin-plus" onClick={openAdd}>
-          <Icon name="plus" /> Add {noun}
+          <Icon name="plus" /> Add artwork
         </button>
       </div>
 
@@ -1942,19 +1756,19 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
         {error && <p className="empty-row" role="alert">Unable to load or update data: {error}</p>}
         {visible.map((item) => {
           const imageCount = item.imageCount ?? 1;
-          const metaParts = [mode === "products" ? item.dateMade : "", item.tools, item.format].filter(Boolean);
+          const metaParts = [item.tools, item.format].filter(Boolean);
           return (
             <article key={item.id}>
-              <img src={item.image || item.bannerImage || placeholder} alt={item.title} />
+              <img src={item.image || placeholder} alt={item.title} />
               <div>
-                <span>{item.category || item.requirementType || `${item.percentage}% OFF`}</span>
+                <span>{item.category}</span>
                 <h3>{item.title}</h3>
                 <p>{item.description}</p>
                 <small>
-                  {mode === "discounts" ? `Code: ${item.code} | ${item.startDate} to ${item.endDate}` : `Published ${item.publishedAt}`}
-                  {mode === "gallery" && imageCount > 1 ? ` · Set of ${imageCount} images` : ""}
+                  Published {item.publishedAt}
+                  {imageCount > 1 ? ` · Set of ${imageCount} images` : ""}
                 </small>
-                {mode !== "discounts" && metaParts.length > 0 && (
+                {metaParts.length > 0 && (
                   <small className="media-meta">{metaParts.join(" · ")}</small>
                 )}
               </div>
@@ -1969,7 +1783,7 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
       {deleteTarget && (
         <div className="modal-backdrop" onMouseDown={() => setDeleteTarget(null)}>
           <div className="confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-delete-title" onMouseDown={(e) => e.stopPropagation()}>
-            <h2 id="confirm-delete-title">Delete this {noun}?</h2>
+            <h2 id="confirm-delete-title">Delete this artwork?</h2>
             <p>“{deleteTarget.title}” will be removed from the database. This can’t be undone.</p>
             <div className="confirm-actions">
               <Btn kind="outline" onClick={() => setDeleteTarget(null)}>Cancel</Btn>
@@ -1987,7 +1801,7 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
             <div className="publish-preview">
               <img src={previewSrc || placeholder} alt="Upload preview" />
 
-              {mode === "gallery" && draft.images.length > 0 && (
+              {draft.images.length > 0 && (
                 <>
                   <ul className="set-thumbs" aria-label="Images in this set">
                     {draft.images.map((src, index) => (
@@ -2016,53 +1830,32 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
                 <input
                   type="file"
                   accept="image/*"
-                  multiple={mode === "gallery"}
+                  multiple
                   disabled={processing || loadingSet}
                   onChange={(e) => {
                     const input = e.target;
                     const picked = Array.from(input.files || []); // copy first: clearing the input empties the live FileList
                     input.value = "";
-                    if (mode === "gallery") void addImages(picked);
-                    else void uploadSingle(picked[0], mode === "discounts");
+                    void addImages(picked);
                   }}
                 />
               </label>
             </div>
 
             <div className="publish-fields">
-              <p className="kicker">{editingId !== null ? "Editing" : "New"} {mode === "gallery" ? "gallery artwork" : mode === "products" ? "shop merchandise" : "discount offer"}</p>
+              <p className="kicker">{editingId !== null ? "Editing" : "New"} gallery artwork</p>
               <h2>{editingId !== null ? "Edit details" : "Publish something new"}</h2>
 
               <ChalkField label="Title">
-                <input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder={mode === "discounts" ? "Summer Promo" : "Item title"} />
+                <input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Item title" />
               </ChalkField>
 
               <ChalkField label="Description">
                 <textarea required rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Write a brief description..." />
               </ChalkField>
 
-              {mode === "products" && (
-                <ChalkField label="Product type">
-                  <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>
-                    {["Pins", "Prints", "Photocard", "Chibi"].map((type) => <option key={type} value={type}>{type}</option>)}
-                  </select>
-                </ChalkField>
-              )}
-
-              {mode === "discounts" && (
-                <ChalkField label="Requirement">
-                  <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>
-                    <option value="Chibi Only">Chibi Only</option>
-                    <option value="Semi-Realistic Only">Semi-Realistic Only</option>
-                    <option value="Any">Any Commission</option>
-                    <option value="Commercial Use">Commercial Use</option>
-                  </select>
-                </ChalkField>
-              )}
-
               <ChalkField label="Art Style">
                 <select value={draft.artStyle} onChange={(e) => changeDraftStyle(e.target.value)}>
-                  {mode !== "gallery" && <option value="">None / any</option>}
                   {ART_STYLES.map((style) => <option key={style} value={style}>{style}</option>)}
                 </select>
               </ChalkField>
@@ -2070,7 +1863,6 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
               {draft.artStyle && (
                 <ChalkField label="Scope">
                   <select value={draft.scope} onChange={(e) => setDraft({ ...draft, scope: e.target.value })}>
-                    {mode !== "gallery" && <option value="">None</option>}
                     {SCOPES_BY_STYLE[draft.artStyle].map((scope) => <option key={scope} value={scope}>{scope}</option>)}
                   </select>
                 </ChalkField>
@@ -2079,7 +1871,6 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
               {draft.artStyle === "Chibi" && (
                 <ChalkField label="Service">
                   <select value={draft.subCategory} onChange={(e) => setDraft({ ...draft, subCategory: e.target.value })}>
-                    {mode !== "gallery" && <option value="">None</option>}
                     {CHIBI_SERVICES.map((service) => <option key={service} value={service}>{service === "YCH" ? "YCH (Your Character Here)" : service}</option>)}
                   </select>
                 </ChalkField>
@@ -2088,54 +1879,22 @@ function PublishManager({ mode }: { mode: LibraryMode }) {
               {draft.artStyle === "Semi-Realistic" && (
                 <ChalkField label="Color Finish">
                   <select value={draft.colorFinish} onChange={(e) => setDraft({ ...draft, colorFinish: e.target.value })}>
-                    {mode !== "gallery" && <option value="">None</option>}
                     {COLOR_FINISHES.map((finish) => <option key={finish} value={finish}>{finish === "Plain" ? "Plain Color" : finish}</option>)}
                   </select>
                 </ChalkField>
               )}
 
-              {mode !== "discounts" && (
-                <>
-                  {mode === "products" && (
-                    <ChalkField label="Date Made" hint="Type your own or pick a preset">
-                      <input list={`${mode}-datemade-list`} autoComplete="off" value={draft.dateMade} onChange={(e) => setDraft({ ...draft, dateMade: e.target.value })} placeholder="e.g. Oct 2026" />
-                      <datalist id={`${mode}-datemade-list`}>{dateMadePresets().map((value) => <option key={value} value={value} />)}</datalist>
-                    </ChalkField>
-                  )}
-                  <ChalkField label="Tools" hint="Type your own or pick a preset">
-                    <input list={`${mode}-tools-list`} autoComplete="off" value={draft.tools} onChange={(e) => setDraft({ ...draft, tools: e.target.value })} placeholder="e.g. Clip Studio Paint" />
-                    <datalist id={`${mode}-tools-list`}>{TOOL_PRESETS.map((value) => <option key={value} value={value} />)}</datalist>
-                  </ChalkField>
-                  <ChalkField label="Format" hint="Type your own or pick a preset">
-                    <input list={`${mode}-format-list`} autoComplete="off" value={draft.format} onChange={(e) => setDraft({ ...draft, format: e.target.value })} placeholder="e.g. Digital illustration" />
-                    <datalist id={`${mode}-format-list`}>{FORMAT_PRESETS.map((value) => <option key={value} value={value} />)}</datalist>
-                  </ChalkField>
-                  <ChalkField label="Date Published" hint="Defaults to today. Pick another date if you need to.">
-                    <input type="date" required value={draft.publishedDate} onChange={(e) => setDraft({ ...draft, publishedDate: e.target.value })} />
-                  </ChalkField>
-                </>
-              )}
-
-              {mode === "products" && (
-                <ChalkField label="Price in PHP">
-                  <input required type="number" min="0" value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value })} placeholder="250" />
-                </ChalkField>
-              )}
-
-              {mode === "discounts" && (
-                <>
-                  <ChalkField label="Discount Percentage (%)">
-                    <input required type="number" min="1" max="100" value={draft.percentage} onChange={(e) => setDraft({ ...draft, percentage: e.target.value })} placeholder="15" />
-                  </ChalkField>
-                  <ChalkField label="Discount Code">
-                    <input required value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} placeholder="CHIBIPROMO" />
-                  </ChalkField>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                    <ChalkField label="Start Date"><input required type="date" value={draft.startDate} onChange={(e) => setDraft({ ...draft, startDate: e.target.value })} /></ChalkField>
-                    <ChalkField label="End Date"><input required type="date" value={draft.endDate} onChange={(e) => setDraft({ ...draft, endDate: e.target.value })} /></ChalkField>
-                  </div>
-                </>
-              )}
+              <ChalkField label="Tools" hint="Type your own or pick a preset">
+                <input list="gallery-tools-list" autoComplete="off" value={draft.tools} onChange={(e) => setDraft({ ...draft, tools: e.target.value })} placeholder="e.g. Clip Studio Paint" />
+                <datalist id="gallery-tools-list">{TOOL_PRESETS.map((value) => <option key={value} value={value} />)}</datalist>
+              </ChalkField>
+              <ChalkField label="Format" hint="Type your own or pick a preset">
+                <input list="gallery-format-list" autoComplete="off" value={draft.format} onChange={(e) => setDraft({ ...draft, format: e.target.value })} placeholder="e.g. Digital illustration" />
+                <datalist id="gallery-format-list">{FORMAT_PRESETS.map((value) => <option key={value} value={value} />)}</datalist>
+              </ChalkField>
+              <ChalkField label="Date Published" hint="Defaults to today. Pick another date if you need to.">
+                <input type="date" required value={draft.publishedDate} onChange={(e) => setDraft({ ...draft, publishedDate: e.target.value })} />
+              </ChalkField>
 
               {formError && <p className="form-error" role="alert">{formError}</p>}
 
@@ -2276,7 +2035,7 @@ function HistoryManager({ onRestore }: { onRestore: (request: CommissionRequest)
 
       {itemToDelete && (
         <div className="modal-backdrop" onMouseDown={() => setItemToDelete(null)}>
-          <div className="promo-modal" style={{ maxWidth: "420px", padding: "30px", textAlign: "center" }} onMouseDown={(e) => e.stopPropagation()}>
+          <div className="dialog-modal" style={{ maxWidth: "420px", padding: "30px", textAlign: "center" }} onMouseDown={(e) => e.stopPropagation()}>
             <h3 style={{ fontFamily: "DM Serif Display", fontSize: "24px", marginBottom: "12px" }}>Permanently Delete Record?</h3>
             <p style={{ color: "var(--muted)", fontSize: "14px", marginBottom: "24px" }}>
               Are you sure you want to permanently delete <strong>{itemToDelete.name}</strong>'s history record? This action cannot be undone.
@@ -2320,7 +2079,6 @@ function RequestDetail({ request, close }: { request: CommissionRequest; close: 
             ["Commercial use", request.commercial ? "Yes" : "No"], 
             ["Priority", request.priority ? "Yes" : "No"], 
             ["Due date", request.dueDate], 
-            ["Discount Applied", request.discountName ? `${request.discountName} (-₱${request.discountAmount?.toLocaleString()})` : "None"], 
             ["Estimate", `₱${request.totalPhp.toLocaleString()}`], 
             ["Project notes", request.notes]
           ].map(([label, answer]) => (
@@ -2389,7 +2147,6 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
   const [requests, setRequests] = useState<CommissionRequest[]>([]);
   const [selected, setSelected] = useState<CommissionRequest | null>(null);
   const [requestError, setRequestError] = useState("");
-  const [productsCount, setProductsCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -2403,20 +2160,8 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
       .catch((err) => {
         if (!active) return;
         const message = err instanceof Error ? err.message : String(err);
-        setRequestError((current) => current ? `${current}; ${message}` : message);
+        setRequestError(message);
         console.error("Error loading commissions from D1:", err);
-      });
-
-    apiRequest<PublishedItem[]>("/api/products")
-      .then((data) => {
-        if (!Array.isArray(data)) throw new Error("The server returned invalid product data.");
-        if (active) setProductsCount(data.length);
-      })
-      .catch((err) => {
-        if (!active) return;
-        const message = err instanceof Error ? err.message : String(err);
-        setRequestError((current) => current ? `${current}; ${message}` : message);
-        console.error("Error loading products from D1:", err);
       });
 
     return () => { active = false; };
@@ -2435,8 +2180,6 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
     ["schedule", "calendar", "Schedule"], 
     ["requests", "mail", "Client requests"], 
     ["artworks", "brush", "Gallery images"], 
-    ["products", "spark", "Shop merchandise"], 
-    ["discounts", "spark", "Discounts"],
     ["history", "clock", "History"]
   ];
 
@@ -2565,14 +2308,6 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
                 {upcoming.length === 0 && <p className="empty-row">No client deadlines scheduled.</p>}
               </div>
             </section>
-            <section className="admin-panel shop-notice">
-              <div>
-                <span className="status-pill"><i /> Shop status</span>
-                <h2>{productsCount ? "Published and visible" : "Still unavailable"}</h2>
-                <p>{productsCount} products are currently live. Publish merchandise to automatically open the public shop.</p>
-              </div>
-              <Icon name="spark" size={34} />
-            </section>
           </div>
         )}
 
@@ -2677,9 +2412,7 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
         {tab === "schedule" && <div className="admin-panel schedule-panel"><div className="panel-head"><div><p>CLIENT DUE DATES</p><h2>Schedule</h2></div><span>{upcoming.length} planned</span></div><div className="schedule-list">{upcoming.map((request) => <button key={request.id} onClick={() => setSelected(request)}><time><strong>{new Date(`${request.dueDate}T00:00`).toLocaleDateString("en-US", { day: "2-digit" })}</strong><span>{new Date(`${request.dueDate}T00:00`).toLocaleDateString("en-US", { month: "short" })}</span></time><div><h3>{request.name}</h3><p>{request.type} · {request.finish} · {request.characters} character{request.characters > 1 ? "s" : ""}</p></div><span className="admin-status">{stages[request.stage]}</span><Icon name="arrow" /></button>)}{upcoming.length === 0 && <p className="empty-row">Requested client due dates will appear automatically.</p>}</div></div>}
         {tab === "requests" && <div className="admin-panel"><div className="panel-head"><div><p>AUTOMATIC INBOX</p><h2>Client requests</h2></div><span>{requests.length} total</span></div><div className="request-list">{requests.map((request) => <button key={request.id} onClick={() => setSelected(request)}><span className="request-avatar">{request.name.slice(0, 2).toUpperCase()}</span><div><strong>{request.name}</strong><small>{request.type} · {request.finish} · submitted {new Date(request.submittedAt).toLocaleDateString()}</small></div><span>{request.dueDate}</span><Icon name="arrow" /></button>)}{requests.length === 0 && <p className="empty-row">Completed commission forms will be added here automatically.</p>}</div></div>}
         
-        {tab === "artworks" && <PublishManager mode="gallery" />}
-        {tab === "products" && <PublishManager mode="products" />}
-        {tab === "discounts" && <PublishManager mode="discounts" />}
+        {tab === "artworks" && <PublishManager />}
         
         {tab === "history" && <HistoryManager onRestore={(request) => setRequests((current) => [request, ...current.filter((item) => item.id !== request.id)])} />}
       </section>
@@ -2791,7 +2524,7 @@ function Footer({ go }: { go: (page: Page) => void }) {
         </div>
         <nav className="footer-col" aria-label="Explore">
           <h3>Explore</h3>
-          {[["Gallery", "gallery"], ["Commission", "commission"], ["Guide", "guide"], ["Shop", "shop"], ["About", "about"]].map(([label, page]) => <button type="button" key={label} onClick={() => go(page as Page)}>{label}</button>)}
+          {[["Gallery", "gallery"], ["Commission", "commission"], ["Guide", "guide"], ["About", "about"]].map(([label, page]) => <button type="button" key={label} onClick={() => go(page as Page)}>{label}</button>)}
         </nav>
         <div className="footer-col">
           <h3>Say hello</h3>
@@ -2904,7 +2637,7 @@ function ChalkDefs() {
 export default function App() {
   const getPage = (): Page => {
     const hash = window.location.hash.replace("#", "").split("?")[0] as Page;
-    return ["home", "gallery", "shop", "guide", "about", "commission", "admin"].includes(hash) ? hash : "home";
+    return ["home", "gallery", "guide", "about", "commission", "admin"].includes(hash) ? hash : "home";
   };
   const getGallerySelection = (): GallerySelection | null => {
     const query = new URLSearchParams(window.location.hash.split("?")[1] || "");
@@ -2917,8 +2650,6 @@ export default function App() {
     return { category, facet: facet as GallerySelection["facet"], value };
   };
   const [page, setPage] = useState<Page>(getPage);
-  const [promo, setPromo] = useState(false);
-  const [promoAvailable, setPromoAvailable] = useState(false);
   const [isAdminAuth, setIsAdminAuth] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -2958,31 +2689,13 @@ export default function App() {
   };
 
   useEffect(() => {
-    let active = true;
-    let timer: number | undefined;
-    apiRequest<DiscountItem[]>("/api/discounts")
-      .then((discounts) => {
-        if (!Array.isArray(discounts)) throw new Error("The server returned invalid discount data.");
-        if (!active) return;
-        setPromoAvailable(discounts.length > 0);
-        if (getPage() === "home" && discounts.length > 0) {
-          timer = window.setTimeout(() => setPromo(true), 900);
-        }
-      })
-      .catch((error) => console.error("Unable to check D1 discounts for the promo modal:", error));
-    const onHash = () => {
-      setPage(getPage());
-    };
+    const onHash = () => setPage(getPage());
     window.addEventListener("hashchange", onHash);
-    return () => {
-      active = false;
-      if (timer !== undefined) window.clearTimeout(timer);
-      window.removeEventListener("hashchange", onHash);
-    };
+    return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
   useEffect(() => {
-    const elements = document.querySelectorAll("main > section, .featured-card, .medium-card, .gallery-card, .guide-sections article, .product-grid article, .form-section");
+    const elements = document.querySelectorAll("main > section, .featured-card, .medium-card, .gallery-card, .guide-sections article, .form-section");
     elements.forEach((element) => element.classList.add("scroll-reveal"));
     const observer = new IntersectionObserver((entries) => entries.forEach((entry) => { if (entry.isIntersecting) { entry.target.classList.add("revealed"); observer.unobserve(entry.target); } }), { threshold: .08 });
     elements.forEach((element) => observer.observe(element));
@@ -3002,7 +2715,7 @@ export default function App() {
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
   };
-  const content = { home: <Home go={go} openPromo={() => setPromo(true)} />, gallery: <Gallery selection={getGallerySelection()} />, shop: <Shop go={go} />, guide: <Guide />, about: <About go={go} />, commission: <Commission go={go} />, admin: <Admin go={go} onLogout={logout} /> };
+  const content = { home: <Home go={go} />, gallery: <Gallery selection={getGallerySelection()} />, guide: <Guide />, about: <About go={go} />, commission: <Commission go={go} />, admin: <Admin go={go} onLogout={logout} /> };
   
   if (page === "admin") {
     if (!authChecked) {
@@ -3025,7 +2738,6 @@ export default function App() {
       <Navbar page={page} go={go} />
       {content[page]}
       <Footer go={go} />
-      {promo && promoAvailable && <PromoModal close={() => setPromo(false)} go={go} />}
     </div>
   );
 }

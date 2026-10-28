@@ -1,13 +1,6 @@
-const MEDIA = {
-  products: ["title", "description", "image", "category", "price", "publishedAt", "artStyle", "scope", "service", "colorFinish", "dateMade", "tools", "format"],
-  discounts: ["title", "percentage", "requirementType", "description", "startDate", "endDate", "bannerImage", "code", "artStyle", "scope", "service", "colorFinish"],
-};
 const GALLERY_COLS = ["title", "description", "image", "category", "scope", "service", "colorFinish", "publishedAt", "artStyle", "dateMade", "tools", "format"];
 
-const NUMERIC = new Set(["price", "percentage"]);
-const DEFAULTS = { requirementType: "Any" };
-const clean = (col, value) =>
-  NUMERIC.has(col) ? Number(value) || 0 : value ?? DEFAULTS[col] ?? "";
+const clean = (value) => value ?? "";
 
 const MAX_ENTRY_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 1_900_000;
@@ -195,9 +188,6 @@ const cleanCommission = (data) => {
     referencesJson,
     totalPhp: Math.round(number(data.totalPhp, 0, 10_000_000, 0)),
     submittedAt: text(data.submittedAt, 40) || new Date().toISOString(),
-    discountCode: data.discountCode ? text(data.discountCode, 100) : null,
-    discountName: data.discountName ? text(data.discountName, 200) : null,
-    discountAmount: Math.round(number(data.discountAmount, 0, 10_000_000, 0)),
   };
 };
 
@@ -282,15 +272,13 @@ export default {
           INSERT INTO commissions (
             id, name, email, social, type, finish, characters, background,
             commercial, priority, dueDate, notes, "references", totalPhp,
-            submittedAt, stage, discountCode, discountName, discountAmount,
-            historyType, submittedToHistoryAt
+            submittedAt, stage, historyType, submittedToHistoryAt
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           c.id, c.name, c.email, c.social, c.type, c.finish, c.characters, c.background,
           c.commercial, c.priority, c.dueDate, c.notes, c.referencesJson, c.totalPhp,
-          c.submittedAt, 0, c.discountCode, c.discountName, c.discountAmount,
-          null, null
+          c.submittedAt, 0, null, null
         ).run();
 
         return Response.json({ success: true }, { headers: corsHeaders });
@@ -355,7 +343,7 @@ export default {
           if (problem) return Response.json({ error: problem }, { status: 413, headers: corsHeaders });
 
           const entryId = Number(item.id);
-          const values = GALLERY_COLS.map((col) => (col === "image" ? images[0] : clean(col, item[col])));
+          const values = GALLERY_COLS.map((col) => (col === "image" ? images[0] : clean(item[col])));
           await env.DB.batch([
             env.DB.prepare(
               `INSERT INTO gallery (id, ${GALLERY_COLS.join(", ")}) VALUES (${["?", ...GALLERY_COLS.map(() => "?")].join(", ")})`
@@ -375,7 +363,7 @@ export default {
 
           const sent = GALLERY_COLS.filter((col) => col in item && !(replacing && col === "image"));
           const assignments = sent.map((col) => `${col} = ?`);
-          const params = sent.map((col) => clean(col, item[col]));
+          const params = sent.map((col) => clean(item[col]));
           if (replacing) {
             assignments.push("image = ?");
             params.push(item.images[0]);
@@ -398,43 +386,6 @@ export default {
             env.DB.prepare("DELETE FROM gallery_images WHERE galleryId = ?").bind(id),
             env.DB.prepare("DELETE FROM gallery WHERE id = ?").bind(id),
           ]);
-          return Response.json({ success: true }, { headers: corsHeaders });
-        }
-      }
-
-      const media = path.match(/^\/api\/(products|discounts)(?:\/(\d+))?\/?$/);
-      if (media) {
-        const table = media[1];
-        const cols = MEDIA[table];
-        const id = media[2] ? Number(media[2]) : null;
-
-        if (!id && request.method === "GET") {
-          const { results } = await env.DB.prepare(`SELECT * FROM ${table} ORDER BY id DESC`).all();
-          return Response.json(results, { headers: corsHeaders });
-        }
-
-        if (!id && request.method === "POST") {
-          const item = await readJson(request);
-          await env.DB.prepare(
-            `INSERT INTO ${table} (id, ${cols.join(", ")}) VALUES (${["?", ...cols.map(() => "?")].join(", ")})`
-          ).bind(Number(item.id), ...cols.map((col) => clean(col, item[col]))).run();
-          return Response.json({ success: true }, { headers: corsHeaders });
-        }
-
-        if (id && request.method === "PUT") {
-          const item = await readJson(request);
-          const sent = cols.filter((col) => col in item);
-          if (!sent.length) {
-            return Response.json({ error: "Nothing to update" }, { status: 400, headers: corsHeaders });
-          }
-          await env.DB.prepare(
-            `UPDATE ${table} SET ${sent.map((col) => `${col} = ?`).join(", ")} WHERE id = ?`
-          ).bind(...sent.map((col) => clean(col, item[col])), id).run();
-          return Response.json({ success: true }, { headers: corsHeaders });
-        }
-
-        if (id && request.method === "DELETE") {
-          await env.DB.prepare(`DELETE FROM ${table} WHERE id = ?`).bind(id).run();
           return Response.json({ success: true }, { headers: corsHeaders });
         }
       }
