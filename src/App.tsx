@@ -896,7 +896,7 @@ function Commission({ go }: { go: (page: Page) => void }) {
         body: JSON.stringify(request)
       });
 
-      alert("Your commission request was successfully submitted to the database!");
+      alert("Your commission request is successfully submitted!");
       go("home");
     } catch (error) {
       console.error("Submission Error Details:", error);
@@ -913,7 +913,7 @@ function Commission({ go }: { go: (page: Page) => void }) {
         <h1>Let's make something <em>yours.</em></h1>
         <p>Step-by-step studio commission intake modeled after live Google Forms.</p>
       </section>
-      {requestError && <p className="wrap" role="alert">Live commission data could not be loaded: {requestError}</p>}
+      {/* {requestError && <p className="wrap" role="alert">Live commission data could not be loaded: {requestError}</p>} */}
 
       <div className={`wrap commission-layout ${step > 2 && step < 5 ? "has-estimate" : "without-estimate"}`}>
         <div className="commission-form">
