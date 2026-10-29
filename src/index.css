@@ -287,8 +287,8 @@ h1 em, h2 em { color: var(--orange); }
 
 footer { background: #333; color: white; padding-top: 70px; }
 .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1.3fr 1.4fr; gap: 50px; padding-bottom: 55px; }
-.footer-brand > div { display: flex; align-items: center; font: 30px "DM Serif Display"; }
-.footer-brand img { width: 58px; }
+.footer-brand > div { display: flex; align-items: center; font: 30px "DM Serif Display"; height: 100%; }
+.footer-brand img { width: 120px; height: 80px; }
 .footer-brand p, footer a, footer button { color: #aaa; font-size: 16px; line-height: 1.8; }
 .footer-grid h3 { color: var(--gold); font-size: 16px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 18px; }
 .footer-grid > div:not(:first-child):not(:last-child) { display: flex; flex-direction: column; align-items: flex-start; }
@@ -780,7 +780,7 @@ footer a:hover, footer button:hover { color: var(--gold); }
 .chalk-theme .portrait-card .art-visual { border-color: var(--paper); }
 
 /* Bands: soft fine dust on dark and coloured sections, chalk edge along the top */
-.chalk-theme :is(.about-strip, .home-commission-cta, .expertise-section, .contact-band, .guide-contact, footer) { position: relative; }
+.chalk-theme :is(.about-strip, .home-commission-cta, .expertise-section, .contact-band, .guide-contact) { position: relative; }
 .chalk-theme .about-strip { background-image: var(--chalk-grain); background-size: 240px; }
 .chalk-theme :is(.about-strip, .home-commission-cta, .expertise-section, .contact-band, .guide-contact, footer)::before { content: ""; position: absolute; left: 0; right: 0; top: 0; z-index: 1; height: 8px; border-top: 3px solid currentColor; border-radius: 60% 40% 0 0 / 100% 100% 0 0; filter: url(#chalk-soft); opacity: .55; pointer-events: none; }
 .chalk-theme :is(footer, .home-commission-cta, .expertise-section, .estimate-card, .contact-band, .guide-contact) { background-image: var(--chalk-dust-soft); background-size: 260px; }
@@ -1037,12 +1037,12 @@ img, svg { max-width: 100%; }
 }
 
 /* Footer: concise and lightweight (no slot indicator or request button) */
-footer { padding-top: clamp(28px, 3.4vw, 44px); }
+footer { padding-top: clamp(0px, 3.4vw, 0px); }
 .footer-grid { grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr)); gap: clamp(20px, 3.4vw, 48px); padding-bottom: clamp(18px, 2.4vw, 28px); }
 .footer-grid > :not(.footer-brand) { display: flex; flex-direction: column; align-items: flex-start; }
-.footer-brand img { width: 46px; }
+.footer-brand img { width: 100px; height: 100px; }
 .footer-brand > div { font-size: 26px; }
-.footer-wordmark { width: 82px !important; height: 38px; }
+.footer-wordmark { margin: 10px; width: 120px !important; height: 60px; }
 .footer-brand p { margin-bottom: 0; }
 .footer-grid h3 { margin-bottom: 8px; }
 .footer-grid > :not(.footer-brand) > :is(a, button) { min-height: 28px; display: inline-flex; align-items: center; }
@@ -1507,5 +1507,71 @@ footer a { overflow-wrap: anywhere; }
   .nav-links button::after,
   .nav-links button::before {
     display: none !important;
+  }
+}
+
+
+/* Container that pushes left and right groups apart */
+.footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-block: 20px;
+  border-top: 1px solid #4a4a4a;
+}
+
+/* Individual inline groups for left and right contents */
+.footer-bottom-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Universal text & link styling to keep everything matching */
+.footer-bottom,
+.footer-bottom span,
+.footer-bottom a,
+.footer-bottom .footer-link-btn,
+.footer-bottom .footer-section-label {
+  color: #cfcfcf;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* Separator dot styling */
+.dot-sep {
+  color: #666;
+  font-size: 12px;
+  user-select: none;
+}
+
+/* Matching link hover states for both <a> and <button> elements */
+.footer-bottom a:hover,
+.footer-bottom .footer-link-btn:hover {
+  color: var(--gold);
+  text-decoration: underline wavy var(--gold) 1px;
+  text-underline-offset: 4px;
+  text-decoration-skip-ink: none;
+}
+
+/* Seamless styling for clickable terms button */
+.footer-link-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Mobile responsive layout adjustment */
+@media (max-width: 768px) {
+  .footer-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
   }
 }

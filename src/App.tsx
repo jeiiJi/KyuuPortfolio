@@ -6,7 +6,7 @@ import heroArtwork from "./assets/Untitled200_20261016201217.png";
 import chibiReference from "./assets/Untitled201_20261021205439.png";
 const API_URL = "";
 
-type Page = "home" | "gallery" | "guide" | "about" | "commission" | "admin";
+type Page = "home" | "guide" | "commission" | "admin";
 type CommissionRequest = {
   id: number; name: string; email: string; social: string; type: string; finish: string;
   characters: number; background: string; commercial: boolean; priority: boolean;
@@ -102,6 +102,7 @@ const apiRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
 
   return data as T;
 };
+
 function useApiData<T>(path: string) {
   const [items, setItems] = useState<T[]>([]);
   const [error, setError] = useState("");
@@ -157,12 +158,19 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const links: { label: string; page: Page }[] = [
-    { label: "Home", page: "home" },
-    { label: "Gallery", page: "gallery" },
-    { label: "Guide", page: "guide" },
-    { label: "About", page: "about" },
-  ];
+  // Handle smooth scrolling to section IDs on the Home page
+  const scrollToSection = (sectionId: string) => {
+    setOpen(false);
+    if (page !== "home") {
+      go("home");
+      // Wait for home page render before scrolling
+      setTimeout(() => {
+        document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    } else {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
+    }
+  };
 
   return (
     <header className="navbar">
@@ -191,17 +199,35 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
         )}
 
         <nav id="primary-nav" className={open ? "nav-links open" : "nav-links"} aria-label="Main navigation">
-          {links.map((link) => (
-            <button
-              key={link.page}
-              className={page === link.page ? "active" : ""}
-              aria-current={page === link.page ? "page" : undefined}
-              onClick={() => { go(link.page); setOpen(false); }}
-            >
-              {link.label}
-            </button>
-          ))}
+          <button
+            type="button"
+            onClick={() => {
+              if (page !== "home") go("home");
+              else window.scrollTo({ top: 0, behavior: "smooth" });
+              setOpen(false);
+            }}
+          >
+            Home
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToSection("about-section")}
+          >
+            About
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToSection("home-gallery-section")}
+          >
+            Gallery
+          </button>
         </nav>
+
+        <div className="nav-actions">
+          <Btn onClick={() => { go("commission"); setOpen(false); }}>
+            Commission Now
+          </Btn>
+        </div>
       </div>
     </header>
   );
@@ -214,6 +240,68 @@ function ArtVisual({ art, label }: { art: string; label: string }) {
 function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }) {
   const { items: published } = useApiData<PublishedItem>("/api/gallery");
   
+  // Gallery state integrated directly into Home
+  const [filter, setFilter] = useState<"Chibi" | "Semi-Realistic">("Chibi");
+  const [scopeValue, setScopeValue] = useState("");
+  const [contextValue, setContextValue] = useState("");
+  const [selected, setSelected] = useState<GalleryItem | null>(null);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+
+  const allItems: GalleryItem[] = published.map((item) => ({
+    id: item.id,
+    title: item.title,
+    type: item.category?.startsWith("Semi-Realistic") ? "Semi-Realistic" : "Chibi",
+    desc: item.description,
+    image: item.image,
+    imageCount: item.imageCount,
+    size: "medium",
+    tags: ["published", item.category || "Chibi", item.scope, item.service || item.category?.match(/\(([^)]+)\)/)?.[1], item.colorFinish].filter((tag): tag is string => Boolean(tag)),
+    publishedAt: item.publishedAt,
+    scope: item.scope,
+    service: item.service || item.category?.match(/\(([^)]+)\)/)?.[1],
+    colorFinish: item.colorFinish,
+    tools: item.tools,
+    format: item.format,
+  }));
+
+  const scopeOptions = filter === "Chibi" ? ["Headshot", "Fullbody"] : ["Headshot", "Bust-up", "Waist-up", "Thigh-up"];
+  const contextLabel = filter === "Chibi" ? "Service" : "Color Finish";
+  const contextOptions = filter === "Chibi"
+    ? ["Solo Deals", "Sticker set", "Acrylic Merch", "Badges/Pins/Pfp Design", "Character Reference sheet", "2D Model character sheet", "YCH", "Alternate outfits/expressions"]
+    : ["Rendered", "Plain", "Monochrome"];
+
+  const visible = allItems.filter((item) => {
+    if (item.type !== filter) return false;
+    if (scopeValue && item.scope !== scopeValue) return false;
+    if (!contextValue) return true;
+    const value = filter === "Chibi" ? item.service : item.colorFinish;
+    return value === contextValue;
+  });
+
+  const visual = (item: GalleryItem) => {
+    if ("image" in item && item.image) {
+      return <img className="gallery-real-image" src={item.image} alt={item.title} />;
+    }
+    return <ArtVisual art="placeholder" label={item.title} />;
+  };
+
+  // Handle loading full image sets for modals
+  useEffect(() => {
+    if (!selected || !("image" in selected)) {
+      setSelectedImages([]);
+      return;
+    }
+    setSelectedImages(selected.image ? [selected.image] : []);
+    if (!selected.imageCount || selected.imageCount < 2) return;
+    let active = true;
+    apiRequest<{ images: string[] }>(`/api/gallery/${selected.id}/images`)
+      .then((data) => {
+        if (active && Array.isArray(data.images) && data.images.length) setSelectedImages(data.images);
+      })
+      .catch((loadError) => console.error("Failed to load the full image set:", loadError));
+    return () => { active = false; };
+  }, [selected]);
+
   const canvasCards: { icon: IconName; title: string; desc: string; selection: GallerySelection }[] = [
     { icon: "brush", title: "Character art", desc: "Originals, fan art & portraits", selection: { category: "Semi-Realistic", facet: "Scope", value: "Headshot" } },
     { icon: "pen", title: "Chibi cuties", desc: "Tiny style, big personality", selection: { category: "Chibi", facet: "Scope", value: "Headshot" } },
@@ -224,13 +312,17 @@ function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }
   return (
     <>
       <main id="main-content" tabIndex={-1}>
+        {/* Hero Section */}
         <section className="hero wrap">
           <div className="hero-copy">
             <div className="eyebrow"><span className="eyebrow-line" /> Digital artist & illustrator</div>
             <h1>Small moments,<br /><em>boldly drawn.</em></h1>
             <p>I turn warm ideas, favorite characters, and little daydreams into expressive digital art.</p>
             <div className="hero-actions">
-              <Btn onClick={() => go("gallery")}>Explore my work <Icon name="arrow" /></Btn>
+              <Btn onClick={() => {
+                const galleryEl = document.getElementById("home-gallery-section");
+                galleryEl?.scrollIntoView({ behavior: "smooth" });
+              }}>Explore my work <Icon name="arrow" /></Btn>
             </div>
           </div>
           <div className="hero-canvas">
@@ -242,41 +334,102 @@ function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }
 
         <ChalkDivider />
 
-        <section className="about-strip">
+        {/* About Strip */}
+        <section id="about-section" className="about-strip">
           <div className="wrap intro-grid">
             <div className="portrait-card"><ArtVisual art="artist" label="Illustrated portrait of the artist" /><span className="seal">ID<br />Artist</span></div>
             <div className="intro-copy">
               <p className="kicker">Meet the artist</p><h2>Hi, I'm Kyuu. I draw feelings you can keep.</h2>
               <p>I'm a digital illustrator who loves expressive faces, cozy color stories, and the magic of turning your favorite idea into something unmistakably yours.</p>
-              <Btn kind="ghost" onClick={() => go("about")}>A little more about me <Icon name="arrow" /></Btn>
-              <div className="quick-terms"><div><span>01</span><p><strong>Kind collaboration</strong>Clear communication from sketch to final.</p></div><div><span>02</span><p><strong>Made for you</strong>Personal use is included; commercial use is quoted.</p></div></div>
+              <div className="quick-terms">
+                <div>
+                  <span>01</span>
+                  <p><strong>Kind collaboration</strong>Clear communication from sketch to final.</p>
+                </div>
+                <div>
+                  <span>02</span>
+                  <p><strong>Made for you</strong> Personal use is included; commercial use is quoted.</p>
+                </div>
+                <div>
+                  <span>03</span>
+                  <p><strong>High-res files</strong> Delivered ready for print, web, or licensing.</p>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="section wrap featured">
+        {/* EMBEDDED GALLERY SECTION */}
+        <section id="home-gallery-section" className="section wrap">
           <div className="section-heading">
-            <div><p className="kicker">My Latest Works</p><h2>This month's favorites</h2></div>
+            <div><p className="kicker">Gallery</p><h2>Explore my work</h2></div>
           </div>
-          <div className="featured-grid">
-            {published.slice(0, 4).map((item, index) => (
-              <div className="featured-card" key={item.id}>
-                <div className="featured-number">0{index + 1}</div>
-                <div className="art-visual">
-                  <img src={item.image || placeholder} alt={item.title} />
-                </div>
-              </div>
+
+          <div className="filter-bar" style={{ position: "static", background: "transparent", border: "none", marginBottom: "20px" }}>
+            <div className="filter-toggle sliding-filter" role="group" aria-label="Filter artwork">
+              <div className={`filter-slider-indicator ${filter === "Semi-Realistic" ? "slide-right" : ""}`} aria-hidden="true" />
+              {(["Chibi", "Semi-Realistic"] as const).map((item) => (
+                <button key={item} type="button" className={`filter-btn ${filter === item ? "active" : ""}`} aria-pressed={filter === item} onClick={() => { setFilter(item); setScopeValue(""); setContextValue(""); }}>
+                  {item}<span>{allItems.filter((art) => art.type === item).length}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="sub-filter-bar" style={{ marginBottom: "30px", borderRadius: "8px" }}>
+            <strong className="sub-filter-label">Filter</strong>
+            <label className="sub-filter-select">
+              <span className="sr-only">Scope</span>
+              <select aria-label="Scope" value={scopeValue} onChange={(event) => setScopeValue(event.target.value)}>
+                <option value="">Scope</option>
+                {scopeOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </label>
+            <label className="sub-filter-select">
+              <span className="sr-only">{contextLabel}</span>
+              <select aria-label={contextLabel} value={contextValue} onChange={(event) => setContextValue(event.target.value)}>
+                <option value="">{contextLabel}</option>
+                {contextOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </label>
+            <button type="button" className="sub-filter-clear" onClick={() => { setScopeValue(""); setContextValue(""); }}>Clear filters</button>
+          </div>
+
+          <div className="gallery-grid" style={{ paddingTop: 0 }}>
+            {visible.map((item) => (
+              <button className={`gallery-card gallery-image-only ${item.size}`} key={item.id} onClick={() => setSelected(item)} aria-label={`View ${item.title} details`}>
+                {visual(item)}
+                <span className="gallery-hover">View artwork <Icon name="arrow" /></span>
+              </button>
             ))}
+            {visible.length === 0 && (
+              <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "60px 0", color: "var(--muted)" }}>
+                <p>No {[scopeValue, contextValue, filter].filter(Boolean).join(" ")} artwork has been added yet.</p>
+              </div>
+            )}
           </div>
-          <div className="center"><Btn kind="outline" onClick={() => go("gallery")}>There's more <Icon name="arrow" /></Btn></div>
         </section>
 
-        <section className="section wrap">
-          <div className="section-heading compact"><div><p className="kicker">My Offers</p><h2>Pick your canvas</h2></div></div>
-          <div className="medium-grid">
-            {canvasCards.map(({ icon, title, desc, selection }, i) => <button key={title} onClick={() => go("gallery", selection)} className="medium-card"><span>0{i + 1}</span><Icon name={icon} size={25} /><h3>{title}</h3><p>{desc}</p><b><Icon name="arrow" /></b></button>)}
+        {/* Modal for viewing individual artwork details */}
+        {selected && (
+          <div className="modal-backdrop" onMouseDown={() => setSelected(null)}>
+            <div className="project-modal" role="dialog" aria-modal="true" aria-labelledby="project-title" onMouseDown={(e) => e.stopPropagation()}>
+              <button type="button" className="modal-close" aria-label="Close artwork details" autoFocus onClick={() => setSelected(null)}><Icon name="close" /></button>
+              <ImageCarousel key={selected.id} images={selectedImages} title={selected.title} />
+              <div className="project-copy">
+                <p className="kicker">{selected.type} · Featured project</p>
+                <h2 id="project-title">{selected.title}</h2>
+                <p>{selected.desc}</p>
+                <div className="tags">{selected.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+                <div className="project-meta">
+                  <span>Published<strong>{"publishedAt" in selected ? selected.publishedAt : "2025"}</strong></span>
+                  {"tools" in selected && selected.tools && <span>Tools<strong>{selected.tools}</strong></span>}
+                  {"format" in selected && selected.format && <span>Format<strong>{selected.format}</strong></span>}
+                </div>
+              </div>
+            </div>
           </div>
-        </section>
+        )}
 
         <section className="home-commission-cta">
           <div className="wrap">
@@ -383,157 +536,6 @@ function ImageCarousel({ images, title }: { images: string[]; title: string }) {
         </>
       )}
     </div>
-  );
-}
-
-function Gallery({ selection }: { selection: GallerySelection | null }) {
-  const [filter, setFilter] = useState<"Chibi" | "Semi-Realistic">(selection?.category || "Chibi");
-  const [scopeValue, setScopeValue] = useState(selection?.facet === "Scope" ? selection.value : "");
-  const [contextValue, setContextValue] = useState(selection?.facet !== "Scope" ? selection?.value || "" : "");
-  const { items: published } = useApiData<PublishedItem>("/api/gallery");
-
-  useEffect(() => {
-    setFilter(selection?.category || "Chibi");
-    setScopeValue(selection?.facet === "Scope" ? selection.value : "");
-    setContextValue(selection?.facet && selection.facet !== "Scope" ? selection.value : "");
-  }, [selection?.category, selection?.facet, selection?.value]);
-  
-  const allItems: GalleryItem[] = published.map((item) => ({
-    id: item.id,
-    title: item.title,
-    type: item.category?.startsWith("Semi-Realistic") ? "Semi-Realistic" : "Chibi",
-    desc: item.description,
-    image: item.image,
-    imageCount: item.imageCount,
-    size: "medium",
-    tags: ["published", item.category || "Chibi", item.scope, item.service || item.category?.match(/\(([^)]+)\)/)?.[1], item.colorFinish].filter((tag): tag is string => Boolean(tag)),
-    publishedAt: item.publishedAt,
-    scope: item.scope,
-    service: item.service || item.category?.match(/\(([^)]+)\)/)?.[1],
-    colorFinish: item.colorFinish,
-    tools: item.tools,
-    format: item.format,
-  }));
-
-  const [selected, setSelected] = useState<GalleryItem | null>(null);
-  const [selectedImages, setSelectedImages] = useState<string[]>([]);
-  const scopeOptions = filter === "Chibi"
-    ? ["Headshot", "Fullbody"]
-    : ["Headshot", "Bust-up", "Waist-up", "Thigh-up"];
-  const contextLabel = filter === "Chibi" ? "Service" : "Color Finish";
-  const contextOptions = filter === "Chibi"
-    ? ["Solo Deals", "Sticker set", "Acrylic Merch", "Badges/Pins/Pfp Design", "Character Reference sheet", "2D Model character sheet", "YCH", "Alternate outfits/expressions"]
-    : ["Rendered", "Plain", "Monochrome"];
-  const visible = allItems.filter((item) => {
-    if (item.type !== filter) return false;
-    if (scopeValue && item.scope !== scopeValue) return false;
-    if (!contextValue) return true;
-    const value = filter === "Chibi" ? item.service : item.colorFinish;
-    return value === contextValue;
-  });
-  
-  const visual = (item: GalleryItem) => {
-    if ("image" in item && item.image) {
-      return <img className="gallery-real-image" src={item.image} alt={item.title} />;
-    }
-    return <ArtVisual art="placeholder" label={item.title} />;
-  };
-
-  useEffect(() => {
-    if (!selected) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setSelected(null); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [selected]);
-
-  useEffect(() => {
-    if (!selected || !("image" in selected)) {
-      setSelectedImages([]);
-      return;
-    }
-    setSelectedImages(selected.image ? [selected.image] : []);
-    if (!selected.imageCount || selected.imageCount < 2) return;
-    let active = true;
-    apiRequest<{ images: string[] }>(`/api/gallery/${selected.id}/images`)
-      .then((data) => {
-        if (active && Array.isArray(data.images) && data.images.length) setSelectedImages(data.images);
-      })
-      .catch((loadError) => console.error("Failed to load the full image set:", loadError));
-    return () => { active = false; };
-  }, [selected]);
-
-  return (
-    <main id="main-content" tabIndex={-1} className="page-main">
-      <section className="page-hero wrap">
-        <p className="kicker">Selected works · 2025—2026</p>
-        <h1>Gallery of <em>little worlds.</em></h1>
-        <p>A collection of character-led illustrations, warm studies, and playful experiments.</p>
-      </section>
-      
-      <div className="filter-bar">
-        <div className="filter-toggle sliding-filter" role="group" aria-label="Filter artwork">
-          <div className={`filter-slider-indicator ${filter === "Semi-Realistic" ? "slide-right" : ""}`} aria-hidden="true" />
-          {(["Chibi", "Semi-Realistic"] as const).map((item) => (
-              <button key={item} type="button" className={`filter-btn ${filter === item ? "active" : ""}`} aria-pressed={filter === item} onClick={() => { setFilter(item); setScopeValue(""); setContextValue(""); }}>
-              {item}<span>{allItems.filter((art) => art.type === item).length}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="sub-filter-bar">
-        <strong className="sub-filter-label">Filter</strong>
-        <label className="sub-filter-select">
-          <span className="sr-only">Scope</span>
-          <select aria-label="Scope" value={scopeValue} onChange={(event) => setScopeValue(event.target.value)}>
-            <option value="">Scope</option>
-            {scopeOptions.map((value) => <option key={value} value={value}>{value}</option>)}
-          </select>
-        </label>
-        <label className="sub-filter-select">
-          <span className="sr-only">{contextLabel}</span>
-          <select aria-label={contextLabel} value={contextValue} onChange={(event) => setContextValue(event.target.value)}>
-            <option value="">{contextLabel}</option>
-            {contextOptions.map((value) => <option key={value} value={value}>{value}</option>)}
-          </select>
-        </label>
-        <button type="button" className="sub-filter-clear" onClick={() => { setScopeValue(""); setContextValue(""); }}>Clear filters</button>
-      </div>
-
-      <section className="wrap gallery-grid">
-        {visible.map((item) => (
-          <button className={`gallery-card gallery-image-only ${item.size}`} key={item.id} onClick={() => setSelected(item)} aria-label={`View ${item.title} details`}>
-            {visual(item)}
-            <span className="gallery-hover">View artwork <Icon name="arrow" /></span>
-          </button>
-        ))}
-        {visible.length === 0 && (
-          <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "60px 0", color: "var(--muted)" }}>
-            <p>No {[scopeValue, contextValue, filter].filter(Boolean).join(" ")} artwork has been added yet.</p>
-          </div>
-        )}
-      </section>
-
-      {selected && (
-        <div className="modal-backdrop" onMouseDown={() => setSelected(null)}>
-          <div className="project-modal" role="dialog" aria-modal="true" aria-labelledby="project-title" onMouseDown={(e) => e.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="Close artwork details" autoFocus onClick={() => setSelected(null)}><Icon name="close" /></button>
-            <ImageCarousel key={selected.id} images={selectedImages} title={selected.title} />
-            <div className="project-copy">
-              <p className="kicker">{selected.type} · Featured project</p>
-              <h2 id="project-title">{selected.title}</h2>
-              <p>{selected.desc}</p>
-              <div className="tags">{selected.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
-              <div className="project-meta">
-                <span>Published<strong>{"publishedAt" in selected ? selected.publishedAt : "2025"}</strong></span>
-                {"tools" in selected && selected.tools && <span>Tools<strong>{selected.tools}</strong></span>}
-                {"format" in selected && selected.format && <span>Format<strong>{selected.format}</strong></span>}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
   );
 }
 
@@ -1228,47 +1230,6 @@ function Guide() {
             <p>If a client loses their files or requires a new download link after the 6-month hosting period has expired, they may reach out to the artist directly. While the artist will make every effort to retrieve the artwork from their personal archives, recovery is not guaranteed if the data has been permanently cleared or archived.</p>
           </section>
         </article>
-      </section>
-    </main>
-  );
-}
-
-function About({ go }: { go: (page: Page) => void }) {
-  return (
-    <main id="main-content" tabIndex={-1} className="page-main about-page">
-      <section className="about-hero wrap"><div><p className="kicker">The person behind the pixels</p><h1>Making art feel <em>personal.</em></h1><p>I'm Kyuu, an independent digital artist exploring softness, character, and playful visual storytelling.</p><Btn onClick={() => go("commission")}>Work with me <Icon name="arrow" /></Btn></div><div className="about-portrait"><ArtVisual art="artist" label="Artist portrait" /><div className="portrait-note">Based in the Philippines<br />Creating worldwide</div></div></section>
-      <section className="wrap story-grid"><div><p className="kicker">My story</p><h2>From notebook margins to a studio of my own.</h2></div><div><p>What started as doodles between classes became a way to connect with people around the world. My work lives somewhere between gentle realism and joyful exaggeration.</p><p>I believe good art feels like recognition: a character that finally looks the way you imagined, or a gift that says what words could not.</p></div></section>
-      <section className="expertise-section"><div className="wrap"><p className="kicker">Core expertise</p><h2>What I bring to the canvas</h2><ul className="expertise-grid">{["Character illustration", "Chibi design", "Portrait commissions", "Merchandise artwork", "Visual storytelling", "Color direction"].map((item, i) => <li key={item}><span aria-hidden="true">0{i + 1}</span><Icon name={i % 2 ? "spark" : "pen"} /><h3>{item}</h3></li>)}</ul></div></section>
-      <section className="wrap timeline-section"><div><p className="kicker">Along the way</p><h2>Milestones & art events</h2><p>A few memorable stops in an always-growing creative practice.</p></div><div className="timeline">{[["2021", "First 100 commissions", "Reached a joyful little milestone with clients across eight countries."], ["2022", "Komiket Manila", "Debuted an original sticker and mini-print collection."], ["2023", "Graphika Art Fair", "Joined a community showcase celebrating independent illustrators."], ["2025", "Inkyuu studio", "Opened a dedicated online home for art and commissions."]].map(([year, title, desc]) => <div key={year}><span>{year}</span><article><h3>{title}</h3><p>{desc}</p></article></div>)}</div></section>
-      <section className="wrap collaborators"><p className="kicker">Featured collaborators</p><h2>Good things made together</h2><div>{["Cloud Nine Café", "Daydream Press", "Mori Studio", "Sunday Club"].map((name) => <span key={name}>{name}</span>)}</div></section>
-      <section className="wrap official-contacts-section" style={{ paddingBottom: "100px" }}>
-        <div className="section-heading compact channels">
-          <div>
-            <p className="kicker">Where to Contact Me</p>
-            <h2>Official channels</h2>
-          </div>
-          <p>Connect with me directly through my verified studio social profiles.</p>
-        </div>
-        <div className="medium-grid official-contact-grid">
-          <a href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer" className="medium-card social-contact-card">
-            <span>01</span>
-            <Icon name="instagram" size={25} />
-            <h3>Instagram</h3>
-            <p>@jeii_ji · Daily sketches, client updates, and finished artwork portfolios.</p>
-          </a>
-          <a href="https://www.facebook.com/christinejoy.morata02/" target="_blank" rel="noreferrer" className="medium-card social-contact-card">
-            <span>02</span>
-            <Icon name="facebook" size={25} />
-            <h3>Facebook</h3>
-            <p>Christine Joy Morata · Studio announcements, inquiries, and community posts.</p>
-          </a>
-          <a href="mailto:kyuukyuuji@gmail.com" className="medium-card social-contact-card">
-            <span>03</span>
-            <Icon name="mail" size={25} />
-            <h3>Email</h3>
-            <p>kyuukyuuji@gmail.com · Direct inquiries and commission questions.</p>
-          </a>
-        </div>
       </section>
     </main>
   );
@@ -2514,28 +2475,27 @@ function Login({ onLogin, go }: { onLogin: () => void; go: (page: Page) => void 
 function Footer({ go }: { go: (page: Page) => void }) {
   return (
     <footer>
-      <div className="wrap footer-grid">
-        <div className="footer-brand">
-          <div>
-            <img src={logo} alt="" />
-            <img className="footer-wordmark" src={brandName} alt="Inkyuu" />
-          </div>
-          <p>Warm, character-led digital art<br />made in the Philippines.</p>
-        </div>
-        <nav className="footer-col" aria-label="Explore">
-          <h3>Explore</h3>
-          {[["Gallery", "gallery"], ["Commission", "commission"], ["Guide", "guide"], ["About", "about"]].map(([label, page]) => <button type="button" key={label} onClick={() => go(page as Page)}>{label}</button>)}
-        </nav>
-        <div className="footer-col">
-          <h3>Say hello</h3>
-          <a href="mailto:kyuukyuuji@gmail.com">kyuukyuuji@gmail.com</a>
-          <a href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer">Instagram<span className="sr-only"> (opens in a new tab)</span></a>
-          <a href="https://www.facebook.com/christinejoy.morata02/" target="_blank" rel="noreferrer">Facebook<span className="sr-only"> (opens in a new tab)</span></a>
-        </div>
-      </div>
       <div className="wrap footer-bottom">
-        <span>© 2026 Inkyuu Studio. All rights reserved.</span>
-        <span>Made with care, color & good music.</span>
+        {/* Left side group */}
+        <div className="footer-bottom-group">
+          <span>© 2026 Inkyuu. All rights reserved.</span>
+          <span className="dot-sep">•</span>
+          <button type="button" className="footer-link-btn" onClick={() => go("guide")}>Terms and Conditions</button>
+        </div>
+
+        {/* Right side group */}
+        <div className="footer-bottom-group">
+          <span className="footer-section-label">Contacts |</span>
+          <a href="mailto:kyuukyuuji@gmail.com">Email</a>
+          <span className="dot-sep">•</span>
+          <a href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer">
+            Instagram<span className="sr-only"> (opens in a new tab)</span>
+          </a>
+          <span className="dot-sep">•</span>
+          <a href="https://www.facebook.com/christinejoy.morata02/" target="_blank" rel="noreferrer">
+            Facebook<span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        </div>
       </div>
     </footer>
   );
@@ -2637,7 +2597,7 @@ function ChalkDefs() {
 export default function App() {
   const getPage = (): Page => {
     const hash = window.location.hash.replace("#", "").split("?")[0] as Page;
-    return ["home", "gallery", "guide", "about", "commission", "admin"].includes(hash) ? hash : "home";
+    return ["home", "gallery", "guide", "commission", "admin"].includes(hash) ? hash : "home";
   };
   const getGallerySelection = (): GallerySelection | null => {
     const query = new URLSearchParams(window.location.hash.split("?")[1] || "");
@@ -2710,12 +2670,12 @@ export default function App() {
 
   const go = (next: Page, selection?: GallerySelection) => {
     const query = selection ? `?category=${encodeURIComponent(selection.category)}&facet=${encodeURIComponent(selection.facet)}&value=${encodeURIComponent(selection.value)}` : "";
-    window.location.hash = `${next}${next === "gallery" ? query : ""}`;
+    window.location.hash = `${next}`;    
     setPage(next);
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
   };
-  const content = { home: <Home go={go} />, gallery: <Gallery selection={getGallerySelection()} />, guide: <Guide />, about: <About go={go} />, commission: <Commission go={go} />, admin: <Admin go={go} onLogout={logout} /> };
+  const content = { home: <Home go={go} />, guide: <Guide />, commission: <Commission go={go} />, admin: <Admin go={go} onLogout={logout} /> };
   
   if (page === "admin") {
     if (!authChecked) {
