@@ -48,7 +48,9 @@ type IconName =
   | "user"
   | "clock"
   | "eye"
-  | "eye-off";
+  | "eye-off"
+  | "pause"
+  | "play";
 
 const Icon = ({ name, size = 18 }: { name: IconName; size?: number }) => {
   const paths: Record<IconName, React.ReactNode> = {
@@ -73,6 +75,8 @@ const Icon = ({ name, size = 18 }: { name: IconName; size?: number }) => {
     clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></>,
     eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>,
     "eye-off": <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><path d="M1 1l22 22" /></>,
+    pause: <><rect x="6" y="4" width="4" height="16" fill="currentColor" stroke="none" /><rect x="14" y="4" width="4" height="16" fill="currentColor" stroke="none" /></>,
+    play: <polygon points="5,3 19,12 5,21" fill="currentColor" stroke="none" />,
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 };
@@ -221,6 +225,22 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
           >
             Gallery
           </button>
+
+          {/* Drawer Footer Element - Only visible inside mobile slide-out menu */}
+          <div className="drawer-footer-panel">
+            <div className="drawer-footer-socials">
+              <span className="drawer-social-label">Contacts |</span>
+              <a href="mailto:kyuukyuuji@gmail.com" aria-label="Email">
+                <Icon name="mail" size={19} />
+              </a>
+              <a href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer" aria-label="Instagram">
+                <Icon name="instagram" size={19} />
+              </a>
+              <a href="https://www.facebook.com/christinejoy.morata02/" target="_blank" rel="noreferrer" aria-label="Facebook">
+                <Icon name="facebook" size={19} />
+              </a>
+            </div>
+          </div>
         </nav>
 
         <div className="nav-actions">
@@ -235,6 +255,114 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
 
 function ArtVisual({ art, label }: { art: string; label: string }) {
   return <div className={`art-visual art-${art}`}><img src={placeholder} alt={label} /></div>;
+}
+
+function HeroCarousel({ artworks }: { artworks: PublishedItem[] }) {
+  // Select between 3 and 5 of the latest published artworks
+  const carouselArtworks = useMemo(() => {
+    return artworks.slice(0, 5);
+  }, [artworks]);
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const touchStart = useRef<number | null>(null);
+
+  const count = carouselArtworks.length;
+
+  useEffect(() => {
+    if (!isPlaying || count <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % count);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, [isPlaying, count]);
+
+  if (count === 0) {
+    return null;
+  }
+
+  const prevSlide = () => setCurrentIndex((prev) => (prev - 1 + count) % count);
+  const nextSlide = () => setCurrentIndex((prev) => (prev + 1) % count);
+
+  return (
+    <section className="hero-carousel-section" aria-label="Featured Artworks Carousel">
+      <div 
+        className="hero-carousel-container"
+        onTouchStart={(e) => { touchStart.current = e.touches[0].clientX; }}
+        onTouchEnd={(e) => {
+          if (touchStart.current === null || count <= 1) return;
+          const dist = e.changedTouches[0].clientX - touchStart.current;
+          touchStart.current = null;
+          if (Math.abs(dist) > 40) {
+            if (dist < 0) nextSlide();
+            else prevSlide();
+          }
+        }}
+      >
+        {carouselArtworks.map((item, idx) => (
+          <div
+            key={item.id}
+            className={`hero-carousel-slide ${idx === currentIndex ? "active" : ""}`}
+            aria-hidden={idx !== currentIndex}
+          >
+            <img src={item.image} alt={item.title} />
+          </div>
+        ))}
+
+        {/* Navigation Dots overlaid directly on top of the image container */}
+        {count > 1 && (
+          <div className="hero-carousel-dots" role="group" aria-label="Slide Selection">
+            {carouselArtworks.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                className={`hero-carousel-dot ${idx === currentIndex ? "active" : ""}`}
+                aria-label={`Go to slide ${idx + 1}`}
+                aria-current={idx === currentIndex}
+                onClick={() => setCurrentIndex(idx)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Navigation Controls & Pause/Play explicitly positioned below */}
+      {count > 1 && (
+        <div className="hero-carousel-controls">
+          <button 
+            type="button" 
+            className="hero-control-btn" 
+            aria-label="Previous artwork"
+            onClick={prevSlide}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
+          <button 
+            type="button" 
+            className="hero-control-btn" 
+            aria-label={isPlaying ? "Pause carousel" : "Play carousel"}
+            onClick={() => setIsPlaying(!isPlaying)}
+          >
+            <Icon name={isPlaying ? "pause" : "play"} size={16} />
+          </button>
+
+          <button 
+            type="button" 
+            className="hero-control-btn" 
+            aria-label="Next artwork"
+            onClick={nextSlide}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </section>
+  );
 }
 
 function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }) {
@@ -313,33 +441,15 @@ function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }
     <>
       <main id="main-content" tabIndex={-1}>
         {/* Hero Section */}
-        <section className="hero wrap">
-          <div className="hero-copy">
-            <div className="eyebrow"><span className="eyebrow-line" /> Digital artist & illustrator</div>
-            <h1>Small moments,<br /><em>boldly drawn.</em></h1>
-            <p>I turn warm ideas, favorite characters, and little daydreams into expressive digital art.</p>
-            <div className="hero-actions">
-              <Btn onClick={() => {
-                const galleryEl = document.getElementById("home-gallery-section");
-                galleryEl?.scrollIntoView({ behavior: "smooth" });
-              }}>Explore my work <Icon name="arrow" /></Btn>
-            </div>
-          </div>
-          <div className="hero-canvas">
-            <div className="art-visual art-hero">
-              <img src={heroArtwork} alt="Featured artwork" />
-            </div>
-          </div>
-        </section>
-
-        <ChalkDivider />
+        {/* Full-width Image Carousel replacing the single static hero */}
+        <HeroCarousel artworks={published} />
 
         {/* About Strip */}
         <section id="about-section" className="about-strip">
           <div className="wrap intro-grid">
             <div className="portrait-card"><ArtVisual art="artist" label="Illustrated portrait of the artist" /><span className="seal">ID<br />Artist</span></div>
             <div className="intro-copy">
-              <p className="kicker">Meet the artist</p><h2>Hi, I'm Kyuu. I draw feelings you can keep.</h2>
+              <p className="kicker">About Me</p><h2>Hi, I'm Kyuu. I draw feelings you can keep.</h2>
               <p>I'm a digital illustrator who loves expressive faces, cozy color stories, and the magic of turning your favorite idea into something unmistakably yours.</p>
               <div className="quick-terms">
                 <div>
@@ -361,10 +471,6 @@ function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }
 
         {/* EMBEDDED GALLERY SECTION */}
         <section id="home-gallery-section" className="section wrap">
-          <div className="section-heading">
-            <div><p className="kicker">Gallery</p><h2>Explore my work</h2></div>
-          </div>
-
           <div className="filter-bar" style={{ position: "static", background: "transparent", border: "none", marginBottom: "20px" }}>
             <div className="filter-toggle sliding-filter" role="group" aria-label="Filter artwork">
               <div className={`filter-slider-indicator ${filter === "Semi-Realistic" ? "slide-right" : ""}`} aria-hidden="true" />
@@ -539,8 +645,8 @@ function ImageCarousel({ images, title }: { images: string[]; title: string }) {
   );
 }
 
-const ChalkField = ({ label, hint, children }: { label: React.ReactNode; hint?: string; children: React.ReactNode }) => (
-  <label className="field"><span>{label}</span>{hint && <small>{hint}</small>}<span className="chalk-input">{children}</span></label>
+const AdminField = ({ label, hint, children }: { label: React.ReactNode; hint?: string; children: React.ReactNode }) => (
+  <label className="field"><span>{label}</span>{hint && <small>{hint}</small>}<span className="input-wrap">{children}</span></label>
 );
 
 const Field = ({ label, hint, children }: { label: React.ReactNode; hint?: string; children: React.ReactNode }) => <label className="field"><span>{label}</span>{hint && <small>{hint}</small>}{children}</label>;
@@ -1129,108 +1235,236 @@ function Commission({ go }: { go: (page: Page) => void }) {
   );
 }
 
-function Guide() {
+const POLICY_SECTIONS = [
+  { id: "policy-rules", numeral: "I", title: "Rules & Regulations" },
+  { id: "policy-copyrights", numeral: "II", title: "Copyrights" },
+  { id: "policy-contract", numeral: "III", title: "Contract & Workflow Terms" },
+  { id: "policy-communication", numeral: "IV", title: "Communication & Client Responsiveness" },
+  { id: "policy-files", numeral: "V", title: "File Storage & Delivery Maintenance" },
+];
+
+function Guide({ go }: { go: (page: Page) => void }) {
+  const [activeSection, setActiveSection] = useState(POLICY_SECTIONS[0].id);
+  const calm = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Highlight the section being read in the "On this page" index.
+  useEffect(() => {
+    const update = () => {
+      let current = POLICY_SECTIONS[0].id;
+      for (const section of POLICY_SECTIONS) {
+        const element = document.getElementById(section.id);
+        if (element && element.getBoundingClientRect().top <= 160) current = section.id;
+      }
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) current = POLICY_SECTIONS[POLICY_SECTIONS.length - 1].id;
+      setActiveSection(current);
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  const jumpTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: calm() ? "auto" : "smooth", block: "start" });
+    setActiveSection(id);
+  };
+
   return (
     <main id="main-content" tabIndex={-1} className="page-main guide-page">
-      <section className="page-hero wrap">
-        <p className="kicker">Kyuu commission guide</p>
-        <h1>Commission <em>Terms & Guidelines.</em></h1>
-        <p>Please review the complete terms below before securing a commission slot.</p>
-      </section>
-      <section className="wrap guide-sections">
-        <article className="guide-section-card">
-          <div className="guide-section-heading"><span>I.</span><h2>RULES & REGULATIONS</h2></div>
-          <div className="guide-topic-grid">
-            <section className="guide-topic-card">
-              <h3>A. NSFW CONTENTS</h3>
-              <p><strong>Not Safe For Work content is NOT allowed,</strong> may the project be in PUBLIC or in PRIVATE. Any commission request that is judged to be NSFW or suggestive will not be accepted and will be rejected immediately.</p>
-              <p>The following will automatically be tagged as NSFW: <em>pornography, nudity, heavy gore, depiction of bodily fluids (e.g., semen), violence, suggestive content, controversial content.</em></p>
-            </section>
-            <section className="guide-topic-card">
-              <h3>B. THEMES</h3>
-              <table className="guide-table guide-theme-table">
-                <thead><tr><th scope="col">Will Draw:</th><th scope="col">Won't Draw:</th></tr></thead>
-                <tbody><tr>
-                  <td data-label="Will Draw:"><ul className="guide-theme-list"><li>OC</li><li>Fictional Characters</li><li>Character Ships</li><li>Nonsexual Nudity</li></ul></td>
-                  <td data-label="Won't Draw:"><ul className="guide-theme-list"><li>NSFW</li><li>Real People without their consent</li><li>Changing a canon character's design (e.g., race, major features)</li><li>Mecha, Cars, etc.</li></ul></td>
-                </tr></tbody>
-              </table>
-            </section>
+      <header className="policy-hero">
+        <div className="wrap policy-hero-inner">
+          <nav className="policy-breadcrumb" aria-label="Breadcrumb">
+            <button type="button" onClick={() => go("home")}>Home</button>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">Terms & Conditions</span>
+          </nav>
+          <p className="kicker">Kyuu commission guide</p>
+          <h1>Commission Terms & Guidelines</h1>
+          <p className="policy-lede">Please review the complete terms below before securing a commission slot.</p>
+        </div>
+      </header>
+
+      <div className="wrap policy-layout">
+        <aside className="policy-toc">
+          <nav aria-label="On this page">
+            <p className="policy-toc-title">On this page</p>
+            <ol>
+              {POLICY_SECTIONS.map((section) => (
+                <li key={section.id}>
+                  <button type="button" aria-current={activeSection === section.id ? "true" : undefined} onClick={() => jumpTo(section.id)}>
+                    <span>{section.numeral}.</span><span>{section.title}</span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </nav>
+        </aside>
+
+        <div className="policy-content">
+        <article id="policy-rules" className="policy-section" aria-labelledby="policy-rules-heading">
+          <header className="policy-section-head"><span className="policy-index" aria-hidden="true">I</span><h2 id="policy-rules-heading">Rules & Regulations</h2></header>
+          <div className="policy-section-body">
+            <section className="policy-clause">
+                          <h3>A. NSFW Contents</h3>
+                          <div className="policy-clause-body">
+                            <p><strong>Not Safe For Work content is NOT allowed,</strong> may the project be in PUBLIC or in PRIVATE. Any commission request that is judged to be NSFW or suggestive will not be accepted and will be rejected immediately.</p>
+                          <p>The following will automatically be tagged as NSFW: <em>pornography, nudity, heavy gore, depiction of bodily fluids (e.g., semen), violence, suggestive content, controversial content.</em></p>
+                          </div>
+                        </section>
+            <section className="policy-clause">
+                          <h3>B. Themes</h3>
+                          <div className="policy-clause-body">
+                            <table className="policy-table policy-theme-table">
+                            <thead><tr><th scope="col">Will Draw:</th><th scope="col">Won't Draw:</th></tr></thead>
+                            <tbody><tr>
+                              <td data-label="Will Draw:"><ul className="policy-theme-list"><li>OC</li><li>Fictional Characters</li><li>Character Ships</li><li>Nonsexual Nudity</li></ul></td>
+                              <td data-label="Won't Draw:"><ul className="policy-theme-list"><li>NSFW</li><li>Real People without their consent</li><li>Changing a canon character's design (e.g., race, major features)</li><li>Mecha, Cars, etc.</li></ul></td>
+                            </tr></tbody>
+                          </table>
+                          </div>
+                        </section>
           </div>
         </article>
 
-        <article className="guide-section-card">
-          <div className="guide-section-heading"><span>II.</span><h2>COPYRIGHTS</h2></div>
-          <div className="guide-topic-grid">
-            <section className="guide-topic-card"><h3>A. ARTIST RIGHTS</h3><p><strong>Pursuant to Republic Act No. 8293 (The Intellectual Property Code of the Philippines), the copyright of the artwork inherently and permanently belongs to the artist.</strong> The artist retains all rights regarding the reproduction, distribution, and public display of the artwork for promotional, portfolio, and social media purposes.</p></section>
-            <section className="guide-topic-card"><h3>B. CLIENT RIGHTS</h3><p>Upon final payment, the client is granted a license to use the artwork for expected purposes. The artist must be clearly and visibly credited whenever the artwork is used or displayed publicly. The client may not alter, edit, or claim the artwork as their own creation.</p></section>
-            <section className="guide-topic-card"><h3>C. AI & BLOCKCHAIN PROHIBITIONS</h3><p>Under no circumstances is the artwork permitted for use in Artificial Intelligence (AI) training databases, machine learning datasets, or any blockchain/NFT platforms. Any such utilization constitutes a direct violation of these terms and copyright law.</p></section>
-            <section className="guide-topic-card"><h3>D. TRANSFER OF OWNERSHIP</h3><p>Full copyright ownership remains with the artist unless a separate, formal agreement is signed/explicitly said by both parties to assign the copyright to the client or an organization. Copyright buyout fees will apply for such transfers.</p></section>
+        <article id="policy-copyrights" className="policy-section" aria-labelledby="policy-copyrights-heading">
+          <header className="policy-section-head"><span className="policy-index" aria-hidden="true">II</span><h2 id="policy-copyrights-heading">Copyrights</h2></header>
+          <div className="policy-section-body">
+            <section className="policy-clause">
+                          <h3>A. Artist Rights</h3>
+                          <div className="policy-clause-body">
+                            <p><strong>Pursuant to Republic Act No. 8293 (The Intellectual Property Code of the Philippines), the copyright of the artwork inherently and permanently belongs to the artist.</strong> The artist retains all rights regarding the reproduction, distribution, and public display of the artwork for promotional, portfolio, and social media purposes.</p>
+                          </div>
+                        </section>
+            <section className="policy-clause">
+                          <h3>B. Client Rights</h3>
+                          <div className="policy-clause-body">
+                            <p>Upon final payment, the client is granted a license to use the artwork for expected purposes. The artist must be clearly and visibly credited whenever the artwork is used or displayed publicly. The client may not alter, edit, or claim the artwork as their own creation.</p>
+                          </div>
+                        </section>
+            <section className="policy-clause">
+                          <h3>C. AI & Blockchain Prohibitions</h3>
+                          <div className="policy-clause-body">
+                            <p>Under no circumstances is the artwork permitted for use in Artificial Intelligence (AI) training databases, machine learning datasets, or any blockchain/NFT platforms. Any such utilization constitutes a direct violation of these terms and copyright law.</p>
+                          </div>
+                        </section>
+            <section className="policy-clause">
+                          <h3>D. Transfer of Ownership</h3>
+                          <div className="policy-clause-body">
+                            <p>Full copyright ownership remains with the artist unless a separate, formal agreement is signed/explicitly said by both parties to assign the copyright to the client or an organization. Copyright buyout fees will apply for such transfers.</p>
+                          </div>
+                        </section>
           </div>
         </article>
 
-        <article className="guide-section-card">
-          <div className="guide-section-heading"><span>III.</span><h2>CONTRACT & WORKFLOW TERMS</h2></div>
-          <p className="guide-intro">By securing a commission slot, both the artist and the client agree to the following parameters regarding the execution, payment, and legal boundaries of the commission.</p>
-          <div className="guide-topic-grid">
-            <section className="guide-topic-card"><h3>A. REVISIONS</h3><p>Once the final artwork is finished and presented for final approval, any requests for major modifications or revisions will incur mandatory additional charges depending on the weight of the adjustment. Work on these final alterations will only commence after the client has paid the required revision fee.</p></section>
-            <section className="guide-topic-card"><h3>B. DEADLINES</h3><p>Clients requiring an expected delivery can opt to designate their commission as a PRIORITY. Priority pieces are fast-tracked ahead of the standard production queue to ensure significantly quicker completion, which will incur an additional charge equivalent to 10% of the project's total price.</p></section>
-            <section className="guide-topic-card guide-topic-wide">
-              <h3>C. PAYMENT TERMS</h3>
-              <p>To ensure a secure and collaborative workflow, payments are broken down into milestone installations. No upfront cost is required to begin the initial drafting phase, but progress is strictly tied to the following payment schedule:</p>
-              <table className="guide-table">
-                <thead><tr><th scope="col">Milestone</th><th scope="col">Payment schedule</th></tr></thead>
-                <tbody>
-                  <tr><th scope="row">Initial Phase</th><td data-label="Payment schedule">The project will be initiated and developed up to the midpoint milestone without an upfront cost.</td></tr>
-                  <tr><th scope="row">Mid-Project Downpayment</th><td data-label="Payment schedule">Upon reaching the midpoint milestone (the finalization of the approved sketch), a mandatory 20% downpayment of the total project fee will be requested.</td></tr>
-                  <tr><th scope="row">Final Settlement</th><td data-label="Payment schedule">The remaining balance must be paid in full within three (3) calendar days after the artwork is finished and presented. High-resolution—without any obstructive watermark—final deliverables will only be released once the full payment has cleared.</td></tr>
-                </tbody>
-              </table>
-            </section>
-            <section className="guide-topic-card">
-              <h3>D. CANCELLATION & REFUND POLICY</h3>
-              <p>Clients may change their minds or cancel the project within a specific window. However, because time and labor are invested into the project as it progresses, the refund policy changes depending on when the cancellation is requested:</p>
-              <ul>
-                <li>Standard Grace Period: The client is entitled to a 100% full cancellation and refund within one (1) week (7 days) of the initial project booking.</li>
-                <li>Mid-Project & Mid-Production: If no cancellation is requested within the first week, production automatically proceeds. If the client persists in canceling the project after the 1-week grace period has passed, the project will enter immediate termination. In this event, the client will only be refunded 12% of their total downpayment amount, and they will be given the latest work-in-progress export of the drawing as-is.</li>
-              </ul>
-            </section>
-            <section className="guide-topic-card">
-              <h3>E. TERMINATION POLICY</h3>
-              <p>The artist reserves the right to suspend work or permanently terminate the contract if the client breaches communication or payment deadlines. Forfeiting a slot due to non-payment will result in the cancellation of the project.</p>
-              <ul>
-                <li>Failure to Provide Downpayment: If the client refuses or fails to settle the 20% mid-project downpayment within one (1) week (7 days) of the initial payment request, production will be immediately halted, the commission will be terminated, and the slot will be forfeited.</li>
-                <li>Failure to Settle Final Balance: Failure to pay the remaining balance within the designated 3-day post-completion window will result in the immediate withholding of the final artwork, termination of future services, and potential blacklisting from subsequent commission openings.</li>
-              </ul>
-            </section>
+        <article id="policy-contract" className="policy-section" aria-labelledby="policy-contract-heading">
+          <header className="policy-section-head"><span className="policy-index" aria-hidden="true">III</span><h2 id="policy-contract-heading">Contract & Workflow Terms</h2></header>
+          <div className="policy-section-body">
+            <p className="policy-intro">By securing a commission slot, both the artist and the client agree to the following parameters regarding the execution, payment, and legal boundaries of the commission.</p>
+            <section className="policy-clause">
+                          <h3>A. Revisions</h3>
+                          <div className="policy-clause-body">
+                            <p>Once the final artwork is finished and presented for final approval, any requests for major modifications or revisions will incur mandatory additional charges depending on the weight of the adjustment. Work on these final alterations will only commence after the client has paid the required revision fee.</p>
+                          </div>
+                        </section>
+            <section className="policy-clause">
+                          <h3>B. Deadlines</h3>
+                          <div className="policy-clause-body">
+                            <p>Clients requiring an expected delivery can opt to designate their commission as a PRIORITY. Priority pieces are fast-tracked ahead of the standard production queue to ensure significantly quicker completion, which will incur an additional charge equivalent to 10% of the project's total price.</p>
+                          </div>
+                        </section>
+            <section className="policy-clause">
+                          <h3>C. Payment Terms</h3>
+                          <div className="policy-clause-body">
+                            <p>To ensure a secure and collaborative workflow, payments are broken down into milestone installations. No upfront cost is required to begin the initial drafting phase, but progress is strictly tied to the following payment schedule:</p>
+                          <table className="policy-table">
+                            <thead><tr><th scope="col">Milestone</th><th scope="col">Payment schedule</th></tr></thead>
+                            <tbody>
+                              <tr><th scope="row">Initial Phase</th><td data-label="Payment schedule">The project will be initiated and developed up to the midpoint milestone without an upfront cost.</td></tr>
+                              <tr><th scope="row">Mid-Project Downpayment</th><td data-label="Payment schedule">Upon reaching the midpoint milestone (the finalization of the approved sketch), a mandatory 20% downpayment of the total project fee will be requested.</td></tr>
+                              <tr><th scope="row">Final Settlement</th><td data-label="Payment schedule">The remaining balance must be paid in full within three (3) calendar days after the artwork is finished and presented. High-resolution—without any obstructive watermark—final deliverables will only be released once the full payment has cleared.</td></tr>
+                            </tbody>
+                          </table>
+                          </div>
+                        </section>
+            <section className="policy-clause">
+                          <h3>D. Cancellation & Refund Policy</h3>
+                          <div className="policy-clause-body">
+                            <p>Clients may change their minds or cancel the project within a specific window. However, because time and labor are invested into the project as it progresses, the refund policy changes depending on when the cancellation is requested:</p>
+                          <ul>
+                            <li>Standard Grace Period: The client is entitled to a 100% full cancellation and refund within one (1) week (7 days) of the initial project booking.</li>
+                            <li>Mid-Project & Mid-Production: If no cancellation is requested within the first week, production automatically proceeds. If the client persists in canceling the project after the 1-week grace period has passed, the project will enter immediate termination. In this event, the client will only be refunded 12% of their total downpayment amount, and they will be given the latest work-in-progress export of the drawing as-is.</li>
+                          </ul>
+                          </div>
+                        </section>
+            <section className="policy-clause">
+                          <h3>E. Termination Policy</h3>
+                          <div className="policy-clause-body">
+                            <p>The artist reserves the right to suspend work or permanently terminate the contract if the client breaches communication or payment deadlines. Forfeiting a slot due to non-payment will result in the cancellation of the project.</p>
+                          <ul>
+                            <li>Failure to Provide Downpayment: If the client refuses or fails to settle the 20% mid-project downpayment within one (1) week (7 days) of the initial payment request, production will be immediately halted, the commission will be terminated, and the slot will be forfeited.</li>
+                            <li>Failure to Settle Final Balance: Failure to pay the remaining balance within the designated 3-day post-completion window will result in the immediate withholding of the final artwork, termination of future services, and potential blacklisting from subsequent commission openings.</li>
+                          </ul>
+                          </div>
+                        </section>
           </div>
         </article>
 
-        <article className="guide-section-card">
-          <div className="guide-section-heading"><span>IV.</span><h2>COMMUNICATION & CLIENT RESPONSIVENESS</h2></div>
-          <div className="guide-topic-grid">
-            <section className="guide-topic-card"><h3>A. RESPONSE WINDOW</h3><p>Clients are expected to respond to milestone updates, feedback requests, or approvals within three (3) calendar days.</p></section>
-            <section className="guide-topic-card"><h3>B. INACTIVITY CLOSURE</h3><p>If a client fails to communicate or respond for more than fourteen (14) consecutive days without prior notice, the project will be considered abandoned. The contract will be terminated, the 20% downpayment (if paid) will be forfeited as a cancellation fee, and the slot will be reopened to the public.</p></section>
-            <section className="guide-topic-card guide-topic-wide">
-              <h3>C. FORCE MAJEURE</h3>
-              <p>The artist is not held liable for delays caused by emergency situations, illness, power outages, natural disasters, or technical failures. In the event of such a delay, the client will be notified immediately, and a revised timeline will be established.</p>
-              <p>If an operational delay occurs and the artist fails to respond to client inquiries or provide milestone updates for more than fourteen (14) consecutive days without prior notice, the client is granted the right to choose one of the following options:</p>
-              <ul>
-                <li><strong>Immediate Project Cancellation:</strong> The client may cancel the contract and receive a 12% refund of the settled downpayment, along with the latest work-in-progress export of the artwork as-is.</li>
-                <li><strong>Timeline Extension:</strong> The client may choose to maintain the commission slot under a newly negotiated, mutually agreed-upon delivery deadline.</li>
-              </ul>
-            </section>
+        <article id="policy-communication" className="policy-section" aria-labelledby="policy-communication-heading">
+          <header className="policy-section-head"><span className="policy-index" aria-hidden="true">IV</span><h2 id="policy-communication-heading">Communication & Client Responsiveness</h2></header>
+          <div className="policy-section-body">
+            <section className="policy-clause">
+                          <h3>A. Response Window</h3>
+                          <div className="policy-clause-body">
+                            <p>Clients are expected to respond to milestone updates, feedback requests, or approvals within three (3) calendar days.</p>
+                          </div>
+                        </section>
+            <section className="policy-clause">
+                          <h3>B. Inactivity Closure</h3>
+                          <div className="policy-clause-body">
+                            <p>If a client fails to communicate or respond for more than fourteen (14) consecutive days without prior notice, the project will be considered abandoned. The contract will be terminated, the 20% downpayment (if paid) will be forfeited as a cancellation fee, and the slot will be reopened to the public.</p>
+                          </div>
+                        </section>
+            <section className="policy-clause">
+                          <h3>C. Force Majeure</h3>
+                          <div className="policy-clause-body">
+                            <p>The artist is not held liable for delays caused by emergency situations, illness, power outages, natural disasters, or technical failures. In the event of such a delay, the client will be notified immediately, and a revised timeline will be established.</p>
+                          <p>If an operational delay occurs and the artist fails to respond to client inquiries or provide milestone updates for more than fourteen (14) consecutive days without prior notice, the client is granted the right to choose one of the following options:</p>
+                          <ul>
+                            <li><strong>Immediate Project Cancellation:</strong> The client may cancel the contract and receive a 12% refund of the settled downpayment, along with the latest work-in-progress export of the artwork as-is.</li>
+                            <li><strong>Timeline Extension:</strong> The client may choose to maintain the commission slot under a newly negotiated, mutually agreed-upon delivery deadline.</li>
+                          </ul>
+                          </div>
+                        </section>
           </div>
         </article>
 
-        <article className="guide-section-card">
-          <div className="guide-section-heading"><span>V.</span><h2>FILE STORAGE & DELIVERY MAINTENANCE</h2></div>
-          <section className="guide-topic-card">
-            <p>Final high-resolution files will be hosted on a cloud drive (e.g., Google Drive) and guaranteed to be accessible for six (6) months following final delivery. Clients are strongly advised to download and back up their files immediately upon receipt.</p>
-            <p>If a client loses their files or requires a new download link after the 6-month hosting period has expired, they may reach out to the artist directly. While the artist will make every effort to retrieve the artwork from their personal archives, recovery is not guaranteed if the data has been permanently cleared or archived.</p>
+        <article id="policy-files" className="policy-section" aria-labelledby="policy-files-heading">
+          <header className="policy-section-head"><span className="policy-index" aria-hidden="true">V</span><h2 id="policy-files-heading">File Storage & Delivery Maintenance</h2></header>
+          <div className="policy-section-body">
+            <section className="policy-clause policy-clause-plain">
+                          <div className="policy-clause-body">
+                            <p>Final high-resolution files will be hosted on a cloud drive (e.g., Google Drive) and guaranteed to be accessible for six (6) months following final delivery. Clients are strongly advised to download and back up their files immediately upon receipt.</p>
+                        <p>If a client loses their files or requires a new download link after the 6-month hosting period has expired, they may reach out to the artist directly. While the artist will make every effort to retrieve the artwork from their personal archives, recovery is not guaranteed if the data has been permanently cleared or archived.</p>
+                          </div>
+                        </section>
+          </div>
+        </article>
+
+          <section className="policy-cta" aria-labelledby="policy-cta-heading">
+            <div>
+              <h2 id="policy-cta-heading">Ready to book a slot?</h2>
+              <p>By submitting a commission request you confirm that you have read and agree to these terms.</p>
+            </div>
+            <div className="policy-cta-actions">
+              <Btn onClick={() => go("commission")}>Request a commission</Btn>
+              <Btn kind="outline" onClick={() => window.scrollTo({ top: 0, behavior: calm() ? "auto" : "smooth" })}>Back to top</Btn>
+            </div>
           </section>
-        </article>
-      </section>
+        </div>
+      </div>
     </main>
   );
 }
@@ -1389,7 +1623,7 @@ function LibraryFilterBar({ artStyle, tags, onArtStyle, onToggleTag, onClear }: 
   const isOn = (kind: FilterKind, value: string) => tags.some((tag) => tag.kind === kind && tag.value === value);
   const toggleDrawer = (name: "scope" | "service") => setDrawer((current) => (current === name ? null : name));
   const pill = (kind: FilterKind, value: string) => (
-    <button key={`${kind}:${value}`} type="button" className={`chalk-pill ${isOn(kind, value) ? "on" : ""}`} aria-pressed={isOn(kind, value)} onClick={() => onToggleTag({ kind, value })}>
+    <button key={`${kind}:${value}`} type="button" className={`filter-pill ${isOn(kind, value) ? "on" : ""}`} aria-pressed={isOn(kind, value)} onClick={() => onToggleTag({ kind, value })}>
       {value}
     </button>
   );
@@ -1405,10 +1639,10 @@ function LibraryFilterBar({ artStyle, tags, onArtStyle, onToggleTag, onClear }: 
             {ART_STYLES.map((style) => <option key={style} value={style}>{style}</option>)}
           </select>
         </label>
-        <button type="button" className={`chalk-pill-btn ${drawer === "scope" ? "open" : ""}`} aria-expanded={drawer === "scope"} aria-controls="filter-drawer" onClick={() => toggleDrawer("scope")}>
+        <button type="button" className={`filter-pill-btn ${drawer === "scope" ? "open" : ""}`} aria-expanded={drawer === "scope"} aria-controls="filter-drawer" onClick={() => toggleDrawer("scope")}>
           Scope <span aria-hidden="true">{drawer === "scope" ? "▴" : "▾"}</span>
         </button>
-        <button type="button" className={`chalk-pill-btn ${drawer === "service" ? "open" : ""}`} aria-expanded={drawer === "service"} aria-controls="filter-drawer" onClick={() => toggleDrawer("service")}>
+        <button type="button" className={`filter-pill-btn ${drawer === "service" ? "open" : ""}`} aria-expanded={drawer === "service"} aria-controls="filter-drawer" onClick={() => toggleDrawer("service")}>
           {serviceLabel} <span aria-hidden="true">{drawer === "service" ? "▴" : "▾"}</span>
         </button>
         {tags.length > 0 && <button type="button" className="sub-filter-clear" onClick={onClear}>Clear filters</button>}
@@ -1429,7 +1663,7 @@ function LibraryFilterBar({ artStyle, tags, onArtStyle, onToggleTag, onClear }: 
       <div className="library-filter-tray" aria-live="polite">
         {tags.length === 0 && <span className="tray-empty">No filters selected</span>}
         {tags.map((tag) => (
-          <span className="chalk-tag" key={`${tag.kind}:${tag.value}`}>
+          <span className="filter-tag" key={`${tag.kind}:${tag.value}`}>
             <small>{KIND_LABEL[tag.kind]}</small> {tag.value}
             <button type="button" aria-label={`Remove ${tag.value} filter`} onClick={() => onToggleTag(tag)}><Icon name="close" size={12} /></button>
           </span>
@@ -1807,55 +2041,55 @@ function PublishManager() {
               <p className="kicker">{editingId !== null ? "Editing" : "New"} gallery artwork</p>
               <h2>{editingId !== null ? "Edit details" : "Publish something new"}</h2>
 
-              <ChalkField label="Title">
+              <AdminField label="Title">
                 <input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Item title" />
-              </ChalkField>
+              </AdminField>
 
-              <ChalkField label="Description">
+              <AdminField label="Description">
                 <textarea required rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Write a brief description..." />
-              </ChalkField>
+              </AdminField>
 
-              <ChalkField label="Art Style">
+              <AdminField label="Art Style">
                 <select value={draft.artStyle} onChange={(e) => changeDraftStyle(e.target.value)}>
                   {ART_STYLES.map((style) => <option key={style} value={style}>{style}</option>)}
                 </select>
-              </ChalkField>
+              </AdminField>
 
               {draft.artStyle && (
-                <ChalkField label="Scope">
+                <AdminField label="Scope">
                   <select value={draft.scope} onChange={(e) => setDraft({ ...draft, scope: e.target.value })}>
                     {SCOPES_BY_STYLE[draft.artStyle].map((scope) => <option key={scope} value={scope}>{scope}</option>)}
                   </select>
-                </ChalkField>
+                </AdminField>
               )}
 
               {draft.artStyle === "Chibi" && (
-                <ChalkField label="Service">
+                <AdminField label="Service">
                   <select value={draft.subCategory} onChange={(e) => setDraft({ ...draft, subCategory: e.target.value })}>
                     {CHIBI_SERVICES.map((service) => <option key={service} value={service}>{service === "YCH" ? "YCH (Your Character Here)" : service}</option>)}
                   </select>
-                </ChalkField>
+                </AdminField>
               )}
 
               {draft.artStyle === "Semi-Realistic" && (
-                <ChalkField label="Color Finish">
+                <AdminField label="Color Finish">
                   <select value={draft.colorFinish} onChange={(e) => setDraft({ ...draft, colorFinish: e.target.value })}>
                     {COLOR_FINISHES.map((finish) => <option key={finish} value={finish}>{finish === "Plain" ? "Plain Color" : finish}</option>)}
                   </select>
-                </ChalkField>
+                </AdminField>
               )}
 
-              <ChalkField label="Tools" hint="Type your own or pick a preset">
+              <AdminField label="Tools" hint="Type your own or pick a preset">
                 <input list="gallery-tools-list" autoComplete="off" value={draft.tools} onChange={(e) => setDraft({ ...draft, tools: e.target.value })} placeholder="e.g. Clip Studio Paint" />
                 <datalist id="gallery-tools-list">{TOOL_PRESETS.map((value) => <option key={value} value={value} />)}</datalist>
-              </ChalkField>
-              <ChalkField label="Format" hint="Type your own or pick a preset">
+              </AdminField>
+              <AdminField label="Format" hint="Type your own or pick a preset">
                 <input list="gallery-format-list" autoComplete="off" value={draft.format} onChange={(e) => setDraft({ ...draft, format: e.target.value })} placeholder="e.g. Digital illustration" />
                 <datalist id="gallery-format-list">{FORMAT_PRESETS.map((value) => <option key={value} value={value} />)}</datalist>
-              </ChalkField>
-              <ChalkField label="Date Published" hint="Defaults to today. Pick another date if you need to.">
+              </AdminField>
+              <AdminField label="Date Published" hint="Defaults to today. Pick another date if you need to.">
                 <input type="date" required value={draft.publishedDate} onChange={(e) => setDraft({ ...draft, publishedDate: e.target.value })} />
-              </ChalkField>
+              </AdminField>
 
               {formError && <p className="form-error" role="alert">{formError}</p>}
 
@@ -2501,99 +2735,6 @@ function Footer({ go }: { go: (page: Page) => void }) {
   );
 }
 
-function ChalkDivider() {
-  const art = useMemo(() => {
-    let seed = 11;
-    const rnd = () => {
-      seed = (seed + 0x6d2b79f5) | 0;
-      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-    const line = (base: number, amp: number, step: number) => {
-      const points: string[] = [];
-      for (let x = -20; x <= 1460; x += step) points.push(`${x},${(base + (rnd() - 0.5) * amp * 2).toFixed(1)}`);
-      return points;
-    };
-    const open = (points: string[]) => `M${points.join(" L")}`;
-    const closed = (points: string[]) => `M-20,180 L${points.join(" L")} L1460,180 Z`;
-    return {
-      dust: closed(line(72, 14, 30)),
-      strokeA: open(line(58, 7, 22)),
-      strokeB: open(line(76, 6, 18)),
-      paper: closed(line(98, 5, 14)),
-      flecks: Array.from({ length: 46 }, () => ({ x: rnd() * 1440, y: 30 + rnd() * 76, r: 0.9 + rnd() * 2.2, gold: rnd() > 0.72 })),
-    };
-  }, []);
-  return (
-    <div className="chalk-divider" aria-hidden="true">
-      <svg viewBox="0 0 1440 170" preserveAspectRatio="none" focusable="false">
-        
-        {/*
-         <path className="cd-dust" d={art.dust} filter="url(#chalk-rough-strong)" />
-
-         <g filter="url(#chalk-soft)">
-          <path className="cd-stroke cd-stroke-a" d={art.strokeA} />
-          <path className="cd-stroke cd-stroke-b" d={art.strokeB} />
-         </g>
-        */}
-        <path className="cd-paper" d={art.paper} filter="url(#chalk-edge)" />
-        {/* 
-         <g className="cd-flecks">
-          {art.flecks.map((fleck, index) => <ellipse key={index} className={fleck.gold ? "cd-fleck-gold" : undefined} cx={fleck.x.toFixed(1)} cy={fleck.y.toFixed(1)} rx={(fleck.r * 1.5).toFixed(1)} ry={fleck.r.toFixed(1)} />)}
-        </g>
-        */}
-      </svg>
-    </div>
-  );
-}
-
-function ChalkDefs() {
-  const grain = "0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.9 0 0 0 -.32";
-  return (
-    <svg className="chalk-defs" width="0" height="0" aria-hidden="true" focusable="false">
-      <defs>
-        <filter id="chalk-rough" x="-4%" y="-4%" width="108%" height="108%" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" seed="4" result="warp" />
-          <feDisplacementMap in="SourceGraphic" in2="warp" scale="3.5" xChannelSelector="R" yChannelSelector="G" result="bent" />
-          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="9" result="grain" />
-          <feColorMatrix in="grain" type="matrix" values={grain} result="speckle" />
-          <feComposite in="bent" in2="speckle" operator="in" />
-        </filter>
-        <filter id="chalk-rough-strong" x="-6%" y="-6%" width="112%" height="112%" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" seed="21" result="warp" />
-          <feDisplacementMap in="SourceGraphic" in2="warp" scale="9" xChannelSelector="R" yChannelSelector="G" result="bent" />
-          <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="5" result="grain" />
-          <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.6 0 0 0 -.12" result="speckle" />
-          <feComposite in="bent" in2="speckle" operator="in" />
-        </filter>
-        <filter id="chalk-soft" x="-10%" y="-100%" width="120%" height="300%" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2" seed="12" result="warp" />
-          <feDisplacementMap in="SourceGraphic" in2="warp" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="bent" />
-          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="grain" />
-          <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.4 0 0 0 -.05" result="speckle" />
-          <feComposite in="bent" in2="speckle" operator="in" />
-        </filter>
-        <filter id="chalk-edge" x="-2%" y="-10%" width="104%" height="160%" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.03 0.08" numOctaves="3" seed="17" result="warp" />
-          <feDisplacementMap in="SourceGraphic" in2="warp" scale="7" xChannelSelector="R" yChannelSelector="G" />
-        </filter>
-        <filter id="chalk-edge-fine" x="-4%" y="-20%" width="108%" height="180%" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.05 0.12" numOctaves="2" seed="23" result="warp" />
-          <feDisplacementMap in="SourceGraphic" in2="warp" scale="2.6" xChannelSelector="R" yChannelSelector="G" />
-        </filter>
-        <filter id="chalk-text" x="-2%" y="-10%" width="104%" height="120%" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.07" numOctaves="2" seed="2" result="warp" />
-          <feDisplacementMap in="SourceGraphic" in2="warp" scale="1.4" xChannelSelector="R" yChannelSelector="G" result="bent" />
-          <feTurbulence type="fractalNoise" baseFrequency="0.9 0.55" numOctaves="3" seed="5" result="grain" />
-          <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -1.2 0 0 0 1.5" result="speckle" />
-          <feComposite in="bent" in2="speckle" operator="in" />
-        </filter>
-      </defs>
-    </svg>
-  );
-}
-
 export default function App() {
   const getPage = (): Page => {
     const hash = window.location.hash.replace("#", "").split("?")[0] as Page;
@@ -2655,7 +2796,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const elements = document.querySelectorAll("main > section, .featured-card, .medium-card, .gallery-card, .guide-sections article, .form-section");
+    const elements = document.querySelectorAll("main > section, .featured-card, .medium-card, .gallery-card, .policy-section, .policy-cta, .form-section");
     elements.forEach((element) => element.classList.add("scroll-reveal"));
     const observer = new IntersectionObserver((entries) => entries.forEach((entry) => { if (entry.isIntersecting) { entry.target.classList.add("revealed"); observer.unobserve(entry.target); } }), { threshold: .08 });
     elements.forEach((element) => observer.observe(element));
@@ -2675,7 +2816,7 @@ export default function App() {
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
   };
-  const content = { home: <Home go={go} />, guide: <Guide />, commission: <Commission go={go} />, admin: <Admin go={go} onLogout={logout} /> };
+  const content = { home: <Home go={go} />, guide: <Guide go={go} />, commission: <Commission go={go} />, admin: <Admin go={go} onLogout={logout} /> };
   
   if (page === "admin") {
     if (!authChecked) {
@@ -2685,16 +2826,14 @@ export default function App() {
       return <Login onLogin={() => setIsAdminAuth(true)} go={go} />;
     }
     return (
-      <div className="chalk-theme">
-        <ChalkDefs />
+      <div className="app-theme">
         {content.admin}
       </div>
     );
   }
 
   return (
-    <div className="site-shell chalk-theme">
-      <ChalkDefs />
+    <div className="site-shell app-theme">
       <Navbar page={page} go={go} />
       {content[page]}
       <Footer go={go} />
