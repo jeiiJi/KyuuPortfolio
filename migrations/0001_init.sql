@@ -1,5 +1,3 @@
--- migrations/0001_init.sql
-
 CREATE TABLE IF NOT EXISTS commissions (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
@@ -13,7 +11,7 @@ CREATE TABLE IF NOT EXISTS commissions (
   priority BOOLEAN,
   dueDate TEXT,
   notes TEXT,
-  "references" TEXT, -- Store JSON stringified array of images
+  "references" TEXT,
   totalPhp INTEGER,
   submittedAt TEXT,
   stage INTEGER,

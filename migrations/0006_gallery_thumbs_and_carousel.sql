@@ -1,6 +1,3 @@
--- Save as: migrations/0006_gallery_thumbs_and_carousel.sql
--- Run once with: pnpm exec wrangler d1 migrations apply inkyuu-db --remote
-
 -- 1. Gallery columns for lightweight list loading and thumb caching
 ALTER TABLE gallery ADD COLUMN thumb TEXT;
 ALTER TABLE gallery ADD COLUMN imageVersion INTEGER NOT NULL DEFAULT 1;

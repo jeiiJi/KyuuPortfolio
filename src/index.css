@@ -417,7 +417,6 @@ footer a:hover, footer button:hover { color: var(--gold); }
   .submission-table { overflow-x: auto; }
 }
 
-/* Inkyuu enhancements */
 .brand { gap: 7px; }
 .brand .brand-symbol { width: 60px; height: 60px; object-fit: contain; }
 .brand .brand-wordmark { width: 107px; height: 59px; object-fit: contain; }
@@ -578,7 +577,6 @@ footer a:hover, footer button:hover { color: var(--gold); }
   .login-card { padding: 35px 25px; }
 }
 
-/* Commission progress tracker and accent bar (previously inline styles) */
 .commission-progress { background: white; border: 1px solid var(--line); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .commission-progress { flex-wrap: wrap; gap: 12px 20px; }
 .commission-progress > div:first-child { flex: 1 1 220px; min-width: 0; }
@@ -622,62 +620,42 @@ footer a:hover, footer button:hover { color: var(--gold); }
   --fs-md: clamp(1rem, .96rem + .2vw, 1.125rem);
   --fs-card: clamp(1.45rem, 1.25rem + .7vw, 1.75rem);
   --fs-h2: clamp(2.1rem, 1.5rem + 2.4vw, 3.5rem);
-
 }
 
 @media (max-width: 650px) {
   :root { --nav-h: 68px; }
 }
 
-/* Solid theme: crisp 1px lines, solid fills and clean radii. No textures, SVG filters or hand-drawn strokes. */
 .app-theme { background-color: var(--paper); }
 .app-theme ::selection { background: var(--gold); color: var(--ink); }
 .app-theme :is(h1, h2) em { text-decoration: underline; text-decoration-color: var(--gold); text-decoration-thickness: 2px; text-underline-offset: .14em; }
-
-/* Brand */
 .app-theme .brand .brand-symbol { transition: transform .25s var(--ease-out); }
 .app-theme .brand:hover .brand-symbol { transform: scale(1.06); }
-
-/* Buttons */
 .app-theme .btn { position: relative; border-radius: 999px; transition: transform .2s, box-shadow .2s, background .2s, color .2s, border-color .2s; }
 .app-theme .btn-ghost { text-decoration: none; }
 .app-theme .btn-ghost::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 9px; height: 2px; background: var(--gold); pointer-events: none; transition: background-color .25s ease; }
 .app-theme .btn-ghost:hover::after { background: var(--orange); animation: underline-draw .45s var(--ease-out); }
-
-/* Cards and boxes keep their real 1px borders; only the radius is modernised */
 .app-theme :is(.featured-card, .medium-card, .form-section, .choice-card) { border-radius: 12px; }
 .app-theme .featured-card { overflow: hidden; }
 .app-theme .gallery-image-only { border: 1px solid var(--border-color); border-radius: 12px; }
 .app-theme .gallery-image-only:hover { border-color: var(--gold); }
 .app-theme footer :is(a, .footer-col > button):hover { text-decoration: underline; text-decoration-color: var(--gold); text-underline-offset: 5px; }
-
-/* Form fields */
 .app-theme :is(.field input, .field select, .field textarea) { border-color: var(--field-line); border-radius: 8px; transition: box-shadow .25s ease, border-color .25s ease; }
 .app-theme :is(.field input, .field select, .field textarea):focus { border-color: var(--ink); box-shadow: 0 0 0 2px rgb(254 157 60 / .3); }
-
-/* Modals */
 .app-theme :is(.dialog-modal, .project-modal) { border-radius: 12px; animation: fade-up .6s var(--ease-out) backwards; }
 .app-theme .modal-close { border-color: var(--border-strong); transition: rotate .25s var(--ease-out), background .2s; }
 .app-theme .modal-close:hover { rotate: 90deg; background: var(--cream); }
-
-/* Gallery filter tabs */
 .app-theme .filter-toggle.sliding-filter { border: 1px solid var(--border-strong); }
 .app-theme .filter-slider-indicator { transition: transform .5s cubic-bezier(.34, 1.45, .5, 1); }
-
-/* Commission form: progress tracker */
 .app-theme .commission-progress { border-radius: 12px; }
 .app-theme .commission-progress-track { height: 8px; box-shadow: inset 0 0 0 1px var(--border-strong); }
 .app-theme .commission-progress-fill { transition: width .6s var(--ease-out); }
-
-/* Commission form options: gentle lift on hover, solid orange outline and cream fill when chosen */
 .app-theme :is(.choice-card, .check-row) { isolation: isolate; transition: transform .15s cubic-bezier(.2, .8, .2, 1), border-color .2s ease, background-color .35s ease, box-shadow .2s ease; }
 .app-theme :is(.choice-card, .check-row):hover { transform: translateY(-2px); border-color: var(--orange); }
 .app-theme :is(.choice-card, .check-row):active { transform: scale(.97); }
 .app-theme :is(.choice-card.selected, .check-row:has(input:checked)) { border-color: var(--orange-deep); background-color: var(--cream); box-shadow: inset 0 0 0 1px var(--orange-deep); animation: card-pop .25s cubic-bezier(.34, 1.56, .64, 1); }
 .app-theme .choice-card.selected .radio { border-color: var(--orange-deep) !important; }
 .app-theme .art-style-card.selected { border-color: var(--orange-deep); box-shadow: inset 0 0 0 1px var(--orange-deep); }
-
-/* Entry and hover motion */
 .app-theme :is(.featured-card, .medium-card, .gallery-image-only, .form-section) { transition: opacity .7s ease, transform .7s cubic-bezier(.2, .8, .2, 1), border-color .3s, box-shadow .3s, background .25s; }
 .app-theme :is(.hero-copy, .page-hero, .policy-hero-inner, .about-hero > div:first-child) > * { animation: fade-up .9s var(--ease-out) backwards; }
 .app-theme :is(.hero-copy, .page-hero, .policy-hero-inner, .about-hero > div:first-child) > :nth-child(2) { animation-delay: .1s; }
@@ -686,40 +664,19 @@ footer a:hover, footer button:hover { color: var(--gold); }
 .app-theme :is(.hero-copy, .page-hero, .policy-hero-inner, .about-hero > div:first-child) > :nth-child(5) { animation-delay: .4s; }
 .app-theme .seal { animation: float-soft 7s ease-in-out infinite; }
 
-@keyframes float-soft {
-  0%, 100% { translate: 0 0; }
-  50% { translate: 0 -8px; }
-}
-@keyframes fade-up {
-  from { opacity: 0; translate: 0 18px; }
-  to { opacity: 1; translate: 0 0; }
-}
-@keyframes underline-draw {
-  from { clip-path: inset(0 100% 0 0); }
-  to { clip-path: inset(0 0 0 0); }
-}
-@keyframes card-pop {
-  0% { transform: scale(.97); }
-  60% { transform: scale(1.015); }
-  100% { transform: scale(1); }
-}
+@keyframes float-soft { 0%, 100% { translate: 0 0; } 50% { translate: 0 -8px; }}
+@keyframes fade-up { from { opacity: 0; translate: 0 18px; } to { opacity: 1; translate: 0 0; }}
+@keyframes underline-draw { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); }}
+@keyframes card-pop { 0% { transform: scale(.97); } 60% { transform: scale(1.015); } 100% { transform: scale(1); }}
 
-/* ==========================================================================
-   3. Fluid layout: containers, spacing, type and grids scale with the viewport
-   No scroll snapping anywhere: the page scrolls freely and smoothly.
-   ========================================================================== */
 html { scroll-behavior: auto; }
-@media (prefers-reduced-motion: no-preference) {
-  html { scroll-behavior: smooth; }
-}
-img, svg { max-width: 100%; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; }} img, svg { max-width: 100%; }
 
 .wrap { width: min(var(--container), calc(100% - 2 * var(--gutter))); }
 .nav-links { gap: clamp(14px, 2.6vw, 36px); }
 .filter-bar { top: var(--nav-h); }
 .estimate-card { top: calc(var(--nav-h) + 32px); }
 
-/* Fluid type for public-page copy (rem based, so it also respects the user's browser text size) */
 .btn, .nav-links button, .field, .estimate-total, .contact-links a,
 .section-heading > p, .card-copy p, .card-copy b, .quick-terms p, .quick-terms strong, .medium-card p, .gallery-copy p, .project-copy > p:not(.kicker), .check-row strong, .check-row small,
 .timeline p, .footer-brand p, footer a, footer button { font-size: var(--fs-sm); }
@@ -739,7 +696,6 @@ img, svg { max-width: 100%; }
 .gallery-copy h2 { font-size: clamp(1.7rem, 1.2rem + 1.4vw, 2.2rem); }
 .card-copy h3, .medium-card h3, .timeline h3, .expertise-grid h3 { font-size: var(--fs-card); }
 
-/* Section rhythm */
 .section { padding-block: var(--section-y); }
 .about-strip, .expertise-section, .home-commission-cta { padding-block: var(--section-y); }
 .story-grid, .timeline-section { padding-block: var(--section-y); }
@@ -748,7 +704,6 @@ img, svg { max-width: 100%; }
 .page-hero { padding: clamp(56px, 8vw, 90px) 0 clamp(36px, 5vw, 55px); max-width: min(900px, 100%); }
 .commission-page { padding-bottom: var(--section-y); }
 
-/* Fluid grids that wrap instead of squeezing */
 .featured-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: clamp(16px, 2vw, 22px); max-width: none; margin: 0; }
 .medium-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: clamp(12px, 1.6vw, 14px); }
 .collaborators > div { grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
@@ -760,9 +715,7 @@ img, svg { max-width: 100%; }
 .gallery-grid { gap: clamp(40px, 5vw, 65px) clamp(18px, 3vw, 30px); padding-block: clamp(36px, 5vw, 60px) clamp(64px, 8vw, 110px); }
 .form-section { padding-block: clamp(26px, 3.4vw, 36px); }
 
-@media (min-width: 651px) {
-  .gallery-card:nth-child(even) { margin-top: clamp(40px, 6vw, 85px); }
-}
+@media (min-width: 651px) { .gallery-card:nth-child(even) { margin-top: clamp(40px, 6vw, 85px); }}
 @media (min-width: 901px) {
   .featured-card:nth-child(2) { margin-top: clamp(20px, 3vw, 40px); }
   .section-heading { align-items: end; }
@@ -786,32 +739,12 @@ img, svg { max-width: 100%; }
 .about-hero > *, .intro-grid > *, .story-grid > *, .timeline-section > *, .commission-layout > * { min-width: 0; }
 :is(.featured-grid, .medium-grid, .gallery-grid, .project-modal, .publish-modal, .two-col, .option-grid, .commission-layout, .request-answers, .stats-grid, .notification-grid, .about-hero, .intro-grid, .story-grid, .timeline-section) > * { min-width: 0; }
 
-/* About: Core expertise wraps into as many cards per row as fit */
 .expertise-grid { display: flex; flex-wrap: wrap; gap: clamp(12px, 2vw, 20px); margin: clamp(28px, 4vw, 40px) 0 0; padding: 0; list-style: none; border: 0; }
 .expertise-grid > li { flex: 1 1 clamp(220px, 28%, 380px); min-width: 0; min-height: clamp(150px, 16vw, 190px); padding: clamp(18px, 2vw, 25px); border: 1px solid #565656; border-radius: 12px; }
 .expertise-grid > li > span { position: absolute; top: 20px; right: 20px; color: #b8b8b8; }
 .expertise-grid h3 { margin-top: clamp(36px, 5vw, 55px); font-family: "DM Serif Display", serif; font-weight: 400; line-height: 1.15; }
 
-/* Hero: full-bleed and exactly one screen tall on arrival (navbar included), then free scrolling.
-   The artwork fills the whole section edge to edge with the copy layered above it.
-   Tune the crop with --hero-pos (for example "70% bottom") and the nudge with --hero-shift. */
-.app-theme .hero.wrap {
-  /* Position the portrait toward its upper crop so the subject's head remains visible. */
-  --hero-pos: center 73%;
-  --hero-shift: 10%;
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
-  gap: 0 clamp(32px, 5vw, 70px);
-  align-items: end;
-  width: 100%;
-  max-width: none;
-  min-height: calc(100vh - var(--nav-h));
-  min-height: calc(100svh - var(--nav-h));
-  margin: 0;
-  padding: clamp(40px, 8vh, 96px) max(var(--gutter), calc((100% - var(--container)) / 2)) 0;
-  overflow: hidden;
-}
+.app-theme .hero.wrap { --hero-pos: center 73%; --hero-shift: 10%; position: relative; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 0 clamp(32px, 5vw, 70px); align-items: end; width: 100%; max-width: none; min-height: calc(100vh - var(--nav-h)); min-height: calc(100svh - var(--nav-h)); margin: 0; padding: clamp(40px, 8vh, 96px) max(var(--gutter), calc((100% - var(--container)) / 2)) 0; overflow: hidden; }
 .app-theme .hero-copy { position: relative; z-index: 3; isolation: isolate; min-width: 0; padding-bottom: clamp(104px, 17vh, 176px); text-align: center; }
 .app-theme .hero-copy::before { content: ""; position: absolute; inset: -2.5rem -3rem; z-index: -1; border-radius: 50%; background: radial-gradient(ellipse at center, rgb(255 255 255 / .96) 0%, rgb(255 255 255 / .88) 48%, rgb(255 255 255 / .5) 76%, transparent 100%); filter: blur(18px); pointer-events: none; }
 .app-theme .hero-copy .eyebrow, .app-theme .hero-actions { justify-content: center; }
@@ -823,7 +756,6 @@ img, svg { max-width: 100%; }
 .app-theme .hero-canvas .art-visual > img { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; max-width: none; object-fit: cover; object-position: var(--hero-pos); translate: var(--hero-shift) 0; filter: none; }
 .app-theme .hero-canvas::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(90deg, var(--paper) 0%, color-mix(in srgb, var(--paper) 97%, transparent) 14%, color-mix(in srgb, var(--paper) 90%, transparent) 40%, color-mix(in srgb, var(--paper) 0%, transparent) 72%); }
 
-/* Tablet and phone: copy first, artwork stretched edge to edge beneath it filling the rest of the screen */
 @media (max-width: 900px) {
   .app-theme .hero.wrap { --hero-shift: 0%; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; min-height: calc(100vh - var(--nav-h)); min-height: calc(100svh - var(--nav-h)); padding: clamp(24px, 5vh, 48px) var(--gutter); background: #fff; }
   .app-theme .hero-copy { width: min(100%, 42rem); padding: 0; }
@@ -845,7 +777,6 @@ img, svg { max-width: 100%; }
   .app-theme .nav-links.open button:last-child { border-bottom: 0; }
 }
 
-/* Footer: concise and lightweight (no slot indicator or request button) */
 footer { padding-top: clamp(0px, 3.4vw, 0px); }
 .footer-grid { grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr)); gap: clamp(20px, 3.4vw, 48px); padding-bottom: clamp(18px, 2.4vw, 28px); }
 .footer-grid > :not(.footer-brand) { display: flex; flex-direction: column; align-items: flex-start; }
@@ -861,24 +792,17 @@ footer { padding-top: clamp(0px, 3.4vw, 0px); }
   .footer-brand { grid-column: 1 / -1; }
 }
 
-/* ==========================================================================
-   4. Accessibility (WCAG 2.1 AA): contrast, focus, targets, screen-reader helpers
-   Orange text uses --orange-deep (and --orange-display for 24px+ headings);
-   the bright --orange remains for borders, dividers, bars and other decoration.
-   ========================================================================== */
 .sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 main:focus { outline: none; }
 .req { color: #b42318; font-weight: 700; }
 ::placeholder { color: #6b6b6b; opacity: 1; }
 
-/* Solid keyboard focus ring: high contrast and clearly visible. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid var(--orange-deep); outline-offset: 3px; }
 .field :is(input, select, textarea):focus-visible, .admin-add input:focus-visible, .crud-row input:focus-visible { outline: 2px solid var(--orange-deep); outline-offset: 2px; }
 :is(footer, .home-commission-cta, .expertise-section, .estimate-card, .admin-nav) :focus-visible { outline-color: var(--gold); }
 .filter-toggle.sliding-filter .filter-btn:focus-visible { outline-offset: -4px; }
 .nav-links button:focus-visible::after { left: 0; right: 0; }
 
-/* Orange as text */
 .kicker, .eyebrow { color: var(--orange-deep); }
 h1 em, h2 em { color: var(--orange-display); }
 .brand-dot { color: var(--orange-deep); }
@@ -891,7 +815,6 @@ h1 em, h2 em { color: var(--orange-display); }
 .login-error, .admin-main header p, .panel-head p, .admin-panel > p, .stats-grid p, .table-row > b:last-child, .progress-cell b,
 .request-answers span, .media-list article span, .admin-status, .deadline-list time, .add-task { color: var(--orange-deep); }
 
-/* Greys that were too faint */
 .login-card > small, .media-list article small, .today-list input:checked + span { color: var(--muted); }
 .footer-brand p, footer a, footer button, .fine-print { color: #cfcfcf; }
 .footer-bottom { color: #bdbdbd; }
@@ -900,7 +823,6 @@ footer a:hover, footer button:hover { color: var(--gold); }
 .medium-card:hover :is(p, h3, > span) { color: var(--ink); }
 .filter-toggle.sliding-filter .filter-btn span { opacity: 1; }
 
-/* Touch and pointer targets */
 .nav-links button { min-height: 44px; }
 .filter-toggle.sliding-filter .filter-btn { min-height: 44px; }
 .modal-close { width: 44px; height: 44px; }
@@ -908,16 +830,13 @@ footer a:hover, footer button:hover { color: var(--gold); }
 .check-row input, .terms-check input { width: 20px; height: 20px; }
 footer a { overflow-wrap: anywhere; }
 
-/* Hover-only content is also revealed for keyboard users */
 .gallery-image-only:focus-visible .gallery-hover { opacity: 1; transform: none; }
 .medium-card:focus-visible b { opacity: 1; transform: none; }
 
-/* Decorative generated text is hidden from screen readers where the browser supports alt text for content */
-
-/* Extra wrapping so nothing overflows between breakpoints */
 .hero-actions { flex-wrap: wrap; }
 .contact-band .wrap { flex-wrap: wrap; gap: 20px 40px; }
 .estimate-card > h2 { font-size: clamp(2.6rem, 2rem + 3vw, 3.6rem); }
+
 @media (max-width: 650px) {
   .nav-links { gap: 0; }
 }
@@ -926,13 +845,6 @@ footer a { overflow-wrap: anywhere; }
   .app-theme *, .app-theme *::before, .app-theme *::after { animation: none !important; transition-duration: .01ms !important; }
 }
 
-/* =====================================================================
-   ADMIN PANEL ADDITIONS
-   Admin theme, full-width media list, kebab menu, filter bar,
-   filter pills/tags, delete confirmation.
-   ===================================================================== */
-
-/* ---- Solid theme for the whole admin (needs the .app-theme wrapper from App.tsx) ---- */
 .app-theme .admin-shell { background: transparent; }
 .app-theme :is(.admin-panel, .stats-grid article, .media-list article) { border-radius: 12px; background-color: var(--paper); }
 .app-theme .media-list article { transition: border-color .3s ease; }
@@ -941,14 +853,12 @@ footer a { overflow-wrap: anywhere; }
 .app-theme :is(.publish-modal, .confirm-modal) { background-color: var(--paper); border-radius: 12px; animation: fade-up .6s var(--ease-out) backwards; }
 .app-theme .publish-preview { background: transparent; }
 
-/* ---- Media list: full width of its manager ---- */
 .media-manager .media-list { width: 100%; grid-template-columns: 1fr; }
 .media-manager .media-list article { grid-template-columns: 100px minmax(0, 1fr) 44px; position: relative; }
 .media-manager .media-list article:has(.kebab-menu) { z-index: 40; }
 .media-list .media-meta { display: block; margin-top: 4px; }
 @media (max-width: 680px) { .media-manager .media-list article { grid-template-columns: 80px minmax(0, 1fr) 40px; } }
 
-/* ---- Kebab (three dots) menu ---- */
 .kebab { position: relative; justify-self: center; }
 .kebab-btn { width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; transition: background .2s, color .2s; }
 .kebab-btn:hover, .kebab-btn[aria-expanded="true"] { background: var(--cream); color: var(--ink); }
@@ -964,7 +874,6 @@ footer a { overflow-wrap: anywhere; }
 .kebab-menu button.danger { color: #a8321f; }
 @keyframes kebab-in { from { opacity: 0; translate: 0 -6px; } to { opacity: 1; translate: 0 0; } }
 
-/* ---- Filter pills + active tags ---- */
 .filter-pill, .filter-pill-btn, .filter-tag {
   position: relative; display: inline-flex; align-items: center; gap: 8px;
   border: 1px solid var(--border-strong); border-radius: 999px;
@@ -980,7 +889,6 @@ footer a { overflow-wrap: anywhere; }
 .filter-tag button:hover { background: rgb(184 67 12 / .14); }
 .filter-tag button:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
 
-/* ---- Filter bar: Filter | Art Style | Scope | Service/Color Finish, drawer, tag tray ---- */
 .library-filter { display: flex; flex-direction: column; gap: 12px; padding-top: 18px; }
 .library-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .library-filter .sub-filter-select { flex: 0 1 210px; }
@@ -996,7 +904,6 @@ footer a { overflow-wrap: anywhere; }
 .tray-empty { color: var(--muted); font-size: 14px; }
 @keyframes drawer-in { from { opacity: 0; translate: 0 -6px; } to { opacity: 1; translate: 0 0; } }
 
-/* ---- Delete confirmation ---- */
 .confirm-modal { position: relative; width: min(440px, 100%); padding: 34px 30px 28px; display: flex; flex-direction: column; gap: 10px; background: var(--paper); box-shadow: 0 30px 80px rgb(0 0 0 / .25); }
 .confirm-modal h2 { margin: 0; font: 26px "DM Serif Display", serif; }
 .confirm-modal p { margin: 0; color: var(--muted); }
@@ -1004,11 +911,6 @@ footer a { overflow-wrap: anywhere; }
 
 @media (prefers-reduced-motion: reduce) { .kebab-menu, .library-filter-drawer { animation: none; } }
 
-/* =====================================================================
-   STICKY ADMIN EDITOR · IMAGE SETS · GALLERY CAROUSEL
-   ===================================================================== */
-
-/* ---- Admin add/edit modal: preview, Replace button and Close stay pinned while the form scrolls ---- */
 .publish-modal { overscroll-behavior: contain; }
 .publish-modal > .publish-preview {
   grid-column: 1; grid-row: 1; z-index: 3; align-self: start;
@@ -1022,14 +924,12 @@ footer a { overflow-wrap: anywhere; }
 .publish-preview > img { max-height: 44vh; }
 .app-theme .publish-modal > .publish-preview { background-color: var(--cream); }
 
-/* The whole Replace / Add button is the file input, so it works with the keyboard too */
 .publish-preview .publish-replace { position: relative; margin-top: 4px; flex: 0 0 auto; }
 .publish-preview .publish-replace.busy { opacity: .6; cursor: progress; }
 .publish-preview .publish-replace:focus-within { outline: 2px solid var(--orange-deep); outline-offset: 3px; }
 .publish-preview input[type="file"] { display: block; position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 0; }
 .publish-preview input[type="file"]:disabled { cursor: progress; }
 
-/* ---- Image set strip inside the preview ---- */
 .set-thumbs { list-style: none; margin: 0; padding: 4px 2px; display: flex; gap: 8px; width: 100%; overflow-x: auto; }
 .set-thumbs li { flex: 0 0 auto; }
 .set-thumb { position: relative; width: 60px; height: 60px; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: #eff1f3; cursor: pointer; display: block; }
@@ -1047,13 +947,11 @@ footer a { overflow-wrap: anywhere; }
 .set-size.over { color: #a8321f; font-weight: 700; }
 .form-error { margin: 0; padding: 10px 14px; border-radius: 10px; background: #fdece8; color: #a8321f; font-size: 14px; }
 
-/* Enable sticky behavior only on screens wider than 760px (desktop/tablet) */
 @media (min-width: 761px) {
   .publish-modal > .publish-preview { position: sticky; top: 0; }
   .publish-modal > .modal-close { position: sticky; top: 14px; }
 }
 
-/* ---- Mobile: keep one column, but pin the (compact) preview and the close button to the top ---- */
 @media (max-width: 760px) {
   .publish-modal { display: block; }
   .publish-modal > .publish-preview { position: static; max-height: none; padding: 12px 16px; border-bottom: 1px solid var(--line); }
@@ -1061,7 +959,6 @@ footer a { overflow-wrap: anywhere; }
   .publish-modal > .modal-close { display: grid; position: static; margin: 12px 12px 0 auto; }
 }
 
-/* ---- Public gallery: multi-image carousel in the artwork modal ---- */
 .project-image.carousel { position: relative; overflow: hidden; }
 .carousel-btn {
   position: absolute; top: 50%; translate: 0 -50%; z-index: 3; width: 46px; height: 46px; display: grid; place-items: center;
@@ -1096,11 +993,6 @@ footer a { overflow-wrap: anywhere; }
   .carousel-btn, .carousel-dots button::before { transition: none; }
 }
 
-/* =====================================================================
-   SOLID OUTLINE ON ADMIN FORM FIELDS
-   (text inputs, dropdowns, date pickers, textareas in the add/edit modal)
-   Each field sits in an .input-wrap frame that draws the border (see AdminField in App.tsx).
-   ===================================================================== */
 .app-theme .input-wrap {
   position: relative; display: block; border: 1px solid var(--field-line); border-radius: 8px;
   background-color: var(--paper); transition: box-shadow .25s ease, border-color .25s ease;
@@ -1112,280 +1004,55 @@ footer a { overflow-wrap: anywhere; }
 .app-theme .input-wrap :is(input, select, textarea):focus,
 .app-theme .input-wrap :is(input, select, textarea):focus-visible { border: 0; box-shadow: none; outline: none; }
 .app-theme .input-wrap:hover { border-color: var(--orange-deep); }
-/* Focus stays clearly visible: darker solid border plus a soft glow around the whole field */
 .app-theme .input-wrap:focus-within { border-color: var(--orange-deep); box-shadow: 0 0 0 3px rgb(254 157 60 / .35); }
 .app-theme .input-wrap textarea { resize: vertical; min-height: 84px; }
 .app-theme .input-wrap input[type="date"] { min-height: 48px; }
-/* Focus stays clearly visible: darker solid border plus a soft glow around the whole frame */
 
 @media (prefers-reduced-motion: reduce) {
   .app-theme .input-wrap { transition: none; }
 }
 
-/* ---- Admin: log out button (under "Back to website") ---- */
 .admin-nav .logout-btn { border: 0; background: transparent; color: #bbb; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 5px; font-size: 14px; cursor: pointer; text-align: left; transition: color .2s ease, background .2s ease; }
 .admin-nav .logout-btn:hover { color: white; background: rgb(255 255 255 / .08); }
 .admin-nav .logout-btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+
 @media (max-width: 900px) { .admin-nav .logout-btn { font-size: 0; justify-content: center; } }
-
-/* ==========================================================
-   Navigation bar: logo placement + borderless menu button
-   ----------------------------------------------------------
-   Above 650px   Logo on the left, links inline, CTA on the right,
-                 menu button hidden.
-   650px & below Links collapse into the slide-out drawer, the
-                 menu button sits on the left and the logo is
-                 centered in the bar.
-   ========================================================== */
-
-.nav-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  max-width: 1200px;
-  height: 76px;
-  margin: 0 auto;
-  padding: 0 24px;
-}
-
-.nav-actions.left-action {
-  display: none; /* the menu button only exists in the mobile layout */
-}
-
-/* Menu / close toggle: no border, no pseudo-element outline.
-   Hover colour and the keyboard focus ring are kept. */
-.menu-button {
-  position: relative;
-  display: none; /* shown by the max-width: 650px block below */
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  color: var(--ink);
-  background: transparent;
-  border: 0;
-  border-radius: 12px; /* only shapes the keyboard focus ring */
-  box-shadow: none;
-  outline: none;
-  cursor: pointer;
-  -webkit-appearance: none;
-  appearance: none;
-  -webkit-tap-highlight-color: transparent;
-  transition: color 0.2s ease, transform 0.2s ease;
-}
-
-.menu-button::-moz-focus-inner {
-  border: 0;
-}
-
-.menu-button::before,
-.menu-button::after {
-  content: none;
-}
-
-.menu-button:hover {
-  color: var(--orange-deep);
-  transform: scale(1.05);
-}
-
-/* Accessible focus ring for keyboard users; mouse and touch taps draw none */
-.menu-button:focus {
-  outline: 2px solid var(--ink);
-  outline-offset: 4px;
-}
-
-.menu-button:focus:not(:focus-visible) {
-  outline: none;
-}
-
-/* Logo sits on the left by default (desktop and large screens) */
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
-
-/* ==========================================================
-   Mobile & Small Screen Media Query Rules (max-width: 650px)
-   ========================================================== */
+.nav-inner { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 1200px; height: 76px; margin: 0 auto; padding: 0 24px; }
+.nav-actions.left-action { display: none;}
+.menu-button { position: relative; display: none; place-items: center; width: 44px; height: 44px; padding: 0; color: var(--ink); background: transparent; border: 0; border-radius: 12px; box-shadow: none; outline: none; cursor: pointer; -webkit-appearance: none; appearance: none; -webkit-tap-highlight-color: transparent; transition: color 0.2s ease, transform 0.2s ease; }
+.menu-button::-moz-focus-inner { border: 0; }
+.menu-button::before, .menu-button::after { content: none; }
+.menu-button:hover { color: var(--orange-deep); transform: scale(1.05); }
+.menu-button:focus { outline: 2px solid var(--ink); outline-offset: 4px; }
+.menu-button:focus:not(:focus-visible) { outline: none; }
+.brand { display: flex; align-items: center; gap: 12px; background: none; border: none; cursor: pointer; padding: 0; }
 
 @media (max-width: 650px) {
-  .nav-inner {
-    display: grid;
-    grid-template-columns: 48px 1fr 48px; /* equal outer columns keep the logo dead-centre */
-    height: 68px;
-    padding: 0 16px;
-    align-items: center;
-  }
-
-  .nav-actions.left-action {
-    display: flex;
-    justify-self: start;
-  }
-
-  .menu-button {
-    display: grid;
-  }
-
-  /* Logo centered ONLY on mobile / small screens */
-  .brand {
-    justify-self: center;
-    margin: 0 auto;
-    font-size: 21px;
-  }
-
-  .brand img {
-    width: 38px;
-    height: 38px;
-  }
-
-  /* Backdrop Overlay below the navbar */
-  .nav-backdrop {
-    position: fixed;
-    top: 68px;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 98;
-    background: rgba(55, 55, 55, 0.45);
-    backdrop-filter: blur(4px);
-    animation: fade-up 0.25s ease-out;
-  }
-
-  /* Full-width slide-in drawer below the navbar */
-  .nav-links {
-    position: fixed;
-    top: 68px;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 99;
-    width: 100%;
-    height: calc(100vh - 68px);
-    height: calc(100dvh - 68px);
-    display: flex;
-    flex-direction: column;
-    padding: 32px 24px;
-    background-color: var(--paper);
-    background-size: 240px;
-    border: none;
-    box-shadow: none;
-    transform: translateX(-100%);
-    transition: transform 0.35s cubic-bezier(0.22, 0.9, 0.3, 1);
-  }
-
-  .nav-links.open {
-    transform: translateX(0);
-  }
-
-  /* Remove pseudo-element borders from mobile drawer panel */
-  .nav-links::after,
-  .nav-links::before {
-    display: none !important;
-  }
-
-  /* Vertical navigation links inside mobile drawer */
-  .nav-links button {
-    min-height: 52px;
-    padding: 14px 12px;
-    text-align: left;
-    font-size: 1.15rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    color: var(--ink);
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
-    transition: color 0.2s ease, padding-left 0.2s ease;
-  }
-
-  .nav-links button:hover,
-  .nav-links button.active {
-    color: var(--orange-deep);
-    padding-left: 18px;
-  }
-
-  .nav-links button::after,
-  .nav-links button::before {
-    display: none !important;
-  }
+  .nav-inner { display: grid; grid-template-columns: 48px 1fr 48px; height: 68px; padding: 0 16px; align-items: center; }
+  .nav-actions.left-action { display: flex; justify-self: start; }
+  .menu-button { display: grid; }
+  .brand { justify-self: center; margin: 0 auto; font-size: 21px; }
+  .brand img { width: 38px; height: 38px; }
+  .nav-backdrop { position: fixed; top: 68px; left: 0; right: 0; bottom: 0; z-index: 98; background: rgba(55, 55, 55, 0.45); backdrop-filter: blur(4px); animation: fade-up 0.25s ease-out; }
+  .nav-links { position: fixed; top: 68px; bottom: 0; left: 0; right: 0; z-index: 99; width: 100%; height: calc(100vh - 68px); height: calc(100dvh - 68px); display: flex; flex-direction: column; padding: 32px 24px; background-color: var(--paper); background-size: 240px; border: none; box-shadow: none; transform: translateX(-100%); transition: transform 0.35s cubic-bezier(0.22, 0.9, 0.3, 1); }
+  .nav-links.open { transform: translateX(0); }
+  .nav-links::after, .nav-links::before { display: none !important; }
+  .nav-links button { min-height: 52px; padding: 14px 12px; text-align: left; font-size: 1.15rem; font-weight: 600; letter-spacing: 0.02em; color: var(--ink); background: transparent; border: none; border-bottom: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); transition: color 0.2s ease, padding-left 0.2s ease; }
+  .nav-links button:hover, .nav-links button.active { color: var(--orange-deep); padding-left: 18px; }
+  .nav-links button::after, .nav-links button::before { display: none !important; }
 }
 
+.footer-bottom { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding-block: 20px; border-top: 1px solid #4a4a4a; }
+.footer-bottom-group { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.footer-bottom, .footer-bottom span, .footer-bottom a, .footer-bottom .footer-link-btn, .footer-bottom .footer-section-label { color: #cfcfcf; font-family: "DM Sans", sans-serif; font-size: 14px; font-weight: 400; line-height: 1.5; }
+.dot-sep { color: #666; font-size: 12px; user-select: none; }
+.footer-bottom a:hover, .footer-bottom .footer-link-btn:hover { color: var(--gold); text-decoration: underline solid var(--gold) 1px; text-underline-offset: 4px; text-decoration-skip-ink: none; }
+.footer-link-btn { border: 0; background: transparent; padding: 0; cursor: pointer; }
 
-/* Container that pushes left and right groups apart */
-.footer-bottom {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-  padding-block: 20px;
-  border-top: 1px solid #4a4a4a;
-}
-
-/* Individual inline groups for left and right contents */
-.footer-bottom-group {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-/* Universal text & link styling to keep everything matching */
-.footer-bottom,
-.footer-bottom span,
-.footer-bottom a,
-.footer-bottom .footer-link-btn,
-.footer-bottom .footer-section-label {
-  color: #cfcfcf;
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.5;
-}
-
-/* Separator dot styling */
-.dot-sep {
-  color: #666;
-  font-size: 12px;
-  user-select: none;
-}
-
-/* Matching link hover states for both <a> and <button> elements */
-.footer-bottom a:hover,
-.footer-bottom .footer-link-btn:hover {
-  color: var(--gold);
-  text-decoration: underline solid var(--gold) 1px;
-  text-underline-offset: 4px;
-  text-decoration-skip-ink: none;
-}
-
-/* Seamless styling for clickable terms button */
-.footer-link-btn {
-  border: 0;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-}
-
-/* Mobile responsive layout adjustment */
 @media (max-width: 768px) {
-  .footer-bottom {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
+.footer-bottom { flex-direction: column; align-items: flex-start; gap: 12px; }
 }
 
-/* ==========================================================================
-   Policy page: Terms & Conditions / Commission Guide
-   Clean container cards, solid 1px dividers, readable body copy, crisp buttons.
-   ========================================================================== */
 .guide-page { background: var(--paper); }
 
 .policy-hero { background: var(--white); border-bottom: 1px solid var(--border-color); }
@@ -1399,7 +1066,6 @@ footer a { overflow-wrap: anywhere; }
 
 .policy-layout { display: grid; grid-template-columns: minmax(200px, 250px) minmax(0, 1fr); gap: clamp(24px, 4vw, 56px); align-items: start; padding-block: clamp(28px, 4vw, 52px) clamp(56px, 7vw, 96px); }
 
-/* "On this page" index */
 .policy-toc { position: sticky; top: calc(var(--nav-h) + 24px); }
 .policy-toc-title { margin: 0 0 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); color: var(--muted); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .policy-toc ol { display: grid; gap: 4px; margin: 0; padding: 8px 0 0; list-style: none; }
@@ -1408,7 +1074,6 @@ footer a { overflow-wrap: anywhere; }
 .policy-toc button:hover { color: var(--ink); background: var(--cream); }
 .policy-toc button[aria-current="true"] { color: var(--ink); font-weight: 600; background: var(--white); border-color: var(--border-color); box-shadow: inset 3px 0 0 var(--orange-deep); }
 
-/* Section cards */
 .policy-content { display: grid; gap: clamp(20px, 2.6vw, 32px); min-width: 0; }
 .policy-section { scroll-margin-top: calc(var(--nav-h) + 24px); overflow: hidden; background: var(--white); border: 1px solid var(--border-color); border-radius: var(--radius-lg); }
 .policy-section-head { display: flex; align-items: center; gap: 14px; padding: clamp(14px, 2vw, 20px) clamp(18px, 3vw, 32px); background: color-mix(in srgb, var(--cream) 45%, white); border-bottom: 1px solid var(--border-color); }
@@ -1417,7 +1082,6 @@ footer a { overflow-wrap: anywhere; }
 .policy-section-body { padding-inline: clamp(18px, 3vw, 32px); }
 .policy-intro { max-width: 70ch; margin: 0; padding-top: clamp(16px, 2.2vw, 24px); color: var(--muted); font-size: var(--fs-sm); line-height: 1.75; }
 
-/* Clauses: solid dividers between items, label on the left from tablet width up */
 .policy-clause { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding-block: clamp(18px, 2.4vw, 26px); }
 .policy-clause + .policy-clause { border-top: 1px solid var(--border-color); }
 .policy-clause h3 { margin: 0; color: var(--ink); font: 600 var(--fs-md)/1.4 "DM Sans", sans-serif; overflow-wrap: anywhere; }
@@ -1431,7 +1095,6 @@ footer a { overflow-wrap: anywhere; }
 .policy-clause-body ul + p { margin-top: 14px; }
 .policy-clause-body > .policy-table:first-child { margin-top: 0; }
 
-/* Tables */
 .policy-table { width: 100%; margin-top: 14px; border: 1px solid var(--border-color); border-radius: var(--radius-md); border-collapse: separate; border-spacing: 0; overflow: hidden; table-layout: fixed; }
 .policy-table th, .policy-table td { padding: 12px 14px; border-bottom: 1px solid var(--border-color); text-align: left; vertical-align: top; font-size: var(--fs-sm); line-height: 1.65; overflow-wrap: anywhere; }
 .policy-table th + td, .policy-table th + th, .policy-table td + td { border-left: 1px solid var(--border-color); }
@@ -1445,7 +1108,6 @@ footer a { overflow-wrap: anywhere; }
 .policy-table .policy-theme-list li:first-child { padding-top: 0; }
 .policy-table .policy-theme-list li:last-child { padding-bottom: 0; border-bottom: 0; }
 
-/* Closing call to action */
 .policy-cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px; padding: clamp(20px, 3vw, 32px); background: var(--white); border: 1px solid var(--border-color); border-radius: var(--radius-lg); }
 .policy-cta h2 { margin: 0 0 6px; font-size: clamp(1.25rem, 1.05rem + .8vw, 1.6rem); line-height: 1.2; }
 .policy-cta p { max-width: 52ch; margin: 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.65; }
@@ -1453,9 +1115,7 @@ footer a { overflow-wrap: anywhere; }
 .app-theme .guide-page .btn { border-radius: var(--radius-sm); }
 .policy-clause-plain { grid-template-columns: minmax(0, 1fr); }
 
-@media (min-width: 901px) {
-  .policy-clause { grid-template-columns: minmax(170px, 220px) minmax(0, 1fr); gap: 8px clamp(20px, 3vw, 40px); }
-}
+@media (min-width: 901px) { .policy-clause { grid-template-columns: minmax(170px, 220px) minmax(0, 1fr); gap: 8px clamp(20px, 3vw, 40px); } }
 @media (max-width: 900px) {
   .policy-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
   .policy-toc { position: static; }
@@ -1475,192 +1135,32 @@ footer a { overflow-wrap: anywhere; }
   .policy-cta-actions .btn { flex: 1 1 160px; }
 }
 
+.drawer-footer-panel { display: none !important; }
 
-/* 1. Completely hide the drawer footer element on desktop views */
-.drawer-footer-panel {
-  display: none !important;
-}
-
-/* 2. Mobile drawer styling (max-width: 650px) */
 @media (max-width: 650px) {
-  .drawer-footer-panel {
-    display: flex !important;
-    flex-direction: column;
-    gap: 15px;
-    margin-top: auto;
-    margin-bottom: -10px; /* Pulls element flush to the bottom edge */
-    margin-inline: -24px;  /* Cancels the parent .nav-links horizontal padding */
-    width: calc(100% + 48px); /* Spans 100% width across the drawer */
-    padding: 20px 24px;
-    background-color: #f2f0ec; /* Light gray background */
-    border: none;              /* Completely removes outer border */
-    border-radius: 0;          /* Removes rounded corners */
-    border-top: 1px solid var(--line); /* Subtle separator above the panel */
-  }
-
+  .drawer-footer-panel { display: flex !important; flex-direction: column; gap: 15px; margin-top: auto; margin-bottom: -10px; margin-inline: -24px; width: calc(100% + 48px); padding: 20px 24px; background-color: #f2f0ec; border: none; border-radius: 0; border-top: 1px solid var(--line); }
   .drawer-footer-copy,
-  .drawer-footer-socials {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    font-size: 15px;
-    color: var(--muted);
-  }
-
-  .drawer-footer-socials a,
-  .drawer-footer-copy .footer-link-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    color: var(--ink);
-    font-size: 13px;
-    text-decoration: none;
-  }
-
+  .drawer-footer-socials { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 15px; color: var(--muted); }
+  .drawer-footer-socials a, .drawer-footer-copy .footer-link-btn { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); font-size: 13px; text-decoration: none; }
   .drawer-footer-socials a:hover,
-  .drawer-footer-copy .footer-link-btn:hover {
-    color: var(--orange-deep);
-  }
-
-  .drawer-social-label {
-    font-weight: 600;
-    color: var(--muted);
-  }
+  .drawer-footer-copy .footer-link-btn:hover { color: var(--orange-deep); }
+  .drawer-social-label { font-weight: 600; color: var(--muted); }
 }
 
+.hero-carousel-section { width: 100%; max-width: 100%; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; background: var(--paper); }
+.hero-carousel-container { position: relative; width: 100%; height: clamp(320px, 42vw, 560px); max-height: 70vh; overflow: hidden; background: var(--paper); }
+.hero-carousel-slide { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; visibility: hidden; transition: opacity 0.6s cubic-bezier(0.22, 0.9, 0.3, 1), visibility 0.6s ease; }
+.hero-carousel-slide.active { opacity: 1; visibility: visible; z-index: 1; }
+.hero-carousel-slide img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+.hero-carousel-dots { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; align-items: center; gap: 10px; padding: 6px 14px; background: rgba(0, 0, 0, 0.25); backdrop-filter: blur(4px); border-radius: 999px; }
+.hero-carousel-dot { width: 10px; height: 10px; padding: 0; border: none; border-radius: 50%; background: rgba(255, 255, 255, 0.7); cursor: pointer; transition: background 0.25s ease, transform 0.25s ease; }
+.hero-carousel-dot:hover { background: #ffffff; }
+.hero-carousel-dot.active { background: var(--orange); transform: scale(1.25); }
+.hero-carousel-dot:focus-visible { outline: 2px solid var(--orange-deep); outline-offset: 2px; }
+.hero-carousel-controls { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 14px 0 24px; width: 100%; background: var(--paper); }
+.hero-control-btn { background: transparent; border: none; color: var(--ink); display: inline-flex; align-items: center; justify-content: center; padding: 6px; cursor: pointer; transition: color 0.2s ease, transform 0.2s ease; }
+.hero-control-btn:hover { color: var(--orange-deep); transform: scale(1.1); }
+.hero-control-btn:focus-visible { outline: 2px solid var(--orange-deep); outline-offset: 3px; border-radius: 4px; }
 
-
-
-/* ==========================================================================
-   HERO CAROUSEL SECTION (nirami-shop.com style)
-   ========================================================================== */
-
-.hero-carousel-section {
-  width: 100%;
-  max-width: 100%;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: var(--paper);
-}
-
-.hero-carousel-container {
-  position: relative;
-  width: 100%;
-  height: clamp(320px, 42vw, 560px);
-  max-height: 70vh;
-  overflow: hidden;
-  background: var(--paper);
-}
-
-.hero-carousel-slide {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.6s cubic-bezier(0.22, 0.9, 0.3, 1), visibility 0.6s ease;
-}
-
-.hero-carousel-slide.active {
-  opacity: 1;
-  visibility: visible;
-  z-index: 1;
-}
-
-.hero-carousel-slide img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-  display: block;
-}
-
-/* Dots directly overlaid on top of the image container */
-.hero-carousel-dots {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 14px;
-  background: rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(4px);
-  border-radius: 999px;
-}
-
-.hero-carousel-dot {
-  width: 10px;
-  height: 10px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
-  transition: background 0.25s ease, transform 0.25s ease;
-}
-
-.hero-carousel-dot:hover {
-  background: #ffffff;
-}
-
-.hero-carousel-dot.active {
-  background: var(--orange);
-  transform: scale(1.25);
-}
-
-.hero-carousel-dot:focus-visible {
-  outline: 2px solid var(--orange-deep);
-  outline-offset: 2px;
-}
-
-/* Controls bar positioned explicitly below the image carousel */
-.hero-carousel-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  padding: 14px 0 24px;
-  width: 100%;
-  background: var(--paper);
-}
-
-.hero-control-btn {
-  background: transparent;
-  border: none;
-  color: var(--ink);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  cursor: pointer;
-  transition: color 0.2s ease, transform 0.2s ease;
-}
-
-.hero-control-btn:hover {
-  color: var(--orange-deep);
-  transform: scale(1.1);
-}
-
-.hero-control-btn:focus-visible {
-  outline: 2px solid var(--orange-deep);
-  outline-offset: 3px;
-  border-radius: 4px;
-}
-
-
-/* Reduce the space between the About and Gallery sections */
-#about-section.about-strip {
-  padding-bottom: 50px; /* Adjust this value to make it tighter or looser */
-}
-
-#home-gallery-section.section {
-  padding-top: 40px; /* Adjust this value to control top spacing above the gallery filters */
-}
+#about-section.about-strip { padding-bottom: 50px; }
+#home-gallery-section.section { padding-top: 40px; }

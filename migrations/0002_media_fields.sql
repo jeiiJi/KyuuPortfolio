@@ -1,7 +1,3 @@
--- Save as: migrations/0002_media_fields.sql
--- Run once with:  pnpm exec wrangler d1 migrations apply inkyuu-db --remote
--- (SQLite has no "ADD COLUMN IF NOT EXISTS", so this file must only run once. Wrangler tracks that for you.)
-
 -- gallery already has scope, service, colorFinish
 ALTER TABLE gallery ADD COLUMN artStyle TEXT;
 ALTER TABLE gallery ADD COLUMN dateMade TEXT;

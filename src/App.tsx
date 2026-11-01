@@ -143,7 +143,6 @@ const money = (php: number) => `₱${php.toLocaleString()}`;
 function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
   const [open, setOpen] = useState(false);
 
-  // Lock body scroll when mobile nav drawer is open
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
@@ -162,12 +161,10 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  // Handle smooth scrolling to section IDs on the Home page
   const scrollToSection = (sectionId: string) => {
     setOpen(false);
     if (page !== "home") {
       go("home");
-      // Wait for home page render before scrolling
       setTimeout(() => {
         document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
       }, 100);
@@ -197,7 +194,6 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
           <img className="brand-wordmark" src={brandName} alt="Inkyuu" />
         </button>
 
-        {/* Backdrop positioned below the navbar */}
         {open && (
           <div className="nav-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
         )}
@@ -226,7 +222,6 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
             Gallery
           </button>
 
-          {/* Drawer Footer Element - Only visible inside mobile slide-out menu */}
           <div className="drawer-footer-panel">
             <div className="drawer-footer-socials">
               <span className="drawer-social-label">Contacts |</span>
@@ -258,7 +253,6 @@ function ArtVisual({ art, label }: { art: string; label: string }) {
 }
 
 function HeroCarousel({ artworks }: { artworks: PublishedItem[] }) {
-  // Select between 3 and 5 of the latest published artworks
   const carouselArtworks = useMemo(() => {
     return artworks.slice(0, 5);
   }, [artworks]);
@@ -309,7 +303,6 @@ function HeroCarousel({ artworks }: { artworks: PublishedItem[] }) {
           </div>
         ))}
 
-        {/* Navigation Dots overlaid directly on top of the image container */}
         {count > 1 && (
           <div className="hero-carousel-dots" role="group" aria-label="Slide Selection">
             {carouselArtworks.map((_, idx) => (
@@ -326,7 +319,6 @@ function HeroCarousel({ artworks }: { artworks: PublishedItem[] }) {
         )}
       </div>
 
-      {/* Navigation Controls & Pause/Play explicitly positioned below */}
       {count > 1 && (
         <div className="hero-carousel-controls">
           <button 
@@ -368,7 +360,6 @@ function HeroCarousel({ artworks }: { artworks: PublishedItem[] }) {
 function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }) {
   const { items: published } = useApiData<PublishedItem>("/api/gallery");
   
-  // Gallery state integrated directly into Home
   const [filter, setFilter] = useState<"Chibi" | "Semi-Realistic">("Chibi");
   const [scopeValue, setScopeValue] = useState("");
   const [contextValue, setContextValue] = useState("");
@@ -413,7 +404,6 @@ function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }
     return <ArtVisual art="placeholder" label={item.title} />;
   };
 
-  // Handle loading full image sets for modals
   useEffect(() => {
     if (!selected || !("image" in selected)) {
       setSelectedImages([]);
@@ -440,11 +430,8 @@ function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }
   return (
     <>
       <main id="main-content" tabIndex={-1}>
-        {/* Hero Section */}
-        {/* Full-width Image Carousel replacing the single static hero */}
         <HeroCarousel artworks={published} />
 
-        {/* About Strip */}
         <section id="about-section" className="about-strip">
           <div className="wrap intro-grid">
             <div className="portrait-card"><ArtVisual art="artist" label="Illustrated portrait of the artist" /><span className="seal">ID<br />Artist</span></div>
@@ -469,7 +456,6 @@ function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }
           </div>
         </section>
 
-        {/* EMBEDDED GALLERY SECTION */}
         <section id="home-gallery-section" className="section wrap">
           <div className="filter-bar" style={{ position: "static", background: "transparent", border: "none", marginBottom: "20px" }}>
             <div className="filter-toggle sliding-filter" role="group" aria-label="Filter artwork">
@@ -516,7 +502,6 @@ function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }
           </div>
         </section>
 
-        {/* Modal for viewing individual artwork details */}
         {selected && (
           <div className="modal-backdrop" onMouseDown={() => setSelected(null)}>
             <div className="project-modal" role="dialog" aria-modal="true" aria-labelledby="project-title" onMouseDown={(e) => e.stopPropagation()}>
@@ -913,7 +898,6 @@ function Commission({ go }: { go: (page: Page) => void }) {
         <h1>Let's make something <em>yours.</em></h1>
         <p>Step-by-step studio commission intake modeled after live Google Forms.</p>
       </section>
-      {/* {requestError && <p className="wrap" role="alert">Live commission data could not be loaded: {requestError}</p>} */}
 
       <div className={`wrap commission-layout ${step > 2 && step < 5 ? "has-estimate" : "without-estimate"}`}>
         <div className="commission-form">
@@ -1247,7 +1231,6 @@ function Guide({ go }: { go: (page: Page) => void }) {
   const [activeSection, setActiveSection] = useState(POLICY_SECTIONS[0].id);
   const calm = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // Highlight the section being read in the "On this page" index.
   useEffect(() => {
     const update = () => {
       let current = POLICY_SECTIONS[0].id;
@@ -1304,154 +1287,154 @@ function Guide({ go }: { go: (page: Page) => void }) {
         </aside>
 
         <div className="policy-content">
-        <article id="policy-rules" className="policy-section" aria-labelledby="policy-rules-heading">
-          <header className="policy-section-head"><span className="policy-index" aria-hidden="true">I</span><h2 id="policy-rules-heading">Rules & Regulations</h2></header>
-          <div className="policy-section-body">
-            <section className="policy-clause">
-                          <h3>A. NSFW Contents</h3>
-                          <div className="policy-clause-body">
-                            <p><strong>Not Safe For Work content is NOT allowed,</strong> may the project be in PUBLIC or in PRIVATE. Any commission request that is judged to be NSFW or suggestive will not be accepted and will be rejected immediately.</p>
-                          <p>The following will automatically be tagged as NSFW: <em>pornography, nudity, heavy gore, depiction of bodily fluids (e.g., semen), violence, suggestive content, controversial content.</em></p>
-                          </div>
-                        </section>
-            <section className="policy-clause">
-                          <h3>B. Themes</h3>
-                          <div className="policy-clause-body">
-                            <table className="policy-table policy-theme-table">
-                            <thead><tr><th scope="col">Will Draw:</th><th scope="col">Won't Draw:</th></tr></thead>
-                            <tbody><tr>
-                              <td data-label="Will Draw:"><ul className="policy-theme-list"><li>OC</li><li>Fictional Characters</li><li>Character Ships</li><li>Nonsexual Nudity</li></ul></td>
-                              <td data-label="Won't Draw:"><ul className="policy-theme-list"><li>NSFW</li><li>Real People without their consent</li><li>Changing a canon character's design (e.g., race, major features)</li><li>Mecha, Cars, etc.</li></ul></td>
-                            </tr></tbody>
-                          </table>
-                          </div>
-                        </section>
-          </div>
-        </article>
+          <article id="policy-rules" className="policy-section" aria-labelledby="policy-rules-heading">
+            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">I</span><h2 id="policy-rules-heading">Rules & Regulations</h2></header>
+            <div className="policy-section-body">
+              <section className="policy-clause">
+                <h3>A. NSFW Contents</h3>
+                <div className="policy-clause-body">
+                  <p><strong>Not Safe For Work content is NOT allowed,</strong> may the project be in PUBLIC or in PRIVATE. Any commission request that is judged to be NSFW or suggestive will not be accepted and will be rejected immediately.</p>
+                  <p>The following will automatically be tagged as NSFW: <em>pornography, nudity, heavy gore, depiction of bodily fluids (e.g., semen), violence, suggestive content, controversial content.</em></p>
+                </div>
+              </section>
+              <section className="policy-clause">
+                <h3>B. Themes</h3>
+                <div className="policy-clause-body">
+                  <table className="policy-table policy-theme-table">
+                    <thead><tr><th scope="col">Will Draw:</th><th scope="col">Won't Draw:</th></tr></thead>
+                    <tbody><tr>
+                      <td data-label="Will Draw:"><ul className="policy-theme-list"><li>OC</li><li>Fictional Characters</li><li>Character Ships</li><li>Nonsexual Nudity</li></ul></td>
+                      <td data-label="Won't Draw:"><ul className="policy-theme-list"><li>NSFW</li><li>Real People without their consent</li><li>Changing a canon character's design (e.g., race, major features)</li><li>Mecha, Cars, etc.</li></ul></td>
+                    </tr></tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+          </article>
 
-        <article id="policy-copyrights" className="policy-section" aria-labelledby="policy-copyrights-heading">
-          <header className="policy-section-head"><span className="policy-index" aria-hidden="true">II</span><h2 id="policy-copyrights-heading">Copyrights</h2></header>
-          <div className="policy-section-body">
-            <section className="policy-clause">
-                          <h3>A. Artist Rights</h3>
-                          <div className="policy-clause-body">
-                            <p><strong>Pursuant to Republic Act No. 8293 (The Intellectual Property Code of the Philippines), the copyright of the artwork inherently and permanently belongs to the artist.</strong> The artist retains all rights regarding the reproduction, distribution, and public display of the artwork for promotional, portfolio, and social media purposes.</p>
-                          </div>
-                        </section>
-            <section className="policy-clause">
-                          <h3>B. Client Rights</h3>
-                          <div className="policy-clause-body">
-                            <p>Upon final payment, the client is granted a license to use the artwork for expected purposes. The artist must be clearly and visibly credited whenever the artwork is used or displayed publicly. The client may not alter, edit, or claim the artwork as their own creation.</p>
-                          </div>
-                        </section>
-            <section className="policy-clause">
-                          <h3>C. AI & Blockchain Prohibitions</h3>
-                          <div className="policy-clause-body">
-                            <p>Under no circumstances is the artwork permitted for use in Artificial Intelligence (AI) training databases, machine learning datasets, or any blockchain/NFT platforms. Any such utilization constitutes a direct violation of these terms and copyright law.</p>
-                          </div>
-                        </section>
-            <section className="policy-clause">
-                          <h3>D. Transfer of Ownership</h3>
-                          <div className="policy-clause-body">
-                            <p>Full copyright ownership remains with the artist unless a separate, formal agreement is signed/explicitly said by both parties to assign the copyright to the client or an organization. Copyright buyout fees will apply for such transfers.</p>
-                          </div>
-                        </section>
-          </div>
-        </article>
+          <article id="policy-copyrights" className="policy-section" aria-labelledby="policy-copyrights-heading">
+            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">II</span><h2 id="policy-copyrights-heading">Copyrights</h2></header>
+            <div className="policy-section-body">
+              <section className="policy-clause">
+                <h3>A. Artist Rights</h3>
+                <div className="policy-clause-body">
+                  <p><strong>Pursuant to Republic Act No. 8293 (The Intellectual Property Code of the Philippines), the copyright of the artwork inherently and permanently belongs to the artist.</strong> The artist retains all rights regarding the reproduction, distribution, and public display of the artwork for promotional, portfolio, and social media purposes.</p>
+                </div>
+              </section>
+              <section className="policy-clause">
+                <h3>B. Client Rights</h3>
+                <div className="policy-clause-body">
+                  <p>Upon final payment, the client is granted a license to use the artwork for expected purposes. The artist must be clearly and visibly credited whenever the artwork is used or displayed publicly. The client may not alter, edit, or claim the artwork as their own creation.</p>
+                </div>
+              </section>
+              <section className="policy-clause">
+                <h3>C. AI & Blockchain Prohibitions</h3>
+                <div className="policy-clause-body">
+                  <p>Under no circumstances is the artwork permitted for use in Artificial Intelligence (AI) training databases, machine learning datasets, or any blockchain/NFT platforms. Any such utilization constitutes a direct violation of these terms and copyright law.</p>
+                </div>
+              </section>
+              <section className="policy-clause">
+                <h3>D. Transfer of Ownership</h3>
+                <div className="policy-clause-body">
+                  <p>Full copyright ownership remains with the artist unless a separate, formal agreement is signed/explicitly said by both parties to assign the copyright to the client or an organization. Copyright buyout fees will apply for such transfers.</p>
+                </div>
+              </section>
+            </div>
+          </article>
 
-        <article id="policy-contract" className="policy-section" aria-labelledby="policy-contract-heading">
-          <header className="policy-section-head"><span className="policy-index" aria-hidden="true">III</span><h2 id="policy-contract-heading">Contract & Workflow Terms</h2></header>
-          <div className="policy-section-body">
-            <p className="policy-intro">By securing a commission slot, both the artist and the client agree to the following parameters regarding the execution, payment, and legal boundaries of the commission.</p>
-            <section className="policy-clause">
-                          <h3>A. Revisions</h3>
-                          <div className="policy-clause-body">
-                            <p>Once the final artwork is finished and presented for final approval, any requests for major modifications or revisions will incur mandatory additional charges depending on the weight of the adjustment. Work on these final alterations will only commence after the client has paid the required revision fee.</p>
-                          </div>
-                        </section>
-            <section className="policy-clause">
-                          <h3>B. Deadlines</h3>
-                          <div className="policy-clause-body">
-                            <p>Clients requiring an expected delivery can opt to designate their commission as a PRIORITY. Priority pieces are fast-tracked ahead of the standard production queue to ensure significantly quicker completion, which will incur an additional charge equivalent to 10% of the project's total price.</p>
-                          </div>
-                        </section>
-            <section className="policy-clause">
-                          <h3>C. Payment Terms</h3>
-                          <div className="policy-clause-body">
-                            <p>To ensure a secure and collaborative workflow, payments are broken down into milestone installations. No upfront cost is required to begin the initial drafting phase, but progress is strictly tied to the following payment schedule:</p>
-                          <table className="policy-table">
-                            <thead><tr><th scope="col">Milestone</th><th scope="col">Payment schedule</th></tr></thead>
-                            <tbody>
-                              <tr><th scope="row">Initial Phase</th><td data-label="Payment schedule">The project will be initiated and developed up to the midpoint milestone without an upfront cost.</td></tr>
-                              <tr><th scope="row">Mid-Project Downpayment</th><td data-label="Payment schedule">Upon reaching the midpoint milestone (the finalization of the approved sketch), a mandatory 20% downpayment of the total project fee will be requested.</td></tr>
-                              <tr><th scope="row">Final Settlement</th><td data-label="Payment schedule">The remaining balance must be paid in full within three (3) calendar days after the artwork is finished and presented. High-resolution—without any obstructive watermark—final deliverables will only be released once the full payment has cleared.</td></tr>
-                            </tbody>
-                          </table>
-                          </div>
-                        </section>
-            <section className="policy-clause">
-                          <h3>D. Cancellation & Refund Policy</h3>
-                          <div className="policy-clause-body">
-                            <p>Clients may change their minds or cancel the project within a specific window. However, because time and labor are invested into the project as it progresses, the refund policy changes depending on when the cancellation is requested:</p>
-                          <ul>
-                            <li>Standard Grace Period: The client is entitled to a 100% full cancellation and refund within one (1) week (7 days) of the initial project booking.</li>
-                            <li>Mid-Project & Mid-Production: If no cancellation is requested within the first week, production automatically proceeds. If the client persists in canceling the project after the 1-week grace period has passed, the project will enter immediate termination. In this event, the client will only be refunded 12% of their total downpayment amount, and they will be given the latest work-in-progress export of the drawing as-is.</li>
-                          </ul>
-                          </div>
-                        </section>
-            <section className="policy-clause">
-                          <h3>E. Termination Policy</h3>
-                          <div className="policy-clause-body">
-                            <p>The artist reserves the right to suspend work or permanently terminate the contract if the client breaches communication or payment deadlines. Forfeiting a slot due to non-payment will result in the cancellation of the project.</p>
-                          <ul>
-                            <li>Failure to Provide Downpayment: If the client refuses or fails to settle the 20% mid-project downpayment within one (1) week (7 days) of the initial payment request, production will be immediately halted, the commission will be terminated, and the slot will be forfeited.</li>
-                            <li>Failure to Settle Final Balance: Failure to pay the remaining balance within the designated 3-day post-completion window will result in the immediate withholding of the final artwork, termination of future services, and potential blacklisting from subsequent commission openings.</li>
-                          </ul>
-                          </div>
-                        </section>
-          </div>
-        </article>
+          <article id="policy-contract" className="policy-section" aria-labelledby="policy-contract-heading">
+            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">III</span><h2 id="policy-contract-heading">Contract & Workflow Terms</h2></header>
+            <div className="policy-section-body">
+              <p className="policy-intro">By securing a commission slot, both the artist and the client agree to the following parameters regarding the execution, payment, and legal boundaries of the commission.</p>
+              <section className="policy-clause">
+                <h3>A. Revisions</h3>
+                <div className="policy-clause-body">
+                  <p>Once the final artwork is finished and presented for final approval, any requests for major modifications or revisions will incur mandatory additional charges depending on the weight of the adjustment. Work on these final alterations will only commence after the client has paid the required revision fee.</p>
+                </div>
+              </section>
+              <section className="policy-clause">
+                <h3>B. Deadlines</h3>
+                <div className="policy-clause-body">
+                  <p>Clients requiring an expected delivery can opt to designate their commission as a PRIORITY. Priority pieces are fast-tracked ahead of the standard production queue to ensure significantly quicker completion, which will incur an additional charge equivalent to 10% of the project's total price.</p>
+                </div>
+              </section>
+              <section className="policy-clause">
+                <h3>C. Payment Terms</h3>
+                <div className="policy-clause-body">
+                  <p>To ensure a secure and collaborative workflow, payments are broken down into milestone installations. No upfront cost is required to begin the initial drafting phase, but progress is strictly tied to the following payment schedule:</p>
+                <table className="policy-table">
+                  <thead><tr><th scope="col">Milestone</th><th scope="col">Payment schedule</th></tr></thead>
+                  <tbody>
+                    <tr><th scope="row">Initial Phase</th><td data-label="Payment schedule">The project will be initiated and developed up to the midpoint milestone without an upfront cost.</td></tr>
+                    <tr><th scope="row">Mid-Project Downpayment</th><td data-label="Payment schedule">Upon reaching the midpoint milestone (the finalization of the approved sketch), a mandatory 20% downpayment of the total project fee will be requested.</td></tr>
+                    <tr><th scope="row">Final Settlement</th><td data-label="Payment schedule">The remaining balance must be paid in full within three (3) calendar days after the artwork is finished and presented. High-resolution—without any obstructive watermark—final deliverables will only be released once the full payment has cleared.</td></tr>
+                  </tbody>
+                </table>
+                </div>
+              </section>
+              <section className="policy-clause">
+                <h3>D. Cancellation & Refund Policy</h3>
+                <div className="policy-clause-body">
+                  <p>Clients may change their minds or cancel the project within a specific window. However, because time and labor are invested into the project as it progresses, the refund policy changes depending on when the cancellation is requested:</p>
+                <ul>
+                  <li>Standard Grace Period: The client is entitled to a 100% full cancellation and refund within one (1) week (7 days) of the initial project booking.</li>
+                  <li>Mid-Project & Mid-Production: If no cancellation is requested within the first week, production automatically proceeds. If the client persists in canceling the project after the 1-week grace period has passed, the project will enter immediate termination. In this event, the client will only be refunded 12% of their total downpayment amount, and they will be given the latest work-in-progress export of the drawing as-is.</li>
+                </ul>
+                </div>
+              </section>
+              <section className="policy-clause">
+                <h3>E. Termination Policy</h3>
+                <div className="policy-clause-body">
+                  <p>The artist reserves the right to suspend work or permanently terminate the contract if the client breaches communication or payment deadlines. Forfeiting a slot due to non-payment will result in the cancellation of the project.</p>
+                <ul>
+                  <li>Failure to Provide Downpayment: If the client refuses or fails to settle the 20% mid-project downpayment within one (1) week (7 days) of the initial payment request, production will be immediately halted, the commission will be terminated, and the slot will be forfeited.</li>
+                  <li>Failure to Settle Final Balance: Failure to pay the remaining balance within the designated 3-day post-completion window will result in the immediate withholding of the final artwork, termination of future services, and potential blacklisting from subsequent commission openings.</li>
+                </ul>
+                </div>
+              </section>
+            </div>
+          </article>
 
-        <article id="policy-communication" className="policy-section" aria-labelledby="policy-communication-heading">
-          <header className="policy-section-head"><span className="policy-index" aria-hidden="true">IV</span><h2 id="policy-communication-heading">Communication & Client Responsiveness</h2></header>
-          <div className="policy-section-body">
-            <section className="policy-clause">
-                          <h3>A. Response Window</h3>
-                          <div className="policy-clause-body">
-                            <p>Clients are expected to respond to milestone updates, feedback requests, or approvals within three (3) calendar days.</p>
-                          </div>
-                        </section>
-            <section className="policy-clause">
-                          <h3>B. Inactivity Closure</h3>
-                          <div className="policy-clause-body">
-                            <p>If a client fails to communicate or respond for more than fourteen (14) consecutive days without prior notice, the project will be considered abandoned. The contract will be terminated, the 20% downpayment (if paid) will be forfeited as a cancellation fee, and the slot will be reopened to the public.</p>
-                          </div>
-                        </section>
-            <section className="policy-clause">
-                          <h3>C. Force Majeure</h3>
-                          <div className="policy-clause-body">
-                            <p>The artist is not held liable for delays caused by emergency situations, illness, power outages, natural disasters, or technical failures. In the event of such a delay, the client will be notified immediately, and a revised timeline will be established.</p>
-                          <p>If an operational delay occurs and the artist fails to respond to client inquiries or provide milestone updates for more than fourteen (14) consecutive days without prior notice, the client is granted the right to choose one of the following options:</p>
-                          <ul>
-                            <li><strong>Immediate Project Cancellation:</strong> The client may cancel the contract and receive a 12% refund of the settled downpayment, along with the latest work-in-progress export of the artwork as-is.</li>
-                            <li><strong>Timeline Extension:</strong> The client may choose to maintain the commission slot under a newly negotiated, mutually agreed-upon delivery deadline.</li>
-                          </ul>
-                          </div>
-                        </section>
-          </div>
-        </article>
+          <article id="policy-communication" className="policy-section" aria-labelledby="policy-communication-heading">
+            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">IV</span><h2 id="policy-communication-heading">Communication & Client Responsiveness</h2></header>
+            <div className="policy-section-body">
+              <section className="policy-clause">
+                <h3>A. Response Window</h3>
+                <div className="policy-clause-body">
+                  <p>Clients are expected to respond to milestone updates, feedback requests, or approvals within three (3) calendar days.</p>
+                </div>
+              </section>
+              <section className="policy-clause">
+                <h3>B. Inactivity Closure</h3>
+                <div className="policy-clause-body">
+                  <p>If a client fails to communicate or respond for more than fourteen (14) consecutive days without prior notice, the project will be considered abandoned. The contract will be terminated, the 20% downpayment (if paid) will be forfeited as a cancellation fee, and the slot will be reopened to the public.</p>
+                </div>
+              </section>
+              <section className="policy-clause">
+                <h3>C. Force Majeure</h3>
+                <div className="policy-clause-body">
+                  <p>The artist is not held liable for delays caused by emergency situations, illness, power outages, natural disasters, or technical failures. In the event of such a delay, the client will be notified immediately, and a revised timeline will be established.</p>
+                <p>If an operational delay occurs and the artist fails to respond to client inquiries or provide milestone updates for more than fourteen (14) consecutive days without prior notice, the client is granted the right to choose one of the following options:</p>
+                <ul>
+                  <li><strong>Immediate Project Cancellation:</strong> The client may cancel the contract and receive a 12% refund of the settled downpayment, along with the latest work-in-progress export of the artwork as-is.</li>
+                  <li><strong>Timeline Extension:</strong> The client may choose to maintain the commission slot under a newly negotiated, mutually agreed-upon delivery deadline.</li>
+                </ul>
+                </div>
+              </section>
+            </div>
+          </article>
 
-        <article id="policy-files" className="policy-section" aria-labelledby="policy-files-heading">
-          <header className="policy-section-head"><span className="policy-index" aria-hidden="true">V</span><h2 id="policy-files-heading">File Storage & Delivery Maintenance</h2></header>
-          <div className="policy-section-body">
-            <section className="policy-clause policy-clause-plain">
-                          <div className="policy-clause-body">
-                            <p>Final high-resolution files will be hosted on a cloud drive (e.g., Google Drive) and guaranteed to be accessible for six (6) months following final delivery. Clients are strongly advised to download and back up their files immediately upon receipt.</p>
-                        <p>If a client loses their files or requires a new download link after the 6-month hosting period has expired, they may reach out to the artist directly. While the artist will make every effort to retrieve the artwork from their personal archives, recovery is not guaranteed if the data has been permanently cleared or archived.</p>
-                          </div>
-                        </section>
-          </div>
-        </article>
+          <article id="policy-files" className="policy-section" aria-labelledby="policy-files-heading">
+            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">V</span><h2 id="policy-files-heading">File Storage & Delivery Maintenance</h2></header>
+            <div className="policy-section-body">
+              <section className="policy-clause policy-clause-plain">
+                <div className="policy-clause-body">
+                  <p>Final high-resolution files will be hosted on a cloud drive (e.g., Google Drive) and guaranteed to be accessible for six (6) months following final delivery. Clients are strongly advised to download and back up their files immediately upon receipt.</p>
+                  <p>If a client loses their files or requires a new download link after the 6-month hosting period has expired, they may reach out to the artist directly. While the artist will make every effort to retrieve the artwork from their personal archives, recovery is not guaranteed if the data has been permanently cleared or archived.</p>
+                </div>
+              </section>
+            </div>
+          </article>
 
           <section className="policy-cta" aria-labelledby="policy-cta-heading">
             <div>
@@ -1506,7 +1489,6 @@ const MAX_ENTRY_BYTES = 10 * 1024 * 1024;
 const ENTRY_LIMIT_LABEL = `${MAX_ENTRY_BYTES / (1024 * 1024)} MB`;
 const MAX_STORED_IMAGE_BYTES = 1_500_000;
 
-// Real size of an image: a data URL decodes to roughly 3/4 of its base64 length. Anything else counts by text length.
 const dataUrlBytes = (src: string) => {
   const comma = src.indexOf(",");
   if (!src.startsWith("data:") || comma === -1) return src.length;
@@ -1545,7 +1527,6 @@ const encodeImage = (img: HTMLImageElement, maxSize: number, quality: number): s
   context.drawImage(img, 0, 0, canvas.width, canvas.height);
   let data = canvas.toDataURL("image/webp", quality);
   if (!data.startsWith("data:image/webp")) {
-    // Older Safari can’t encode WebP: fall back to JPEG with a white background behind transparent areas.
     context.globalCompositeOperation = "destination-over";
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.width, canvas.height);
@@ -1699,9 +1680,9 @@ function PublishManager() {
   const [formError, setFormError] = useState("");
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState("");
-  const [loadingSet, setLoadingSet] = useState(false);   // fetching the other images of a set being edited
-  const [lockSave, setLockSave] = useState(false);       // set when that fetch failed, so a partial set is never saved
-  const editRequest = useRef(0);                         // ignores answers that arrive after the editor was closed
+  const [loadingSet, setLoadingSet] = useState(false);
+  const [lockSave, setLockSave] = useState(false);
+  const editRequest = useRef(0);
 
   const loadItems = async () => {
     setLoading(true);
@@ -1725,7 +1706,6 @@ function PublishManager() {
 
   const visible = useMemo(() => items.filter((item) => matchesFilters(item, artStyleFilter, tags)), [items, artStyleFilter, tags]);
 
-  // Changing Art Style wipes every sub-filter (Scope, Service, Color Finish).
   const changeArtStyleFilter = (value: string) => { setArtStyleFilter(value); setTags([]); };
   const toggleTag = (tag: ActiveTag) => setTags((current) =>
     current.some((existing) => existing.kind === tag.kind && existing.value === tag.value)
@@ -1733,8 +1713,6 @@ function PublishManager() {
       : [...current, tag]
   );
 
-  // Any number of images can be picked at once and become one set (the first is the cover).
-  // The only limit is the combined stored size of the entry (10 MB), checked as each image is added.
   const addImages = async (picked: File[]) => {
     const files = picked.filter((file) => file.type.startsWith("image/"));
     if (!files.length) {
@@ -1839,7 +1817,6 @@ function PublishManager() {
     setEditingId(item.id);
     setOpen(true);
 
-    // The list only carries each entry's cover, so fetch the rest of its set. Saving stays disabled until it arrives.
     const token = ++editRequest.current;
     setLockSave(false);
     setLoadingSet(false);
@@ -1900,7 +1877,6 @@ function PublishManager() {
 
     const item: AdminLibraryItem = {
       ...common,
-      // Keep the legacy "Chibi (Service)" category string: the public gallery still reads it.
       category: style === "Chibi" ? `Chibi (${service})` : style,
       image: draft.images[0],
       images: draft.images,
@@ -2029,7 +2005,7 @@ function PublishManager() {
                   disabled={processing || loadingSet}
                   onChange={(e) => {
                     const input = e.target;
-                    const picked = Array.from(input.files || []); // copy first: clearing the input empties the live FileList
+                    const picked = Array.from(input.files || []);
                     input.value = "";
                     void addImages(picked);
                   }}
@@ -2710,14 +2686,12 @@ function Footer({ go }: { go: (page: Page) => void }) {
   return (
     <footer>
       <div className="wrap footer-bottom">
-        {/* Left side group */}
         <div className="footer-bottom-group">
           <span>© 2026 Inkyuu. All rights reserved.</span>
           <span className="dot-sep">•</span>
           <button type="button" className="footer-link-btn" onClick={() => go("guide")}>Terms and Conditions</button>
         </div>
 
-        {/* Right side group */}
         <div className="footer-bottom-group">
           <span className="footer-section-label">Contacts |</span>
           <a href="mailto:kyuukyuuji@gmail.com">Email</a>
@@ -2765,7 +2739,6 @@ export default function App() {
     }
   };
 
-  // Check the login whenever the admin page is opened, and drop back to the login form if the server ever says 401.
   useEffect(() => {
     if (page === "admin") {
       setAuthChecked(false);
