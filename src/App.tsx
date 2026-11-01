@@ -257,21 +257,17 @@ function ArtVisual({ art, label }: { art: string; label: string }) {
   return <div className={`art-visual art-${art}`}><img src={placeholder} alt={label} /></div>;
 }
 
-type CarouselSlide = {
-  position: number;
-  data: string;
-  alt: string;
-  bytes: number;
-  version: number;
-};
+function HeroCarousel({ artworks }: { artworks: PublishedItem[] }) {
+  // Select between 3 and 5 of the latest published artworks
+  const carouselArtworks = useMemo(() => {
+    return artworks.slice(0, 5);
+  }, [artworks]);
 
-function HeroCarousel() {
-  const { items: slides, error: carouselError, loading: carouselLoading } = useApiData<CarouselSlide>("/api/carousel");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const touchStart = useRef<number | null>(null);
 
-  const count = slides.length;
+  const count = carouselArtworks.length;
 
   useEffect(() => {
     if (!isPlaying || count <= 1) return;
@@ -303,20 +299,20 @@ function HeroCarousel() {
           }
         }}
       >
-        {slides.map((slide, idx) => (
+        {carouselArtworks.map((item, idx) => (
           <div
-            key={slide.position}
+            key={item.id}
             className={`hero-carousel-slide ${idx === currentIndex ? "active" : ""}`}
             aria-hidden={idx !== currentIndex}
           >
-            <img src={slide.data} alt={slide.alt || "Featured artwork"} />
+            <img src={item.image} alt={item.title} />
           </div>
         ))}
 
         {/* Navigation Dots overlaid directly on top of the image container */}
         {count > 1 && (
           <div className="hero-carousel-dots" role="group" aria-label="Slide Selection">
-            {slides.map((_, idx) => (
+            {carouselArtworks.map((_, idx) => (
               <button
                 key={idx}
                 type="button"
@@ -330,7 +326,7 @@ function HeroCarousel() {
         )}
       </div>
 
-      {/* Navigation Controls & Pause/Play positioned below */}
+      {/* Navigation Controls & Pause/Play explicitly positioned below */}
       {count > 1 && (
         <div className="hero-carousel-controls">
           <button 
@@ -366,136 +362,6 @@ function HeroCarousel() {
         </div>
       )}
     </section>
-  );
-}
-
-function CarouselManager() {
-  const [slides, setSlides] = useState<CarouselSlide[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  const loadSlides = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await apiRequest<CarouselSlide[]>("/api/carousel");
-      if (Array.isArray(data)) setSlides(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadSlides();
-  }, []);
-
-  const handleAddSlide = async (files: FileList | null) => {
-    if (!files || !files[0]) return;
-    if (slides.length >= 5) {
-      alert("Maximum 5 slides allowed in the carousel.");
-      return;
-    }
-    try {
-      const data = await compressImage(files[0]);
-      const newSlide: CarouselSlide = {
-        position: slides.length,
-        data,
-        alt: "Carousel Slide",
-        bytes: dataUrlBytes(data),
-        version: 1,
-      };
-      setSlides((prev) => [...prev, newSlide]);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  const removeSlide = (index: number) => {
-    if (slides.length <= 1) {
-      alert("Carousel must contain at least 1 slide (minimum 1 required).");
-      return;
-    }
-    setSlides((prev) => prev.filter((_, i) => i !== index).map((s, idx) => ({ ...s, position: idx })));
-  };
-
-  const moveSlide = (index: number, delta: number) => {
-    const target = index + delta;
-    if (target < 0 || target >= slides.length) return;
-    setSlides((prev) => {
-      const next = [...prev];
-      [next[index], next[target]] = [next[target], next[index]];
-      return next.map((s, idx) => ({ ...s, position: idx }));
-    });
-  };
-
-  const saveCarousel = async () => {
-    if (slides.length < 1 || slides.length > 5) {
-      alert("Carousel must have between 1 and 5 slides.");
-      return;
-    }
-    setSaving(true);
-    try {
-      await apiRequest("/api/carousel", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slides }),
-      });
-      alert("Home carousel successfully updated!");
-      await loadSlides();
-    } catch (err) {
-      alert(`Failed to save carousel: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="admin-panel media-manager">
-      <div className="panel-head">
-        <div>
-          <p>HOME PAGE</p>
-          <h2>Carousel Slides (1–5)</h2>
-        </div>
-        <Btn onClick={saveCarousel} disabled={saving}>{saving ? "Saving..." : "Save Carousel"}</Btn>
-      </div>
-      {error && <p className="empty-row" role="alert">{error}</p>}
-      {loading ? <p className="empty-row">Loading carousel slides...</p> : (
-        <div className="media-list" style={{ gridTemplateColumns: "1fr" }}>
-          {slides.map((slide, idx) => (
-            <article key={idx} style={{ display: "grid", gridTemplateColumns: "100px 1fr auto", gap: "16px", padding: "12px", alignItems: "center" }}>
-              <img src={slide.data} alt={`Slide ${idx + 1}`} style={{ width: "100px", height: "70px", objectFit: "cover", borderRadius: "6px" }} />
-              <div>
-                <h3>Slide {idx + 1}</h3>
-                <p>Size: {formatMB(slide.bytes)} · Version: {slide.version}</p>
-              </div>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                <button type="button" disabled={idx === 0} onClick={() => moveSlide(idx, -1)} style={{ padding: "4px 8px", cursor: "pointer" }} title="Move Up">↑</button>
-                <button type="button" disabled={idx === slides.length - 1} onClick={() => moveSlide(idx, 1)} style={{ padding: "4px 8px", cursor: "pointer" }} title="Move Down">↓</button>
-                <button type="button" className="danger" onClick={() => removeSlide(idx)} style={{ background: "#ffefef", color: "#d9534f", border: "1px solid #d9534f", padding: "4px 8px", cursor: "pointer" }}>Remove</button>
-              </div>
-            </article>
-          ))}
-          {slides.length < 5 && (
-            <label className="btn btn-outline" style={{ display: "inline-flex", marginTop: "16px", cursor: "pointer", width: "fit-content" }}>
-              <Icon name="plus" /> Add Slide ({slides.length}/5)
-              <input 
-                type="file" 
-                accept="image/*" 
-                style={{ display: "none" }} 
-                onChange={(e) => {
-                  const input = e.target;
-                  handleAddSlide(input.files);
-                  input.value = "";
-                }} 
-              />
-            </label>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -576,7 +442,7 @@ function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }
       <main id="main-content" tabIndex={-1}>
         {/* Hero Section */}
         {/* Full-width Image Carousel replacing the single static hero */}
-        <HeroCarousel/>
+        <HeroCarousel artworks={published} />
 
         {/* About Strip */}
         <section id="about-section" className="about-strip">
@@ -2509,7 +2375,6 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
     ["schedule", "calendar", "Schedule"], 
     ["requests", "mail", "Client requests"], 
     ["artworks", "brush", "Gallery images"], 
-    ["carousel", "spark", "Carousel"], 
     ["history", "clock", "History"]
   ];
 
@@ -2743,7 +2608,7 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
         {tab === "requests" && <div className="admin-panel"><div className="panel-head"><div><p>AUTOMATIC INBOX</p><h2>Client requests</h2></div><span>{requests.length} total</span></div><div className="request-list">{requests.map((request) => <button key={request.id} onClick={() => setSelected(request)}><span className="request-avatar">{request.name.slice(0, 2).toUpperCase()}</span><div><strong>{request.name}</strong><small>{request.type} · {request.finish} · submitted {new Date(request.submittedAt).toLocaleDateString()}</small></div><span>{request.dueDate}</span><Icon name="arrow" /></button>)}{requests.length === 0 && <p className="empty-row">Completed commission forms will be added here automatically.</p>}</div></div>}
         
         {tab === "artworks" && <PublishManager />}
-        {tab === "carousel" && <CarouselManager />}
+        
         {tab === "history" && <HistoryManager onRestore={(request) => setRequests((current) => [request, ...current.filter((item) => item.id !== request.id)])} />}
       </section>
       {selected && <RequestDetail request={selected} close={() => setSelected(null)} />}
