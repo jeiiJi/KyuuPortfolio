@@ -1,4 +1,10 @@
-const GALLERY_COLS = ["title", "description", "image", "category", "scope", "service", "colorFinish", "publishedAt", "artStyle", "dateMade", "tools", "format"];
+// worker.js - Updated for Gallery Thumbs, Counts, Versions, and Carousel Slides[cite: 1]
+
+const GALLERY_COLS = [
+  "title", "description", "image", "thumb", "category", "scope", 
+  "service", "colorFinish", "publishedAt", "artStyle", "dateMade", 
+  "tools", "format", "imageVersion", "imageCount"
+];
 
 const clean = (value) => value ?? "";
 
@@ -13,21 +19,27 @@ const imageBytes = (src) => {
   const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
   return Math.floor((base64.length * 3) / 4) - padding;
 };
+
 const megabytes = (bytes) => (bytes / (1024 * 1024)).toFixed(1);
 
 const checkImages = (images) => {
-  if (!Array.isArray(images) || images.length === 0) return "Add at least one image.";
+  if (!Array.isArray(images) || images.length === 0) {
+    return "Error: Minimum 1 image required per gallery entry.";
+  }
+  if (images.length > 5) {
+    return "Error: Maximum 5 images allowed per gallery entry.";
+  }
   let total = 0;
   for (let i = 0; i < images.length; i++) {
     if (typeof images[i] !== "string" || !images[i]) return `Image ${i + 1} is not valid.`;
     const bytes = imageBytes(images[i]);
     if (bytes > MAX_IMAGE_BYTES) {
-      return `Image ${i + 1} is ${megabytes(bytes)} MB after processing, which is too large to store as one image. Try a smaller version.`;
+      return `Image ${i + 1} is ${megabytes(bytes)} MB after processing, which exceeds the single-image storage limit.`;
     }
     total += bytes;
   }
   if (total > MAX_ENTRY_BYTES) {
-    return `These images total ${megabytes(total)} MB, over the ${MAX_ENTRY_BYTES / (1024 * 1024)} MB limit for one entry.`;
+    return `These images total ${megabytes(total)} MB, exceeding the 10 MB limit for one entry.`;
   }
   return "";
 };
@@ -78,9 +90,6 @@ const timingSafeEqual = (a, b) => {
   return difference === 0;
 };
 
-const sha256 = async (text) => new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(text)));
-
-// stored format: pbkdf2$<iterations>$<salt>$<hash>  (created by scripts/make-admin-secrets.mjs)
 const verifyPassword = async (password, stored) => {
   const parts = String(stored || "").split("$");
   if (parts.length !== 4 || parts[0] !== "pbkdf2") return false;
@@ -168,7 +177,7 @@ const cleanCommission = (data) => {
   const references = Array.isArray(data.references) ? data.references.filter((item) => typeof item === "string").slice(0, 10) : [];
   const referencesJson = JSON.stringify(references);
   if (referencesJson.length > MAX_REFERENCES_BYTES) {
-    throw new HttpError(413, "Your reference images are too large to send together. Please remove a few or use smaller files.");
+    throw new HttpError(413, "Your reference images are too large to send together.");
   }
 
   const id = Number(data.id);
@@ -255,6 +264,37 @@ export default {
         return Response.json({ error: "Please log in as admin to do that." }, { status: 401, headers: corsHeaders });
       }
 
+      // --- Carousel API Endpoints (`carousel_slides`)[cite: 1] ---
+      if (path === "/api/carousel" && request.method === "GET") {
+        const { results } = await env.DB.prepare(
+          "SELECT position, data, alt, bytes, version FROM carousel_slides ORDER BY position ASC"
+        ).all();
+        return Response.json(results, { headers: corsHeaders });
+      }
+
+      if (path === "/api/carousel" && request.method === "PUT") {
+        const body = await readJson(request);
+        const slides = body.slides;
+        if (!Array.isArray(slides) || slides.length < 1 || slides.length > 5) {
+          return Response.json({ error: "Carousel must contain between 1 and 5 slides." }, { status: 400, headers: corsHeaders });
+        }
+
+        const statements = [env.DB.prepare("DELETE FROM carousel_slides")];
+        slides.forEach((slide, idx) => {
+          const data = slide.data || "";
+          const alt = slide.alt || "";
+          const bytes = imageBytes(data);
+          statements.push(
+            env.DB.prepare(
+              "INSERT INTO carousel_slides (position, data, alt, bytes, version) VALUES (?, ?, ?, ?, COALESCE((SELECT version + 1 FROM carousel_slides WHERE position = ?), 1))"
+            ).bind(idx, data, alt, bytes, idx)
+          );
+        });
+
+        await env.DB.batch(statements);
+        return Response.json({ success: true }, { headers: corsHeaders });
+      }
+
       if (path === "/api/commissions" && request.method === "GET") {
         const { results } = await env.DB.prepare("SELECT * FROM commissions ORDER BY submittedAt DESC").all();
         const formatted = results.map((r) => {
@@ -310,20 +350,18 @@ export default {
         return Response.json({ success: true }, { headers: corsHeaders });
       }
 
+      // --- Gallery API Endpoints (`gallery` & `gallery_images`)[cite: 1] ---
       const gallery = path.match(/^\/api\/gallery(?:\/(\d+)(\/images)?)?\/?$/);
       if (gallery) {
         const id = gallery[1] ? Number(gallery[1]) : null;
         const wantsImages = Boolean(gallery[2]);
 
+        // Optimized public gallery list reading thumb, imageVersion, and imageCount[cite: 1]
         if (!id && request.method === "GET") {
           const { results } = await env.DB.prepare(
-            "SELECT g.*, (SELECT COUNT(*) FROM gallery_images i WHERE i.galleryId = g.id) AS extraCount FROM gallery g ORDER BY g.id DESC"
+            "SELECT id, title, description, thumb, category, scope, service, colorFinish, publishedAt, artStyle, tools, format, imageVersion, imageCount FROM gallery ORDER BY id DESC"
           ).all();
-          const rows = results.map(({ extraImages, extraCount, ...row }) => ({
-            ...row,
-            imageCount: (row.image ? 1 : 0) + Number(extraCount || 0),
-          }));
-          return Response.json(rows, { headers: corsHeaders });
+          return Response.json(results, { headers: corsHeaders });
         }
 
         if (id && wantsImages && request.method === "GET") {
@@ -343,7 +381,19 @@ export default {
           if (problem) return Response.json({ error: problem }, { status: 413, headers: corsHeaders });
 
           const entryId = Number(item.id);
-          const values = GALLERY_COLS.map((col) => (col === "image" ? images[0] : clean(item[col])));
+          const coverImage = images[0];
+          const thumb = item.thumb || coverImage; // fallback to cover image if thumb is not provided
+          const imageCount = images.length;
+          const imageVersion = 1;
+
+          const values = GALLERY_COLS.map((col) => {
+            if (col === "image") return coverImage;
+            if (col === "thumb") return thumb;
+            if (col === "imageCount") return imageCount;
+            if (col === "imageVersion") return imageVersion;
+            return clean(item[col]);
+          });
+
           await env.DB.batch([
             env.DB.prepare(
               `INSERT INTO gallery (id, ${GALLERY_COLS.join(", ")}) VALUES (${["?", ...GALLERY_COLS.map(() => "?")].join(", ")})`
@@ -364,10 +414,17 @@ export default {
           const sent = GALLERY_COLS.filter((col) => col in item && !(replacing && col === "image"));
           const assignments = sent.map((col) => `${col} = ?`);
           const params = sent.map((col) => clean(item[col]));
+
           if (replacing) {
             assignments.push("image = ?");
             params.push(item.images[0]);
+            assignments.push("thumb = ?");
+            params.push(item.thumb || item.images[0]);
+            assignments.push("imageCount = ?");
+            params.push(item.images.length);
+            assignments.push("imageVersion = imageVersion + 1");
           }
+
           if (!assignments.length) {
             return Response.json({ error: "Nothing to update" }, { status: 400, headers: corsHeaders });
           }
