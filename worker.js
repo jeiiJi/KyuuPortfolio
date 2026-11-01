@@ -15,8 +15,11 @@ const imageBytes = (src) => {
 };
 const megabytes = (bytes) => (bytes / (1024 * 1024)).toFixed(1);
 
+const MAX_SET_IMAGES = 5;
+
 const checkImages = (images) => {
   if (!Array.isArray(images) || images.length === 0) return "Add at least one image.";
+  if (images.length > MAX_SET_IMAGES) return `Each set can have at most ${MAX_SET_IMAGES} photos.`;
   let total = 0;
   for (let i = 0; i < images.length; i++) {
     if (typeof images[i] !== "string" || !images[i]) return `Image ${i + 1} is not valid.`;
@@ -32,8 +35,23 @@ const checkImages = (images) => {
   return "";
 };
 
+const cleanSlides = (slides) => {
+  if (!Array.isArray(slides)) return { error: "Send a slides array." };
+  const images = slides.map((slide) => (slide && typeof slide.data === "string" ? slide.data : ""));
+  const problem = checkImages(images);
+  if (problem) return { error: problem };
+  return {
+    slides: images.map((data, position) => ({
+      position,
+      data,
+      alt: text(slides[position]?.alt, 200),
+      bytes: imageBytes(data),
+    })),
+  };
+};
+
 const extraImageInserts = (env, galleryId, images) => {
-  const extras = images.slice(1);
+  const extras = images.slice(1, MAX_SET_IMAGES);
   const statements = [];
   for (let start = 0; start < extras.length; start += ROWS_PER_INSERT) {
     const chunk = extras.slice(start, start + ROWS_PER_INSERT);
@@ -310,20 +328,50 @@ export default {
         return Response.json({ success: true }, { headers: corsHeaders });
       }
 
+      if (path === "/api/carousel" && request.method === "GET") {
+        const { results } = await env.DB.prepare(
+          "SELECT position, data, alt, version FROM carousel_slides ORDER BY position LIMIT 5"
+        ).all();
+        return Response.json(results || [], { headers: corsHeaders });
+      }
+
+      if (path === "/api/carousel" && request.method === "PUT") {
+        const body = await readJson(request);
+        const cleaned = cleanSlides(body.slides);
+        if (cleaned.error) return Response.json({ error: cleaned.error }, { status: 400, headers: corsHeaders });
+
+        await env.DB.batch([
+          env.DB.prepare("DELETE FROM carousel_slides"),
+          ...cleaned.slides.map((slide) =>
+            env.DB.prepare(
+              "INSERT INTO carousel_slides (position, data, alt, bytes, version) VALUES (?, ?, ?, ?, 1)"
+            ).bind(slide.position, slide.data, slide.alt, slide.bytes)
+          ),
+        ]);
+        return Response.json({ success: true, count: cleaned.slides.length }, { headers: corsHeaders });
+      }
+
       const gallery = path.match(/^\/api\/gallery(?:\/(\d+)(\/images)?)?\/?$/);
       if (gallery) {
         const id = gallery[1] ? Number(gallery[1]) : null;
         const wantsImages = Boolean(gallery[2]);
 
         if (!id && request.method === "GET") {
-          const { results } = await env.DB.prepare(
-            "SELECT g.*, (SELECT COUNT(*) FROM gallery_images i WHERE i.galleryId = g.id) AS extraCount FROM gallery g ORDER BY g.id DESC"
-          ).all();
-          const rows = results.map(({ extraImages, extraCount, ...row }) => ({
-            ...row,
-            imageCount: (row.image ? 1 : 0) + Number(extraCount || 0),
-          }));
-          return Response.json(rows, { headers: corsHeaders });
+          const { results } = await env.DB.prepare(`
+            SELECT
+              id, title, description,
+              COALESCE(NULLIF(thumb, ''), image) AS image,
+              category, scope, service, colorFinish, publishedAt,
+              artStyle, dateMade, tools, format,
+              COALESCE(
+                imageCount,
+                MIN(5, (CASE WHEN image IS NOT NULL AND image <> '' THEN 1 ELSE 0 END)
+                  + (SELECT COUNT(*) FROM gallery_images i WHERE i.galleryId = gallery.id))
+              ) AS imageCount
+            FROM gallery
+            ORDER BY id DESC
+          `).all();
+          return Response.json(results, { headers: corsHeaders });
         }
 
         if (id && wantsImages && request.method === "GET") {
@@ -344,10 +392,11 @@ export default {
 
           const entryId = Number(item.id);
           const values = GALLERY_COLS.map((col) => (col === "image" ? images[0] : clean(item[col])));
+          const thumb = typeof item.thumb === "string" && item.thumb ? item.thumb : images[0];
           await env.DB.batch([
             env.DB.prepare(
-              `INSERT INTO gallery (id, ${GALLERY_COLS.join(", ")}) VALUES (${["?", ...GALLERY_COLS.map(() => "?")].join(", ")})`
-            ).bind(entryId, ...values),
+              `INSERT INTO gallery (id, ${GALLERY_COLS.join(", ")}, thumb, imageCount, imageVersion) VALUES (${["?", ...GALLERY_COLS.map(() => "?"), "?", "?", "?"].join(", ")})`
+            ).bind(entryId, ...values, thumb, images.length, 1),
             ...extraImageInserts(env, entryId, images),
           ]);
           return Response.json({ success: true }, { headers: corsHeaders });
@@ -365,8 +414,8 @@ export default {
           const assignments = sent.map((col) => `${col} = ?`);
           const params = sent.map((col) => clean(item[col]));
           if (replacing) {
-            assignments.push("image = ?");
-            params.push(item.images[0]);
+            assignments.push("image = ?", "thumb = ?", "imageCount = ?", "imageVersion = imageVersion + 1");
+            params.push(item.images[0], typeof item.thumb === "string" && item.thumb ? item.thumb : item.images[0], item.images.length);
           }
           if (!assignments.length) {
             return Response.json({ error: "Nothing to update" }, { status: 400, headers: corsHeaders });

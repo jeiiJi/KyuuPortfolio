@@ -20,6 +20,7 @@ type PublishedItem = {
   imageCount?: number; tools?: string; format?: string;
   publishedAt: string;
 };
+type CarouselSlide = { position: number; data: string; alt: string; version?: number };
 type GallerySelection = { category: "Chibi" | "Semi-Realistic"; facet: "Scope" | "Services" | "Color Finish"; value: string };
 type AdminLibraryItem = {
   id: number; title: string; description: string; image?: string;
@@ -252,16 +253,19 @@ function ArtVisual({ art, label }: { art: string; label: string }) {
   return <div className={`art-visual art-${art}`}><img src={placeholder} alt={label} /></div>;
 }
 
-function HeroCarousel({ artworks }: { artworks: PublishedItem[] }) {
-  const carouselArtworks = useMemo(() => {
-    return artworks.slice(0, 5);
-  }, [artworks]);
+function HeroCarousel() {
+  const { items: slides } = useApiData<CarouselSlide>("/api/carousel");
+  const carouselSlides = useMemo(() => slides.slice(0, 5), [slides]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const touchStart = useRef<number | null>(null);
 
-  const count = carouselArtworks.length;
+  const count = carouselSlides.length;
+
+  useEffect(() => {
+    setCurrentIndex((prev) => (count === 0 ? 0 : prev % count));
+  }, [count]);
 
   useEffect(() => {
     if (!isPlaying || count <= 1) return;
@@ -293,19 +297,19 @@ function HeroCarousel({ artworks }: { artworks: PublishedItem[] }) {
           }
         }}
       >
-        {carouselArtworks.map((item, idx) => (
+        {carouselSlides.map((item, idx) => (
           <div
-            key={item.id}
+            key={`${item.position}-${item.version ?? 0}`}
             className={`hero-carousel-slide ${idx === currentIndex ? "active" : ""}`}
             aria-hidden={idx !== currentIndex}
           >
-            <img src={item.image} alt={item.title} />
+            <img src={item.data} alt={item.alt || `Featured artwork ${idx + 1}`} />
           </div>
         ))}
 
         {count > 1 && (
           <div className="hero-carousel-dots" role="group" aria-label="Slide Selection">
-            {carouselArtworks.map((_, idx) => (
+            {carouselSlides.map((_, idx) => (
               <button
                 key={idx}
                 type="button"
@@ -430,7 +434,7 @@ function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }
   return (
     <>
       <main id="main-content" tabIndex={-1}>
-        <HeroCarousel artworks={published} />
+        <HeroCarousel />
 
         <section id="about-section" className="about-strip">
           <div className="wrap intro-grid">
@@ -1488,6 +1492,7 @@ const matchesFilters = (item: AdminLibraryItem, artStyle: string, tags: ActiveTa
 const MAX_ENTRY_BYTES = 10 * 1024 * 1024;
 const ENTRY_LIMIT_LABEL = `${MAX_ENTRY_BYTES / (1024 * 1024)} MB`;
 const MAX_STORED_IMAGE_BYTES = 1_500_000;
+const MAX_SET_IMAGES = 5;
 
 const dataUrlBytes = (src: string) => {
   const comma = src.indexOf(",");
@@ -1534,6 +1539,14 @@ const encodeImage = (img: HTMLImageElement, maxSize: number, quality: number): s
   }
   return data;
 };
+
+const makeThumb = (dataUrl: string): Promise<string> =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(encodeImage(img, 640, 0.62) || dataUrl);
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
 
 const compressImage = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -1654,6 +1667,340 @@ function LibraryFilterBar({ artStyle, tags, onArtStyle, onToggleTag, onClear }: 
   );
 }
 
+function ImageSetBoard({
+  images,
+  previewIndex,
+  onPreview,
+  onAdd,
+  onReplace,
+  onRemove,
+  onMove,
+  onReorder,
+  processing,
+  loadingSet,
+  progress,
+  overBudget,
+  setSize,
+  coverLabel = "Cover",
+  addLabel,
+}: {
+  images: string[];
+  previewIndex: number;
+  onPreview: (index: number) => void;
+  onAdd: (files: File[]) => void;
+  onReplace: (file: File) => void;
+  onRemove: (index: number) => void;
+  onMove: (index: number, delta: number) => void;
+  onReorder: (from: number, to: number) => void;
+  processing: boolean;
+  loadingSet: boolean;
+  progress: string;
+  overBudget: boolean;
+  setSize: number;
+  coverLabel?: string;
+  addLabel: string;
+}) {
+  const dragFrom = useRef<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+  const atMax = images.length >= MAX_SET_IMAGES;
+  const atMin = images.length <= 1;
+  const previewSrc = images[previewIndex];
+  const busy = processing || loadingSet;
+
+  return (
+    <div className="publish-preview">
+      <img src={previewSrc || placeholder} alt="Upload preview" />
+
+      {images.length > 0 && (
+        <>
+          <ul className="set-thumbs" aria-label="Images in this set">
+            {images.map((src, index) => (
+              <li
+                key={`${index}-${src.slice(-24)}`}
+                draggable={!busy}
+                className={`${dragOver === index ? "drag-over" : ""} ${dragFrom.current === index ? "dragging" : ""}`}
+                onDragStart={(event) => {
+                  dragFrom.current = index;
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", String(index));
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                  setDragOver(index);
+                }}
+                onDragLeave={() => setDragOver((current) => (current === index ? null : current))}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const from = dragFrom.current;
+                  dragFrom.current = null;
+                  setDragOver(null);
+                  if (from == null || from === index) return;
+                  onReorder(from, index);
+                }}
+                onDragEnd={() => {
+                  dragFrom.current = null;
+                  setDragOver(null);
+                }}
+              >
+                <button
+                  type="button"
+                  className={`set-thumb ${index === previewIndex ? "on" : ""}`}
+                  aria-pressed={index === previewIndex}
+                  aria-label={`Show image ${index + 1}${index === 0 ? ` (${coverLabel})` : ""}`}
+                  onClick={() => onPreview(index)}
+                >
+                  <img src={src} alt="" />
+                  {index === 0 && <b>{coverLabel}</b>}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="set-actions">
+            <button type="button" aria-label="Move image earlier" disabled={busy || previewIndex === 0} onClick={() => onMove(previewIndex, -1)}>←</button>
+            <button type="button" aria-label="Move image later" disabled={busy || previewIndex >= images.length - 1} onClick={() => onMove(previewIndex, 1)}>→</button>
+            <label className={`set-file-btn ${busy ? "busy" : ""}`}>
+              Replace
+              <input
+                type="file"
+                accept="image/*"
+                disabled={busy || !images.length}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) onReplace(file);
+                }}
+              />
+            </label>
+            <button type="button" className="danger" disabled={busy || atMin} onClick={() => onRemove(previewIndex)}>
+              <Icon name="trash" size={14} /> Remove
+            </button>
+          </div>
+          <div className="set-meter" aria-hidden="true"><i className={overBudget ? "over" : ""} style={{ width: `${Math.min(100, Math.round((setSize / MAX_ENTRY_BYTES) * 100))}%` }} /></div>
+          <small className={`set-size ${overBudget ? "over" : ""}`}>
+            {images.length} of {MAX_SET_IMAGES} {images.length === 1 ? "photo" : "photos"} · {formatMB(setSize)} of {ENTRY_LIMIT_LABEL}
+          </small>
+        </>
+      )}
+
+      <label className={`publish-replace ${busy || atMax ? "busy" : ""}`}>
+        <Icon name="plus" /> {addLabel}
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          disabled={busy || atMax}
+          onChange={(e) => {
+            const input = e.target;
+            const picked = Array.from(input.files || []);
+            input.value = "";
+            onAdd(picked);
+          }}
+        />
+      </label>
+    </div>
+  );
+}
+
+function CarouselManager() {
+  const [slides, setSlides] = useState<string[]>([]);
+  const [alts, setAlts] = useState<string[]>([]);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [progress, setProgress] = useState("");
+  const [error, setError] = useState("");
+  const [dirty, setDirty] = useState(false);
+
+  const loadSlides = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await apiRequest<CarouselSlide[]>("/api/carousel");
+      if (!Array.isArray(data)) throw new Error("The server returned invalid carousel data.");
+      const next = data.slice(0, MAX_SET_IMAGES);
+      setSlides(next.map((slide) => slide.data).filter(Boolean));
+      setAlts(next.map((slide) => slide.alt || ""));
+      setPreviewIndex(0);
+      setDirty(false);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : String(loadError));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadSlides();
+  }, []);
+
+  const setOrder = (next: string[], nextAlts: string[], focus: number) => {
+    setSlides(next);
+    setAlts(nextAlts);
+    setPreviewIndex(Math.max(0, Math.min(focus, next.length - 1)));
+    setDirty(true);
+  };
+
+  const processFiles = async (files: File[], mode: "add" | "replace") => {
+    const picked = files.filter((file) => file.type.startsWith("image/"));
+    if (!picked.length) {
+      setError("Please choose image files.");
+      return;
+    }
+    setError("");
+    setProcessing(true);
+    try {
+      if (mode === "replace") {
+        setProgress("Processing replacement…");
+        const data = await compressImage(picked[0]);
+        const next = [...slides];
+        next[previewIndex] = data;
+        setOrder(next, alts, previewIndex);
+        return;
+      }
+      const room = MAX_SET_IMAGES - slides.length;
+      if (room <= 0) {
+        setError(`The featured carousel can have at most ${MAX_SET_IMAGES} photos.`);
+        return;
+      }
+      const added: string[] = [];
+      for (let index = 0; index < Math.min(picked.length, room); index++) {
+        setProgress(`Processing ${index + 1} of ${Math.min(picked.length, room)}…`);
+        added.push(await compressImage(picked[index]));
+      }
+      if (picked.length > room) {
+        setError(`Kept the first ${room} photo${room === 1 ? "" : "s"}. A carousel set can have at most ${MAX_SET_IMAGES}.`);
+      }
+      setOrder([...slides, ...added], [...alts, ...added.map(() => "")], slides.length);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : String(uploadError));
+    } finally {
+      setProgress("");
+      setProcessing(false);
+    }
+  };
+
+  const removeAt = (index: number) => {
+    if (slides.length <= 1) {
+      setError("Keep at least one photo in the carousel.");
+      return;
+    }
+    setOrder(slides.filter((_, position) => position !== index), alts.filter((_, position) => position !== index), index);
+  };
+
+  const move = (index: number, delta: number) => {
+    const target = index + delta;
+    if (target < 0 || target >= slides.length) return;
+    const next = [...slides];
+    const nextAlts = [...alts];
+    [next[index], next[target]] = [next[target], next[index]];
+    [nextAlts[index], nextAlts[target]] = [nextAlts[target], nextAlts[index]];
+    setOrder(next, nextAlts, target);
+  };
+
+  const reorder = (from: number, to: number) => {
+    const next = [...slides];
+    const nextAlts = [...alts];
+    const [moved] = next.splice(from, 1);
+    const [movedAlt] = nextAlts.splice(from, 1);
+    next.splice(to, 0, moved);
+    nextAlts.splice(to, 0, movedAlt);
+    setOrder(next, nextAlts, to);
+  };
+
+  const setSize = slides.reduce((total, src) => total + dataUrlBytes(src), 0);
+  const overBudget = setSize > MAX_ENTRY_BYTES;
+
+  const save = async () => {
+    if (slides.length < 1 || slides.length > MAX_SET_IMAGES) {
+      setError(`The featured carousel needs between 1 and ${MAX_SET_IMAGES} photos.`);
+      return;
+    }
+    if (overBudget) {
+      setError(`These images total ${formatMB(setSize)}, over the ${ENTRY_LIMIT_LABEL} limit.`);
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await apiRequest<{ success: boolean }>("/api/carousel", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slides: slides.map((data, index) => ({ data, alt: alts[index] || `Featured artwork ${index + 1}` })),
+        }),
+      });
+      setDirty(false);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : String(saveError));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addLabel = processing
+    ? progress || "Processing…"
+    : loading
+      ? "Loading slides…"
+      : slides.length >= MAX_SET_IMAGES
+        ? "Maximum of 5 photos"
+        : slides.length ? "Add carousel photo" : "Choose carousel photos";
+
+  return (
+    <div className="carousel-manager">
+      <div className="panel-head">
+        <div>
+          <p>FEATURED HERO</p>
+          <h2>Carousel images</h2>
+        </div>
+        <button type="button" className="admin-plus" disabled={saving || processing || loading || !dirty} onClick={() => void save()}>
+          {saving ? "Saving…" : "Save carousel"}
+        </button>
+      </div>
+      <p className="carousel-manager-copy">These photos appear on the home hero. They are managed separately from the gallery feed (1 to 5 photos). Drag a thumbnail to reorder.</p>
+      {loading && <p className="empty-row">Loading carousel from D1…</p>}
+      {error && <p className="empty-row" role="alert">{error}</p>}
+      {!loading && (
+        <>
+          <ImageSetBoard
+            images={slides}
+            previewIndex={previewIndex}
+            onPreview={setPreviewIndex}
+            onAdd={(files) => void processFiles(files, "add")}
+            onReplace={(file) => void processFiles([file], "replace")}
+            onRemove={removeAt}
+            onMove={move}
+            onReorder={reorder}
+            processing={processing}
+            loadingSet={loading}
+            progress={progress}
+            overBudget={overBudget}
+            setSize={setSize}
+            coverLabel="First"
+            addLabel={addLabel}
+          />
+          {slides.length > 0 && (
+            <label className="carousel-alt-field">
+              Alt text for this slide
+              <input
+                value={alts[previewIndex] || ""}
+                onChange={(event) => {
+                  const next = [...alts];
+                  next[previewIndex] = event.target.value;
+                  setAlts(next);
+                  setDirty(true);
+                }}
+                placeholder={`Featured artwork ${previewIndex + 1}`}
+              />
+            </label>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function PublishManager() {
   const emptyDraft = () => ({
     title: "",
@@ -1719,32 +2066,39 @@ function PublishManager() {
       setFormError("Please choose image files.");
       return;
     }
+    const room = MAX_SET_IMAGES - draft.images.length;
+    if (room <= 0) {
+      setFormError(`Each artwork set can have at most ${MAX_SET_IMAGES} photos.`);
+      return;
+    }
     setFormError("");
     setProcessing(true);
     let running = draft.images.reduce((total, src) => total + dataUrlBytes(src), 0);
     const added: string[] = [];
     const problems: string[] = [];
     let leftOut = 0;
+    const usable = files.slice(0, room);
     try {
-      for (let index = 0; index < files.length; index++) {
-        setProgress(`Processing ${index + 1} of ${files.length}…`);
+      for (let index = 0; index < usable.length; index++) {
+        setProgress(`Processing ${index + 1} of ${usable.length}…`);
         let data: string;
         try {
-          data = await compressImage(files[index]);
+          data = await compressImage(usable[index]);
         } catch (uploadError) {
           problems.push(uploadError instanceof Error ? uploadError.message : String(uploadError));
           continue;
         }
         const bytes = dataUrlBytes(data);
         if (running + bytes > MAX_ENTRY_BYTES) {
-          leftOut = files.length - index;
+          leftOut = usable.length - index;
           break;
         }
         running += bytes;
         added.push(data);
       }
+      if (files.length > room) problems.push(`Each set can have at most ${MAX_SET_IMAGES} photos. Extra files were skipped.`);
       if (added.length) setDraft((prev) => ({ ...prev, images: [...prev.images, ...added] }));
-      if (leftOut) problems.push(`Added ${added.length} of ${files.length} images. The other ${leftOut} would go over the ${ENTRY_LIMIT_LABEL} limit for one entry.`);
+      if (leftOut) problems.push(`Added ${added.length} of ${usable.length} images. The other ${leftOut} would go over the ${ENTRY_LIMIT_LABEL} limit for one entry.`);
       if (problems.length) setFormError(problems.join(" "));
     } finally {
       setProgress("");
@@ -1752,7 +2106,34 @@ function PublishManager() {
     }
   };
 
+  const replaceImage = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setFormError("Please choose an image file.");
+      return;
+    }
+    setFormError("");
+    setProcessing(true);
+    setProgress("Processing replacement…");
+    try {
+      const data = await compressImage(file);
+      setDraft((prev) => {
+        const next = [...prev.images];
+        next[previewIndex] = data;
+        return { ...prev, images: next };
+      });
+    } catch (uploadError) {
+      setFormError(uploadError instanceof Error ? uploadError.message : String(uploadError));
+    } finally {
+      setProgress("");
+      setProcessing(false);
+    }
+  };
+
   const removeImage = (index: number) => {
+    if (draft.images.length <= 1) {
+      setFormError("Keep at least one photo in the set.");
+      return;
+    }
     setDraft((prev) => ({ ...prev, images: prev.images.filter((_, position) => position !== index) }));
     setPreviewIndex((current) => Math.max(0, Math.min(current, draft.images.length - 2)));
   };
@@ -1766,6 +2147,16 @@ function PublishManager() {
       return { ...prev, images: next };
     });
     setPreviewIndex(target);
+  };
+
+  const reorderImages = (from: number, to: number) => {
+    setDraft((prev) => {
+      const next = [...prev.images];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return { ...prev, images: next };
+    });
+    setPreviewIndex(to);
   };
 
   const changeDraftStyle = (style: string) => setDraft((prev) => ({
@@ -1808,7 +2199,7 @@ function PublishManager() {
       subCategory: itemService(item) || (style === "Chibi" ? "Sticker set" : ""),
       scope: item.scope || SCOPES_BY_STYLE[style][0],
       colorFinish: item.colorFinish || (style === "Semi-Realistic" ? "Rendered" : ""),
-      images: item.image && item.image !== placeholder ? [item.image] : [],
+      images: [],
       tools: item.tools || "", format: item.format || "",
       publishedDate: toInputDate(item.publishedAt)
     });
@@ -1818,25 +2209,23 @@ function PublishManager() {
     setOpen(true);
 
     const token = ++editRequest.current;
-    setLockSave(false);
-    setLoadingSet(false);
-    if ((item.imageCount ?? 1) > 1) {
-      setLoadingSet(true);
-      apiRequest<{ images: string[] }>(`/api/gallery/${item.id}/images`)
-        .then((data) => {
-          if (token !== editRequest.current) return;
-          if (!Array.isArray(data.images) || !data.images.length) throw new Error("the server returned no images");
-          setDraft((prev) => ({ ...prev, images: data.images.filter((image) => image && image !== placeholder) }));
-        })
-        .catch((loadError) => {
-          if (token !== editRequest.current) return;
-          setLockSave(true);
-          setFormError(`Couldn’t load this set’s images (${loadError instanceof Error ? loadError.message : String(loadError)}). Close the editor and try again so nothing gets lost.`);
-        })
-        .finally(() => {
-          if (token === editRequest.current) setLoadingSet(false);
-        });
-    }
+    setLockSave(true);
+    setLoadingSet(true);
+    apiRequest<{ images: string[] }>(`/api/gallery/${item.id}/images`)
+      .then((data) => {
+        if (token !== editRequest.current) return;
+        if (!Array.isArray(data.images) || !data.images.length) throw new Error("the server returned no images");
+        setDraft((prev) => ({ ...prev, images: data.images.filter((image) => image && image !== placeholder).slice(0, MAX_SET_IMAGES) }));
+        setLockSave(false);
+      })
+      .catch((loadError) => {
+        if (token !== editRequest.current) return;
+        setLockSave(true);
+        setFormError(`Couldn’t load this set’s images (${loadError instanceof Error ? loadError.message : String(loadError)}). Close the editor and try again so nothing gets lost.`);
+      })
+      .finally(() => {
+        if (token === editRequest.current) setLoadingSet(false);
+      });
   };
 
   const confirmDelete = async () => {
@@ -1855,14 +2244,17 @@ function PublishManager() {
 
   const setSize = draft.images.reduce((total, src) => total + dataUrlBytes(src), 0);
   const overBudget = setSize > MAX_ENTRY_BYTES;
-  const usedPercent = Math.min(100, Math.round((setSize / MAX_ENTRY_BYTES) * 100));
 
   const publish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loadingSet || lockSave) return;
     setFormError("");
 
-    if (!draft.images.length) { setFormError("Add at least one image to publish."); return; }
+    if (!draft.images.length) { setFormError("Add at least one photo to publish."); return; }
+    if (draft.images.length > MAX_SET_IMAGES) {
+      setFormError(`Each artwork set can have at most ${MAX_SET_IMAGES} photos.`);
+      return;
+    }
     if (overBudget) {
       setFormError(`These images total ${formatMB(setSize)}, over the ${ENTRY_LIMIT_LABEL} limit for one entry. Remove a few and try again.`);
       return;
@@ -1885,10 +2277,11 @@ function PublishManager() {
     };
 
     try {
+      const thumb = await makeThumb(draft.images[0]);
       await apiRequest<{ success: boolean }>(editingId !== null ? `/api/gallery/${editingId}` : "/api/gallery", {
         method: editingId !== null ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(item)
+        body: JSON.stringify({ ...item, thumb, imageCount: draft.images.length })
       });
       await loadItems();
     } catch (publishError) {
@@ -1901,15 +2294,17 @@ function PublishManager() {
     closeModal();
   };
 
-  const previewSrc = draft.images[previewIndex];
   const replaceLabel = processing
     ? progress || "Processing…"
     : loadingSet
       ? "Loading images…"
-      : draft.images.length ? "Add more images" : "Choose images";
+      : draft.images.length >= MAX_SET_IMAGES
+        ? "Maximum of 5 photos"
+        : draft.images.length ? "Add more photos" : "Choose photos";
 
   return (
     <div className="admin-panel media-manager">
+      <CarouselManager />
       <div className="panel-head">
         <div>
           <p>PUBLISHED LIBRARY</p>
@@ -1969,49 +2364,22 @@ function PublishManager() {
           <form className="publish-modal" onSubmit={publish} onMouseDown={(e) => e.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="Close editor" onClick={closeModal}><Icon name="close" /></button>
 
-            <div className="publish-preview">
-              <img src={previewSrc || placeholder} alt="Upload preview" />
-
-              {draft.images.length > 0 && (
-                <>
-                  <ul className="set-thumbs" aria-label="Images in this set">
-                    {draft.images.map((src, index) => (
-                      <li key={`${index}-${src.length}`}>
-                        <button type="button" className={`set-thumb ${index === previewIndex ? "on" : ""}`} aria-pressed={index === previewIndex} aria-label={`Show image ${index + 1}${index === 0 ? " (cover)" : ""}`} onClick={() => setPreviewIndex(index)}>
-                          <img src={src} alt="" />
-                          {index === 0 && <b>Cover</b>}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="set-actions">
-                    <button type="button" aria-label="Move image earlier" disabled={previewIndex === 0} onClick={() => moveImage(previewIndex, -1)}>←</button>
-                    <button type="button" aria-label="Move image later" disabled={previewIndex >= draft.images.length - 1} onClick={() => moveImage(previewIndex, 1)}>→</button>
-                    <button type="button" className="danger" onClick={() => removeImage(previewIndex)}><Icon name="trash" size={14} /> Remove</button>
-                  </div>
-                  <div className="set-meter" aria-hidden="true"><i className={overBudget ? "over" : ""} style={{ width: `${usedPercent}%` }} /></div>
-                  <small className={`set-size ${overBudget ? "over" : ""}`}>
-                    {draft.images.length} {draft.images.length === 1 ? "image" : "images"} · {formatMB(setSize)} of {ENTRY_LIMIT_LABEL}
-                  </small>
-                </>
-              )}
-
-              <label className={`publish-replace ${processing || loadingSet ? "busy" : ""}`}>
-                <Icon name="plus" /> {replaceLabel}
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  disabled={processing || loadingSet}
-                  onChange={(e) => {
-                    const input = e.target;
-                    const picked = Array.from(input.files || []);
-                    input.value = "";
-                    void addImages(picked);
-                  }}
-                />
-              </label>
-            </div>
+            <ImageSetBoard
+              images={draft.images}
+              previewIndex={previewIndex}
+              onPreview={setPreviewIndex}
+              onAdd={(files) => void addImages(files)}
+              onReplace={(file) => void replaceImage(file)}
+              onRemove={removeImage}
+              onMove={moveImage}
+              onReorder={reorderImages}
+              processing={processing}
+              loadingSet={loadingSet}
+              progress={progress}
+              overBudget={overBudget}
+              setSize={setSize}
+              addLabel={replaceLabel}
+            />
 
             <div className="publish-fields">
               <p className="kicker">{editingId !== null ? "Editing" : "New"} gallery artwork</p>
