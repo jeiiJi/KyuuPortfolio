@@ -1177,7 +1177,7 @@ footer a { overflow-wrap: anywhere; }
 .hero-control-btn:hover { color: var(--orange-deep, #b8430c); transform: scale(1.1); }
 .hero-control-btn:focus-visible { outline: 2px solid var(--orange-deep); outline-offset: 3px; border-radius: 4px; }
 
-#about-section.about-strip { padding-bottom: 50px; }
+#about-section.about-strip { padding-bottom: 50px; margin-top: 50px;}
 #home-gallery-section.section { padding-top: 40px; }
 
 .carousel-manager { margin-bottom: 36px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
