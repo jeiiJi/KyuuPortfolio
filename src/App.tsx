@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import logo from "./assets/inkdrop-logo.png";
 import brandName from "./assets/brand-name.png";
 import placeholder from "./assets/placeholder.svg";
-import heroArtwork from "./assets/Untitled200_20261016201217.png";
 import chibiReference from "./assets/Untitled201_20261021205439.png";
 const API_URL = "";
 
@@ -11,6 +10,8 @@ type CommissionRequest = {
   id: number; name: string; email: string; social: string; type: string; finish: string;
   characters: number; background: string; commercial: boolean; priority: boolean;
   dueDate: string; notes: string; references: string[]; totalPhp: number;
+  // Currency the client used on the form, the total in that currency, and the PHP-per-unit
+  currency?: CurrencyCode; totalAmount?: number; exchangeRate?: number;
   submittedAt: string; stage: number;
   historyType?: "Finished" | "Cancelled"; submittedToHistoryAt?: string;
 };
@@ -139,10 +140,131 @@ function useApiData<T>(path: string) {
 
   return { items, error, loading };
 }
-const money = (php: number) => `₱${php.toLocaleString()}`;
+// ---------------------------------------------------------------------------
+// Multi-currency
+// All prices in the app are authored in PHP. Other currencies are display
+// conversions using the fixed rates below (PHP per 1 unit of the currency).
+// Update these numbers whenever you want to re-quote; records that were already
+// submitted keep the rate they were saved with.
+// ---------------------------------------------------------------------------
+type CurrencyCode = "PHP" | "USD" | "EUR";
+
+const CURRENCIES: Record<CurrencyCode, { symbol: string; label: string; phpPerUnit: number; decimals: number }> = {
+  PHP: { symbol: "₱", label: "Philippine peso", phpPerUnit: 1, decimals: 0 },
+  USD: { symbol: "$", label: "US dollar", phpPerUnit: 63.70, decimals: 2 },
+  EUR: { symbol: "€", label: "Euro", phpPerUnit: 71.28, decimals: 2 },
+};
+const CURRENCY_CODES = Object.keys(CURRENCIES) as CurrencyCode[];
+const CURRENCY_STORAGE_KEY = "inkyuu:currency";
+
+const isCurrencyCode = (value: unknown): value is CurrencyCode =>
+  typeof value === "string" && Object.prototype.hasOwnProperty.call(CURRENCIES, value);
+
+const readStoredCurrency = (): CurrencyCode => {
+  try {
+    const stored = window.localStorage.getItem(CURRENCY_STORAGE_KEY);
+    return isCurrencyCode(stored) ? stored : "PHP";
+  } catch {
+    return "PHP"; // storage blocked (private mode, etc.)
+  }
+};
+
+const roundTo = (value: number, decimals: number) => {
+  const factor = 10 ** decimals;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+};
+
+// PHP -> currency, using the given rate (defaults to the current rate).
+const convertFromPhp = (php: number, code: CurrencyCode, rate: number = CURRENCIES[code].phpPerUnit) =>
+  code === "PHP" ? Math.round(php) : roundTo(php / rate, CURRENCIES[code].decimals);
+
+const formatAmount = (amount: number, code: CurrencyCode) => {
+  const { symbol, decimals } = CURRENCIES[code];
+  return `${symbol}${amount.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+};
+
+type CurrencyContextValue = {
+  currency: CurrencyCode;
+  setCurrency: (code: CurrencyCode) => void;
+  rate: number;
+  convertFromPhp: (php: number) => number;
+  money: (php: number) => string;
+};
+
+const CurrencyContext = createContext<CurrencyContextValue | null>(null);
+
+function CurrencyProvider({ children }: { children: React.ReactNode }) {
+  const [currency, setCurrencyState] = useState<CurrencyCode>(readStoredCurrency);
+
+  const setCurrency = (code: CurrencyCode) => {
+    setCurrencyState(code);
+    try {
+      window.localStorage.setItem(CURRENCY_STORAGE_KEY, code);
+    } catch {
+      /* the choice still applies for this visit */
+    }
+  };
+
+  // Keep other open tabs in step with the choice.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === CURRENCY_STORAGE_KEY) setCurrencyState(readStoredCurrency());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const value = useMemo<CurrencyContextValue>(() => {
+    const rate = CURRENCIES[currency].phpPerUnit;
+    return {
+      currency,
+      setCurrency,
+      rate,
+      convertFromPhp: (php) => convertFromPhp(php, currency, rate),
+      money: (php) => formatAmount(convertFromPhp(php, currency, rate), currency),
+    };
+  }, [currency]);
+
+  return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
+}
+
+const useCurrency = (): CurrencyContextValue => {
+  const context = useContext(CurrencyContext);
+  if (!context) throw new Error("useCurrency must be used inside <CurrencyProvider>.");
+  return context;
+};
+
+// Admin side: read the price exactly as the client saw it when they submitted.
+// Records saved before multi-currency existed have no currency fields and are PHP.
+const getRequestPrice = (request: CommissionRequest) => {
+  const currency: CurrencyCode = isCurrencyCode(request.currency) ? request.currency : "PHP";
+  const amount = request.totalAmount != null && Number.isFinite(Number(request.totalAmount))
+    ? Number(request.totalAmount)
+    : request.totalPhp;
+  const rate = Number(request.exchangeRate) > 0 ? Number(request.exchangeRate) : 1;
+  return {
+    currency,
+    rate,
+    original: formatAmount(amount, currency),
+    php: formatAmount(request.totalPhp, "PHP"),
+    isForeign: currency !== "PHP",
+  };
+};
+
+// "$25.00 USD ≈ ₱1,450 PHP" (just "₱1,450 PHP" for peso clients)
+function RequestPrice({ request }: { request: CommissionRequest }) {
+  const price = getRequestPrice(request);
+  return (
+    <span className="price-pair">
+      <strong>{price.original} {price.currency}</strong>
+      {price.isForeign && <span className="price-php"> ≈ {price.php} PHP</span>}
+    </span>
+  );
+}
 
 function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
   const [open, setOpen] = useState(false);
+  const { currency, setCurrency } = useCurrency();
 
   useEffect(() => {
     if (open) {
@@ -224,6 +346,22 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
           </button>
 
           <div className="drawer-footer-panel">
+            <div className="drawer-currency">
+              <span className="drawer-social-label">Currency |</span>
+              <label className="currency-picker">
+                <span className="sr-only">Currency</span>
+                <select
+                  className="currency-select"
+                  value={currency}
+                  onChange={(event) => setCurrency(event.target.value as CurrencyCode)}
+                  aria-label="Choose currency"
+                >
+                  {CURRENCY_CODES.map((code) => (
+                    <option key={code} value={code}>{CURRENCIES[code].symbol} {code}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <div className="drawer-footer-socials">
               <span className="drawer-social-label">Contacts |</span>
               <a href="mailto:kyuukyuuji@gmail.com" aria-label="Email">
@@ -240,6 +378,19 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
         </nav>
 
         <div className="nav-actions">
+          <label className="currency-picker">
+            <span className="sr-only">Currency</span>
+            <select
+              className="currency-select"
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value as CurrencyCode)}
+              aria-label="Choose currency"
+            >
+              {CURRENCY_CODES.map((code) => (
+                <option key={code} value={code}>{CURRENCIES[code].symbol} {code}</option>
+              ))}
+            </select>
+          </label>
           <Btn onClick={() => { go("commission"); setOpen(false); }}>
             Commission Now
           </Btn>
@@ -641,6 +792,7 @@ const AdminField = ({ label, hint, children }: { label: React.ReactNode; hint?: 
 const Field = ({ label, hint, children }: { label: React.ReactNode; hint?: string; children: React.ReactNode }) => <label className="field"><span>{label}</span>{hint && <small>{hint}</small>}{children}</label>;
 
 function Commission({ go }: { go: (page: Page) => void }) {
+  const { currency, rate, money, convertFromPhp: toSelected } = useCurrency();
   const [step, setStep] = useState(1);
 
   const [form, setForm] = useState({
@@ -811,6 +963,12 @@ function Commission({ go }: { go: (page: Page) => void }) {
     </>
   );
 
+  const currencyNote = currency !== "PHP" ? (
+    <p className="fine-print currency-note">
+      Prices are converted from PHP at {CURRENCIES[currency].symbol}1 = ₱{rate}. Your total is saved as {formatAmount(toSelected(total), currency)} {currency} (₱{total.toLocaleString()} PHP).
+    </p>
+  ) : null;
+
   const uploadReferences = (files: FileList | null) => {
     if (!files) return;
     Array.from(files).slice(0, 10 - references.length).forEach((file) => {
@@ -873,6 +1031,10 @@ function Commission({ go }: { go: (page: Page) => void }) {
       dueDate: form.dueDate,
       notes: `Usage: ${form.usageType}\nService: ${form.chibiService || "N/A"}${form.chibiService === "Alternate outfits/expressions" ? ` (${form.alternativesCount} alternatives)` : ""}${form.ychTheme ? `\nYCH Theme: ${form.ychTheme}` : ""}\nBg Details: ${form.backgroundDetails}\nNotes: ${form.additionalDetails}\nConfirmed all terms: Yes`,
       references,
+      // Lock in exactly what the client saw so the record never shifts later.
+      currency,
+      totalAmount: toSelected(total),
+      exchangeRate: rate,
       totalPhp: total,
       submittedAt: new Date().toISOString(),
       stage: 0,
@@ -1161,10 +1323,11 @@ function Commission({ go }: { go: (page: Page) => void }) {
               </div>
               
               <div className="checkout-summary estimate-card">
-                <div className="estimate-top"><span>Order Summary · PHP</span><Icon name="spark" /></div>
+                <div className="estimate-top"><span>Order Summary · {currency}</span><Icon name="spark" /></div>
                 <h2>{money(total)}</h2>
                 <div className="estimate-lines">{estimateBreakdown}</div>
                 <div className="estimate-total"><span>Estimated total</span><strong>{money(total)}</strong></div>
+              {currencyNote}
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "20px" }}>
@@ -1178,10 +1341,11 @@ function Commission({ go }: { go: (page: Page) => void }) {
 
           {step > 2 && step < 5 && (
             <aside className="estimate-card estimate-card-mobile">
-              <div className="estimate-top"><span>Live Estimate · PHP</span><Icon name="spark" /></div>
+              <div className="estimate-top"><span>Live Estimate · {currency}</span><Icon name="spark" /></div>
               <h2>{money(total)}</h2>
               <div className="estimate-lines">{estimateBreakdown}</div>
               <div className="estimate-total"><span>Estimated total</span><strong>{money(total)}</strong></div>
+              {currencyNote}
               <p className="fine-print">GCASH is the accepted payment platform. Final confirmation is sent after admin review.</p>
             </aside>
           )}
@@ -1212,10 +1376,11 @@ function Commission({ go }: { go: (page: Page) => void }) {
         </div>
 
         {step > 2 && step < 5 && <aside className="estimate-card estimate-card-desktop">
-          <div className="estimate-top"><span>Live Estimate · PHP</span><Icon name="spark" /></div>
+          <div className="estimate-top"><span>Live Estimate · {currency}</span><Icon name="spark" /></div>
           <h2>{money(total)}</h2>
           <div className="estimate-lines">{estimateBreakdown}</div>
           <div className="estimate-total"><span>Estimated total</span><strong>{money(total)}</strong></div>
+              {currencyNote}
           <p className="fine-print">GCASH is the accepted payment platform. Final confirmation is sent after admin review.</p>
         </aside>}
       </div>
@@ -2542,7 +2707,7 @@ function HistoryManager({ onRestore }: { onRestore: (request: CommissionRequest)
               <div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "4px" }}>
                   <span style={{ color: isFinished ? "var(--orange)" : "#d9534f", fontWeight: "bold" }}>{item.historyType || "Finished"}</span>
-                  <span>· {item.type} · {money(item.totalPhp)}</span>
+                  <span>· {item.type} · <RequestPrice request={item} /></span>
                 </div>
                 <h3>{item.name}</h3>
                 <p>Recorded on: {new Date(item.submittedToHistoryAt || item.submittedAt).toLocaleString()}</p>
@@ -2618,7 +2783,10 @@ function RequestDetail({ request, close }: { request: CommissionRequest; close: 
             ["Commercial use", request.commercial ? "Yes" : "No"], 
             ["Priority", request.priority ? "Yes" : "No"], 
             ["Due date", request.dueDate], 
-            ["Estimate", `₱${request.totalPhp.toLocaleString()}`], 
+            ["Estimate", (() => { const price = getRequestPrice(request); return price.isForeign ? `${price.original} ${price.currency} ≈ ${price.php} PHP` : `${price.php} PHP`; })()],
+            ...(getRequestPrice(request).isForeign
+              ? [["Rate at submission", `1 ${getRequestPrice(request).currency} = ₱${getRequestPrice(request).rate} PHP (saved with this request)`]]
+              : []),
             ["Project notes", request.notes]
           ].map(([label, answer]) => (
             <div key={label}><span>{label}</span><p>{answer}</p></div>
@@ -2949,7 +3117,7 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
         )}
 
         {tab === "schedule" && <div className="admin-panel schedule-panel"><div className="panel-head"><div><p>CLIENT DUE DATES</p><h2>Schedule</h2></div><span>{upcoming.length} planned</span></div><div className="schedule-list">{upcoming.map((request) => <button key={request.id} onClick={() => setSelected(request)}><time><strong>{new Date(`${request.dueDate}T00:00`).toLocaleDateString("en-US", { day: "2-digit" })}</strong><span>{new Date(`${request.dueDate}T00:00`).toLocaleDateString("en-US", { month: "short" })}</span></time><div><h3>{request.name}</h3><p>{request.type} · {request.finish} · {request.characters} character{request.characters > 1 ? "s" : ""}</p></div><span className="admin-status">{stages[request.stage]}</span><Icon name="arrow" /></button>)}{upcoming.length === 0 && <p className="empty-row">Requested client due dates will appear automatically.</p>}</div></div>}
-        {tab === "requests" && <div className="admin-panel"><div className="panel-head"><div><p>AUTOMATIC INBOX</p><h2>Client requests</h2></div><span>{requests.length} total</span></div><div className="request-list">{requests.map((request) => <button key={request.id} onClick={() => setSelected(request)}><span className="request-avatar">{request.name.slice(0, 2).toUpperCase()}</span><div><strong>{request.name}</strong><small>{request.type} · {request.finish} · submitted {new Date(request.submittedAt).toLocaleDateString()}</small></div><span>{request.dueDate}</span><Icon name="arrow" /></button>)}{requests.length === 0 && <p className="empty-row">Completed commission forms will be added here automatically.</p>}</div></div>}
+        {tab === "requests" && <div className="admin-panel"><div className="panel-head"><div><p>AUTOMATIC INBOX</p><h2>Client requests</h2></div><span>{requests.length} total</span></div><div className="request-list">{requests.map((request) => <button key={request.id} onClick={() => setSelected(request)}><span className="request-avatar">{request.name.slice(0, 2).toUpperCase()}</span><div><strong>{request.name}</strong><small>{request.type} · {request.finish} · submitted {new Date(request.submittedAt).toLocaleDateString()}</small><small className="request-price"><RequestPrice request={request} /></small></div><span>{request.dueDate}</span><Icon name="arrow" /></button>)}{requests.length === 0 && <p className="empty-row">Completed commission forms will be added here automatically.</p>}</div></div>}
         
         {tab === "artworks" && <PublishManager />}
         
@@ -3174,10 +3342,12 @@ export default function App() {
   }
 
   return (
-    <div className="site-shell app-theme">
-      <Navbar page={page} go={go} />
-      {content[page]}
-      <Footer go={go} />
-    </div>
+    <CurrencyProvider>
+      <div className="site-shell app-theme">
+        <Navbar page={page} go={go} />
+        {content[page]}
+        <Footer go={go} />
+      </div>
+    </CurrencyProvider>
   );
 }

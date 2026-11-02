@@ -175,6 +175,33 @@ const number = (value, min, max, fallback) => {
   return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
 };
 
+const SUPPORTED_CURRENCIES = ["PHP", "USD", "EUR"];
+
+// Adds the currency columns to older databases the first time the worker runs.
+// (migrations/0001_add_currency_to_commissions.sql does the same thing for wrangler.)
+let currencyColumnsReady = false;
+const ensureCurrencyColumns = async (env) => {
+  if (currencyColumnsReady) return;
+  const { results } = await env.DB.prepare("PRAGMA table_info(commissions)").all();
+  const existing = new Set((results || []).map((column) => column.name));
+  const statements = [];
+  if (!existing.has("currency")) {
+    statements.push(env.DB.prepare("ALTER TABLE commissions ADD COLUMN currency TEXT NOT NULL DEFAULT 'PHP'"));
+  }
+  if (!existing.has("totalAmount")) {
+    statements.push(env.DB.prepare("ALTER TABLE commissions ADD COLUMN totalAmount REAL"));
+  }
+  if (!existing.has("exchangeRate")) {
+    statements.push(env.DB.prepare("ALTER TABLE commissions ADD COLUMN exchangeRate REAL NOT NULL DEFAULT 1"));
+  }
+  if (statements.length) {
+    // Rows saved before this change were all in PHP, so their original total is the PHP total.
+    statements.push(env.DB.prepare("UPDATE commissions SET totalAmount = totalPhp WHERE totalAmount IS NULL"));
+    await env.DB.batch(statements);
+  }
+  currencyColumnsReady = true;
+};
+
 const cleanCommission = (data) => {
   const name = text(data.name, 120).trim();
   const email = text(data.email, 200).trim();
@@ -188,6 +215,18 @@ const cleanCommission = (data) => {
   if (referencesJson.length > MAX_REFERENCES_BYTES) {
     throw new HttpError(413, "Your reference images are too large to send together. Please remove a few or use smaller files.");
   }
+
+  // The currency the client chose, the total they were shown in it, and the rate used.
+  // Stored as sent so historical records never shift when rates change later.
+  const currency = SUPPORTED_CURRENCIES.includes(data.currency) ? data.currency : "PHP";
+  const totalPhp = Math.round(number(data.totalPhp, 0, 10_000_000, 0));
+  const exchangeRate = currency === "PHP" ? 1 : number(data.exchangeRate, 0, 100000, 0);
+  if (currency !== "PHP" && !(exchangeRate > 0)) {
+    throw new HttpError(400, "The exchange rate for the selected currency is missing.");
+  }
+  const totalAmount = currency === "PHP"
+    ? totalPhp
+    : Math.round(number(data.totalAmount, 0, 1_000_000_000, 0) * 100) / 100;
 
   const id = Number(data.id);
   return {
@@ -204,7 +243,10 @@ const cleanCommission = (data) => {
     dueDate: text(data.dueDate, 40),
     notes: text(data.notes, 4000),
     referencesJson,
-    totalPhp: Math.round(number(data.totalPhp, 0, 10_000_000, 0)),
+    currency,
+    totalAmount,
+    exchangeRate,
+    totalPhp,
     submittedAt: text(data.submittedAt, 40) || new Date().toISOString(),
   };
 };
@@ -274,28 +316,41 @@ export default {
       }
 
       if (path === "/api/commissions" && request.method === "GET") {
+        await ensureCurrencyColumns(env);
         const { results } = await env.DB.prepare("SELECT * FROM commissions ORDER BY submittedAt DESC").all();
         const formatted = results.map((r) => {
           let references = [];
           try { references = JSON.parse(r.references || "[]"); } catch { references = []; }
-          return { ...r, commercial: Boolean(r.commercial), priority: Boolean(r.priority), references };
+          return {
+            ...r,
+            commercial: Boolean(r.commercial),
+            priority: Boolean(r.priority),
+            references,
+            // Older rows have no currency data: they were PHP.
+            currency: r.currency || "PHP",
+            totalAmount: r.totalAmount ?? r.totalPhp,
+            exchangeRate: r.exchangeRate ?? 1,
+          };
         });
         return Response.json(formatted, { headers: corsHeaders });
       }
 
       if (path === "/api/commissions" && request.method === "POST") {
         const c = cleanCommission(await readJson(request));
+        await ensureCurrencyColumns(env);
 
         await env.DB.prepare(`
           INSERT INTO commissions (
             id, name, email, social, type, finish, characters, background,
             commercial, priority, dueDate, notes, "references", totalPhp,
+            currency, totalAmount, exchangeRate,
             submittedAt, stage, historyType, submittedToHistoryAt
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           c.id, c.name, c.email, c.social, c.type, c.finish, c.characters, c.background,
           c.commercial, c.priority, c.dueDate, c.notes, c.referencesJson, c.totalPhp,
+          c.currency, c.totalAmount, c.exchangeRate,
           c.submittedAt, 0, null, null
         ).run();
 
