@@ -176,10 +176,10 @@ function useApiData<T>(path: string) {
 type CurrencyCode = "PHP" | "USD" | "EUR";
 
 // Standard conversion used to derive EUR from the USD price (1 USD = X EUR).
-const EUR_PER_USD = 0.8937;
+const EUR_PER_USD = 1.12;
 // Reference only: lets the admin see a rough peso equivalent of USD / EUR
 // requests. It is never used to price anything shown to a client.
-const PHP_PER_USD_REFERENCE = 63.70;
+const PHP_PER_USD_REFERENCE = 63.59;
 
 const CURRENCIES: Record<CurrencyCode, { symbol: string; label: string; phpPerUnit: number; decimals: number }> = {
   PHP: { symbol: "₱", label: "Philippine peso", phpPerUnit: 1, decimals: 0 },
