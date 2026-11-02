@@ -1971,6 +1971,8 @@ function ImageSetBoard({
   variant = "gallery",
   frames,
   onFrameChange,
+  devicePreview = "pc",
+  onDevicePreviewChange,
 }: {
   images: string[];
   previewIndex: number;
@@ -1990,6 +1992,8 @@ function ImageSetBoard({
   variant?: "gallery" | "carousel";
   frames?: SlideFrame[];
   onFrameChange?: (index: number, frame: SlideFrame) => void;
+  devicePreview?: "pc" | "mobile";
+  onDevicePreviewChange?: (mode: "pc" | "mobile") => void;
 }) {
   const dragFrom = useRef<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
@@ -2015,10 +2019,34 @@ function ImageSetBoard({
 
   return (
     <div className={`publish-preview${isCarousel ? " set-board-carousel" : ""}`}>
+      {isCarousel && (
+        <div className="carousel-device-toolbar">
+          <div className="carousel-device-indicators">
+            <button
+              type="button"
+              className={`device-tab ${devicePreview === "pc" ? "active" : ""}`}
+              onClick={() => onDevicePreviewChange?.("pc")}
+            >
+              <Icon name="grid" size={14} /> PC View (16:7)
+            </button>
+            <button
+              type="button"
+              className={`device-tab ${devicePreview === "mobile" ? "active" : ""}`}
+              onClick={() => onDevicePreviewChange?.("mobile")}
+            >
+              <Icon name="user" size={14} /> Mobile View (Portrait)
+            </button>
+          </div>
+          <span className="device-badge">
+            {devicePreview === "pc" ? "Desktop View Active" : "Mobile View Indicator Active"}
+          </span>
+        </div>
+      )}
+
       {framed && previewSrc ? (
         <div
           ref={stageRef}
-          className="set-frame-stage"
+          className={`set-frame-stage ${isCarousel && devicePreview === "mobile" ? "mobile-preview-stage" : ""}`}
           onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); placeFocus(event); }}
           onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) placeFocus(event); }}
           onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
@@ -2030,7 +2058,9 @@ function ImageSetBoard({
         <img src={previewSrc || placeholder} alt="Upload preview" />
       )}
       {isCarousel && previewSrc && (
-        <p className="set-preview-caption">Slide {previewIndex + 1} of {images.length}. Framed like the home hero, so edges may be cropped on smaller screens.</p>
+        <p className="set-preview-caption">
+          Slide {previewIndex + 1} of {images.length}. Framed like the home hero ({devicePreview === "pc" ? "Desktop 16:7" : "Mobile 9:16 Portrait"}).
+        </p>
       )}
 
       {images.length > 0 && (
@@ -2140,6 +2170,7 @@ function CarouselManager() {
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [devicePreview, setDevicePreview] = useState<"pc" | "mobile">("pc");
 
   const loadSlides = async () => {
     setLoading(true);
@@ -2335,6 +2366,8 @@ function CarouselManager() {
             variant="carousel"
             frames={frames}
             onFrameChange={updateFrame}
+            devicePreview={devicePreview}
+            onDevicePreviewChange={setDevicePreview}
           />
           {slides.length > 0 && (
             <fieldset className="carousel-frame-controls">
