@@ -1189,19 +1189,7 @@ footer a { overflow-wrap: anywhere; }
 
 .nav-actions { gap: 12px; }
 .currency-picker { position: relative; display: inline-flex; align-items: center; }
-.currency-select {
-  appearance: none; -webkit-appearance: none;
-  min-height: 44px; min-width: 88px; padding: 0 34px 0 16px;
-  border: 1px solid var(--ink); border-radius: 999px;
-  background-color: transparent; color: var(--ink);
-  font-size: 14px; font-weight: 700; cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%23373737' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 14px center;
-  transition: border-color .2s, color .2s;
-}
-.currency-select:hover { border-color: var(--orange); color: var(--orange); }
-.currency-select:focus-visible { outline: 2px solid var(--orange-deep, var(--orange)); outline-offset: 3px; }
-.currency-select option { color: var(--ink); background: var(--paper); }
+.currency-select { appearance: none; -webkit-appearance: none; min-height: 44px; min-width: 88px; padding: 0 34px 0 16px; border: none; outline: none; background-color: transparent; color: var(--ink); font-size: 14px; font-weight: 700; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%23373737' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; transition: border-color .2s, color .2s; }
 
 @media (max-width: 650px) {
   .nav-inner { grid-template-columns: 1fr auto 1fr; }
@@ -1224,7 +1212,7 @@ footer a { overflow-wrap: anywhere; }
   .app-theme .navbar .nav-links.open { top: var(--mobile-navbar-h); }
 
   .nav-actions .currency-picker { display: none; }
-  .drawer-currency { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .drawer-currency .currency-picker { flex: 1 1 auto; max-width: 180px; }
-  .drawer-currency .currency-select { width: 100%; min-width: 0; min-height: 44px; padding: 0 34px 0 16px; font-size: 14px; background-color: var(--paper); background-position: right 14px center; }
+  .drawer-currency { display: flex; align-items: center; justify-content: flex-start; gap: 12px; }
+  .drawer-currency .currency-picker { flex: 0 0 auto; width: auto; max-width: none; }
+  .drawer-currency .currency-select { width: 100%; min-width: 0; min-height: 44px; padding: 0 32px 0 12px; font-size: 14px; background-position: right 12px center; }
 }
