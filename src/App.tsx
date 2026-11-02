@@ -1971,8 +1971,6 @@ function ImageSetBoard({
   variant = "gallery",
   frames,
   onFrameChange,
-  devicePreview = "pc",
-  onDevicePreviewChange,
 }: {
   images: string[];
   previewIndex: number;
@@ -1992,8 +1990,6 @@ function ImageSetBoard({
   variant?: "gallery" | "carousel";
   frames?: SlideFrame[];
   onFrameChange?: (index: number, frame: SlideFrame) => void;
-  devicePreview?: "pc" | "mobile";
-  onDevicePreviewChange?: (mode: "pc" | "mobile") => void;
 }) {
   const dragFrom = useRef<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
@@ -2004,7 +2000,6 @@ function ImageSetBoard({
   const isCarousel = variant === "carousel";
   const framed = isCarousel && Boolean(frames) && Boolean(onFrameChange);
   const activeFrame = frames?.[previewIndex] ?? DEFAULT_FRAME;
-  const isMobileView = devicePreview === "mobile";
   const stageRef = useRef<HTMLDivElement | null>(null);
 
   // Click or drag on the preview to place the focal point.
@@ -2020,57 +2015,23 @@ function ImageSetBoard({
 
   return (
     <div className={`publish-preview${isCarousel ? " set-board-carousel" : ""}`}>
-      {isCarousel && (
-        <div className="carousel-device-toolbar">
-          <div className="carousel-device-indicators" role="group" aria-label="Preview framing mode">
-            <button
-              type="button"
-              className={`device-tab ${!isMobileView ? "active" : ""}`}
-              aria-pressed={!isMobileView}
-              onClick={() => onDevicePreviewChange?.("pc")}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
-              <span>Desktop View</span>
-              <small>16:7</small>
-            </button>
-            <button
-              type="button"
-              className={`device-tab ${isMobileView ? "active" : ""}`}
-              aria-pressed={isMobileView}
-              onClick={() => onDevicePreviewChange?.("mobile")}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg>
-              <span>Mobile View</span>
-              <small>9:16</small>
-            </button>
-          </div>
-          <span className={`device-badge ${isMobileView ? "is-mobile" : "is-desktop"}`} role="status" aria-live="polite">
-            <i className="device-badge-dot" aria-hidden="true" />
-            Now previewing: {isMobileView ? "Mobile · 9:16 portrait" : "Desktop · 16:7 landscape"}
-          </span>
-        </div>
-      )}
-
       {framed && previewSrc ? (
-        <div key={isMobileView ? "mobile" : "desktop"} className={`set-device-guide ${isMobileView ? "is-mobile" : "is-desktop"}`}>
-          <div
-            ref={stageRef}
-            className={`set-frame-stage ${isMobileView ? "mobile-preview-stage" : "desktop-preview-stage"}`}
-            onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); placeFocus(event); }}
-            onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) placeFocus(event); }}
-            onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
-          >
-            <img src={previewSrc} alt="Upload preview" draggable={false} style={frameImageStyle(activeFrame)} />
-            <span className="set-focus-marker" style={{ left: `${activeFrame.x}%`, top: `${activeFrame.y}%` }} aria-hidden="true" />
-            <span className="set-device-tag" aria-hidden="true">{isMobileView ? "Mobile · 9:16" : "Desktop · 16:7"}</span>
-          </div>
+        <div
+          ref={stageRef}
+          className="set-frame-stage"
+          onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); placeFocus(event); }}
+          onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) placeFocus(event); }}
+          onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
+        >
+          <img src={previewSrc} alt="Upload preview" draggable={false} style={frameImageStyle(activeFrame)} />
+          <span className="set-focus-marker" style={{ left: `${activeFrame.x}%`, top: `${activeFrame.y}%` }} aria-hidden="true" />
         </div>
       ) : (
         <img src={previewSrc || placeholder} alt="Upload preview" />
       )}
       {isCarousel && previewSrc && (
         <p className="set-preview-caption">
-          Slide {previewIndex + 1} of {images.length}. {isMobileView ? "Showing the Mobile guide (9:16 portrait)." : "Framed like the home hero (Desktop 16:7)."}
+          Slide {previewIndex + 1} of {images.length}. Framed exactly like the home hero.
         </p>
       )}
 
@@ -2140,6 +2101,21 @@ function ImageSetBoard({
                 }}
               />
             </label>
+            <label className={`set-file-btn ${busy || atMax ? "busy" : ""}`}>
+              <Icon name="plus" size={14} /> {addLabel}
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                disabled={busy || atMax}
+                onChange={(e) => {
+                  const input = e.target;
+                  const picked = Array.from(input.files || []);
+                  input.value = "";
+                  onAdd(picked);
+                }}
+              />
+            </label>
             <button type="button" className="danger" disabled={busy || atMin} onClick={() => onRemove(previewIndex)}>
               <Icon name="trash" size={14} /> Remove
             </button>
@@ -2151,21 +2127,25 @@ function ImageSetBoard({
         </>
       )}
 
-      <label className={`publish-replace ${busy || atMax ? "busy" : ""}`}>
-        <Icon name="plus" /> {addLabel}
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          disabled={busy || atMax}
-          onChange={(e) => {
-            const input = e.target;
-            const picked = Array.from(input.files || []);
-            input.value = "";
-            onAdd(picked);
-          }}
-        />
-      </label>
+      {images.length === 0 && (
+        <div className="set-actions">
+          <label className={`set-file-btn ${busy || atMax ? "busy" : ""}`}>
+            <Icon name="plus" size={14} /> {addLabel}
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              disabled={busy || atMax}
+              onChange={(e) => {
+                const input = e.target;
+                const picked = Array.from(input.files || []);
+                input.value = "";
+                onAdd(picked);
+              }}
+            />
+          </label>
+        </div>
+      )}
     </div>
   );
 }
@@ -2181,7 +2161,6 @@ function CarouselManager() {
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const [dirty, setDirty] = useState(false);
-  const [devicePreview, setDevicePreview] = useState<"pc" | "mobile">("pc");
 
   const loadSlides = async () => {
     setLoading(true);
@@ -2377,8 +2356,6 @@ function CarouselManager() {
             variant="carousel"
             frames={frames}
             onFrameChange={updateFrame}
-            devicePreview={devicePreview}
-            onDevicePreviewChange={setDevicePreview}
           />
           {slides.length > 0 && (
             <fieldset className="carousel-frame-controls">
