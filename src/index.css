@@ -1184,6 +1184,44 @@ footer a { overflow-wrap: anywhere; }
 .carousel-manager-copy { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.65; max-width: none; }
 .carousel-manager .publish-preview { min-height: 0; padding: 12px 0 0; background: transparent; }
 .carousel-manager .publish-preview > img { max-height: 280px; aspect-ratio: 16 / 9; object-fit: cover; }
+
+/* Admin carousel board: full-width preview, five evenly sized slots, aligned actions */
+.publish-preview .set-file-btn { margin-top: 0; font-weight: 400; gap: 0; }
+.carousel-manager .set-board-carousel { align-items: stretch; gap: 14px; padding: 12px 0 0; }
+.carousel-manager .set-board-carousel > img { width: 100%; max-height: none; aspect-ratio: 16 / 7; object-fit: cover; border-radius: 12px; border: 1px solid var(--line); }
+/* Framing preview: same crop box idea as the hero, with a focal-point marker */
+.carousel-manager .set-board-carousel .set-frame-stage { position: relative; width: 100%; aspect-ratio: 20 / 9; overflow: hidden; border-radius: 12px; border: 1px solid var(--line); background: #eff1f3; cursor: crosshair; touch-action: none; user-select: none; }
+.carousel-manager .set-board-carousel .set-frame-stage > img { width: 100%; height: 100%; max-height: none; aspect-ratio: auto; object-fit: cover; display: block; pointer-events: none; }
+.set-focus-marker { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55), inset 0 0 0 1.5px rgba(0, 0, 0, 0.35); pointer-events: none; }
+.set-focus-marker::after { content: ""; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55); }
+.carousel-frame-controls { display: grid; gap: 12px; margin: 14px 0 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); min-width: 0; }
+.carousel-frame-controls legend { padding: 0 6px; font-size: 14px; font-weight: 700; }
+.carousel-frame-controls p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; max-width: none; }
+.carousel-frame-controls label { display: grid; gap: 6px; margin: 0; font-size: 14px; font-weight: 700; }
+.carousel-frame-controls label span { display: flex; justify-content: space-between; gap: 10px; }
+.carousel-frame-controls label b { color: var(--muted); font-weight: 600; }
+.carousel-frame-controls input[type="range"] { width: 100%; accent-color: var(--orange, #f8762a); }
+.carousel-frame-reset { justify-self: start; min-height: 40px; padding: 0 16px; border: 1px solid var(--ink); border-radius: 999px; background: white; color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
+.carousel-frame-reset:hover { background: var(--cream); }
+.carousel-frame-reset:focus-visible { outline: 2px solid var(--orange-deep); outline-offset: 2px; }
+.set-preview-caption { margin: -6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; text-align: center; }
+.carousel-manager .set-board-carousel .set-thumbs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; padding: 4px 2px; overflow: visible; }
+.carousel-manager .set-board-carousel .set-thumbs li { min-width: 0; }
+.carousel-manager .set-board-carousel .set-thumb { width: 100%; height: auto; aspect-ratio: 16 / 10; border-radius: 10px; }
+.carousel-manager .set-board-carousel .set-thumb b { padding: 2px 0; font-size: 12px; }
+.set-slot-empty { cursor: default; }
+.set-thumb.empty { display: grid; place-items: center; border: 2px dashed var(--line); background: transparent; color: var(--muted); font-size: 14px; font-weight: 700; cursor: default; }
+.carousel-manager .set-board-carousel .publish-replace { align-self: center; margin-top: 0; }
+@media (max-width: 560px) {
+  .carousel-manager .set-board-carousel > img { aspect-ratio: 4 / 3; }
+  .carousel-manager .set-board-carousel .set-frame-stage { aspect-ratio: 8 / 7; }
+  .carousel-manager .set-board-carousel .set-thumbs { gap: 6px; }
+  .set-actions button, .set-file-btn { padding: 0 12px; }
+}
+
+/* Email validation message in the commission form */
+.field small.field-error { color: #a8321f; font-weight: 600; }
+.app-theme .field input[aria-invalid="true"] { border-color: #a8321f; }
 .carousel-alt-field { display: flex; flex-direction: column; gap: 7px; margin-top: 14px; font-size: 14px; font-weight: 700; }
 .carousel-alt-field input { border: 1px solid var(--line); background: var(--paper); padding: 13px 14px; outline: none; color: var(--ink); }
 

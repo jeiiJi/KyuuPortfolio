@@ -46,6 +46,9 @@ const cleanSlides = (slides) => {
       data,
       alt: text(slides[position]?.alt, 200),
       bytes: imageBytes(data),
+      focusX: number(slides[position]?.focusX, 0, 100, 50),
+      focusY: number(slides[position]?.focusY, 0, 100, 50),
+      zoom: number(slides[position]?.zoom, 1, 3, 1),
     })),
   };
 };
@@ -167,7 +170,8 @@ const readJson = async (request) => {
   }
 };
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Same rules as the commission form: a sensible local part, dotted domain labels and a letter-only ending.
+const EMAIL_PATTERN = /^(?=.{1,254}$)(?=[^@]{1,64}@)[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/;
 const MAX_REFERENCES_BYTES = 1_900_000;
 const text = (value, max) => String(value ?? "").slice(0, max);
 const number = (value, min, max, fallback) => {
@@ -200,6 +204,21 @@ const ensureCurrencyColumns = async (env) => {
     await env.DB.batch(statements);
   }
   currencyColumnsReady = true;
+};
+
+// Adds the framing columns (focal point + zoom) to carousel_slides on older databases.
+// (migrations/0002_add_framing_to_carousel_slides.sql does the same thing for wrangler.)
+let carouselFramingReady = false;
+const ensureCarouselFramingColumns = async (env) => {
+  if (carouselFramingReady) return;
+  const { results } = await env.DB.prepare("PRAGMA table_info(carousel_slides)").all();
+  const existing = new Set((results || []).map((column) => column.name));
+  const statements = [];
+  if (!existing.has("focusX")) statements.push(env.DB.prepare("ALTER TABLE carousel_slides ADD COLUMN focusX REAL NOT NULL DEFAULT 50"));
+  if (!existing.has("focusY")) statements.push(env.DB.prepare("ALTER TABLE carousel_slides ADD COLUMN focusY REAL NOT NULL DEFAULT 50"));
+  if (!existing.has("zoom")) statements.push(env.DB.prepare("ALTER TABLE carousel_slides ADD COLUMN zoom REAL NOT NULL DEFAULT 1"));
+  if (statements.length) await env.DB.batch(statements);
+  carouselFramingReady = true;
 };
 
 const cleanCommission = (data) => {
@@ -384,8 +403,9 @@ export default {
       }
 
       if (path === "/api/carousel" && request.method === "GET") {
+        await ensureCarouselFramingColumns(env);
         const { results } = await env.DB.prepare(
-          "SELECT position, data, alt, version FROM carousel_slides ORDER BY position LIMIT 5"
+          "SELECT position, data, alt, version, focusX, focusY, zoom FROM carousel_slides ORDER BY position LIMIT 5"
         ).all();
         return Response.json(results || [], { headers: corsHeaders });
       }
@@ -395,12 +415,13 @@ export default {
         const cleaned = cleanSlides(body.slides);
         if (cleaned.error) return Response.json({ error: cleaned.error }, { status: 400, headers: corsHeaders });
 
+        await ensureCarouselFramingColumns(env);
         await env.DB.batch([
           env.DB.prepare("DELETE FROM carousel_slides"),
           ...cleaned.slides.map((slide) =>
             env.DB.prepare(
-              "INSERT INTO carousel_slides (position, data, alt, bytes, version) VALUES (?, ?, ?, ?, 1)"
-            ).bind(slide.position, slide.data, slide.alt, slide.bytes)
+              "INSERT INTO carousel_slides (position, data, alt, bytes, version, focusX, focusY, zoom) VALUES (?, ?, ?, ?, 1, ?, ?, ?)"
+            ).bind(slide.position, slide.data, slide.alt, slide.bytes, slide.focusX, slide.focusY, slide.zoom)
           ),
         ]);
         return Response.json({ success: true, count: cleaned.slides.length }, { headers: corsHeaders });

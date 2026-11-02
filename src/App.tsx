@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import logo from "./assets/inkdrop-logo.png";
 import brandName from "./assets/brand-name.png";
 import placeholder from "./assets/placeholder.svg";
@@ -21,7 +22,27 @@ type PublishedItem = {
   imageCount?: number; tools?: string; format?: string;
   publishedAt: string;
 };
-type CarouselSlide = { position: number; data: string; alt: string; version?: number };
+type CarouselSlide = { position: number; data: string; alt: string; version?: number; focusX?: number; focusY?: number; zoom?: number };
+// Framing for one hero slide: focal point (0-100 % from the left/top) and zoom (1 = fit to cover).
+type SlideFrame = { x: number; y: number; zoom: number };
+const DEFAULT_FRAME: SlideFrame = { x: 50, y: 50, zoom: 1 };
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 3;
+const clampNumber = (value: unknown, min: number, max: number, fallback: number) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
+};
+const frameFromSlide = (slide: Partial<CarouselSlide>): SlideFrame => ({
+  x: clampNumber(slide.focusX, 0, 100, DEFAULT_FRAME.x),
+  y: clampNumber(slide.focusY, 0, 100, DEFAULT_FRAME.y),
+  zoom: clampNumber(slide.zoom, MIN_ZOOM, MAX_ZOOM, DEFAULT_FRAME.zoom),
+});
+// Used by BOTH the home hero and the admin preview so the two always frame an image identically.
+const frameImageStyle = (frame: SlideFrame): CSSProperties => ({
+  objectPosition: `${frame.x}% ${frame.y}%`,
+  transformOrigin: `${frame.x}% ${frame.y}%`,
+  transform: frame.zoom > 1 ? `scale(${frame.zoom})` : undefined,
+});
 type GallerySelection = { category: "Chibi" | "Semi-Realistic"; facet: "Scope" | "Services" | "Color Finish"; value: string };
 type AdminLibraryItem = {
   id: number; title: string; description: string; image?: string;
@@ -141,21 +162,169 @@ function useApiData<T>(path: string) {
   return { items, error, loading };
 }
 // ---------------------------------------------------------------------------
-// Multi-currency
-// All prices in the app are authored in PHP. Other currencies are display
-// conversions using the fixed rates below (PHP per 1 unit of the currency).
-// Update these numbers whenever you want to re-quote; records that were already
-// submitted keep the rate they were saved with.
+// Multi-currency + independent pricing
+//
+// PHP and USD are two SEPARATE price lists (see PRICE_TABLES below):
+//   - PHP is tailored for local clients / meet-ups.
+//   - USD is set on its own for international clients. It is NOT PHP / rate.
+// EUR has no price list of its own: it is the USD price translated into euro
+// with EUR_PER_USD.
+//
+// To re-quote, edit PRICE_TABLES.USD (or PRICE_TABLES.PHP) and/or the rates
+// below. Records that were already submitted keep what they were saved with.
 // ---------------------------------------------------------------------------
 type CurrencyCode = "PHP" | "USD" | "EUR";
 
+// Standard conversion used to derive EUR from the USD price (1 USD = X EUR).
+const EUR_PER_USD = 0.8937;
+// Reference only: lets the admin see a rough peso equivalent of USD / EUR
+// requests. It is never used to price anything shown to a client.
+const PHP_PER_USD_REFERENCE = 63.70;
+
 const CURRENCIES: Record<CurrencyCode, { symbol: string; label: string; phpPerUnit: number; decimals: number }> = {
   PHP: { symbol: "₱", label: "Philippine peso", phpPerUnit: 1, decimals: 0 },
-  USD: { symbol: "$", label: "US dollar", phpPerUnit: 63.70, decimals: 2 },
-  EUR: { symbol: "€", label: "Euro", phpPerUnit: 71.28, decimals: 2 },
+  USD: { symbol: "$", label: "US dollar", phpPerUnit: PHP_PER_USD_REFERENCE, decimals: 2 },
+  EUR: { symbol: "€", label: "Euro", phpPerUnit: roundToDecimals(PHP_PER_USD_REFERENCE / EUR_PER_USD, 2), decimals: 2 },
 };
 const CURRENCY_CODES = Object.keys(CURRENCIES) as CurrencyCode[];
 const CURRENCY_STORAGE_KEY = "inkyuu:currency";
+
+function roundToDecimals(value: number, decimals: number) {
+  const factor = 10 ** decimals;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+}
+
+// Every number that makes up a quote. PHP and USD each get their own copy.
+type PriceTable = {
+  chibiBase: Record<string, number>;
+  semiBase: Record<string, number>;
+  semiColor: Record<string, number>;
+  chibiBackground: Record<string, number>;
+  semiBackground: Record<string, number>;
+  stickerDiscountBase: number;   // discount for a 4-sticker set ...
+  stickerDiscountStep: number;   // ... plus this much for every extra sticker
+  acrylicExtra: number;
+  badgesExtra: number;
+  referenceSheetExtra: number;
+  modelSheetExtra: number;
+  ychDiscount: number;
+  alternatesExtra: number;
+  extraCharacterFlatChibi: number;  // each extra character costs 80% of the scope total + this
+  extraCharacterFlatSemi: number;
+};
+
+// Commercial use adds 50% of the base estimated total (no fixed price).
+const COMMERCIAL_SURCHARGE_RATE = 0.5;
+
+const PRICE_TABLES: Record<"PHP" | "USD", PriceTable> = {
+  // Local clients / meet-ups (pesos).
+  PHP: {
+    chibiBase: { Headshot: 170, Fullbody: 200 },
+    semiBase: { Headshot: 250, "Bust-up": 380, "Waist-up": 520, "Thigh-up": 680 },
+    semiColor: { Rendered: 475, Plain: 280 },
+    chibiBackground: { Complex: 50, Plain: 0, "None/Transparent": 0 },
+    semiBackground: { Complex: 220, Plain: 150, "None/Transparent": 680 },
+    stickerDiscountBase: 20,
+    stickerDiscountStep: 10,
+    acrylicExtra: 50,
+    badgesExtra: 30,
+    referenceSheetExtra: 30,
+    modelSheetExtra: 300,
+    ychDiscount: 10,
+    alternatesExtra: 30,
+    extraCharacterFlatChibi: 35,
+    extraCharacterFlatSemi: 50,
+  },
+  // International clients (US dollars). Set these on their own, independent of
+  // the peso list. The values below are starting figures: change them freely.
+  USD: {
+    chibiBase: { Headshot: 8, Fullbody: 10 },
+    semiBase: { Headshot: 15, "Bust-up": 23, "Waist-up": 35, "Thigh-up": 40 },
+    semiColor: { Rendered: 15, Plain: 9 },
+    chibiBackground: { Complex: 2, Plain: 0, "None/Transparent": 0 },
+    semiBackground: { Complex: 7, Plain: 5, "None/Transparent": 21 },
+    stickerDiscountBase: 1,
+    stickerDiscountStep: 0.5,
+    acrylicExtra: 2,
+    badgesExtra: 1,
+    referenceSheetExtra: 1,
+    modelSheetExtra: 8,
+    ychDiscount: 0.5,
+    alternatesExtra: 3,
+    extraCharacterFlatChibi: 3,
+    extraCharacterFlatSemi: 2,
+  },
+};
+
+type PricingInput = {
+  artStyle: string; baseOption: string; chibiService: string; stickerCount: number;
+  alternativesCount: number; colorOption: string; bgOption: string; characters: number;
+  usageType: string; dueDate: string;
+};
+
+// Works out the quote from one price list. All amounts come back in that list's
+// own currency (PHP list -> pesos, USD list -> dollars).
+const calculatePricing = (form: PricingInput, table: PriceTable, decimals: number) => {
+  const round = (value: number) => roundToDecimals(value, decimals);
+  const isChibi = form.artStyle === "Chibi";
+  const isSemi = form.artStyle === "Semi-Realistic";
+
+  const basePrice = isChibi ? (table.chibiBase[form.baseOption] ?? 0)
+    : isSemi ? (table.semiBase[form.baseOption] ?? 0)
+    : 0;
+
+  const chibiServicePrice = (() => {
+    if (!isChibi || !form.chibiService) return 0;
+    switch (form.chibiService) {
+      case "Solo Deals": return basePrice;
+      case "Sticker set": {
+        const discount = table.stickerDiscountBase + (form.stickerCount - 4) * table.stickerDiscountStep;
+        return round(basePrice * form.stickerCount - discount);
+      }
+      case "Acrylic Merch": return round(basePrice + table.acrylicExtra);
+      case "Badges/Pins/Pfp Design": return round(basePrice + table.badgesExtra);
+      case "Character Reference sheet": return round(basePrice * 4 + table.referenceSheetExtra);
+      case "2D Model character sheet": return round(basePrice * 5 + table.modelSheetExtra);
+      case "YCH": return Math.max(0, round(basePrice - table.ychDiscount));
+      case "Alternate outfits/expressions": return round(basePrice * form.alternativesCount + table.alternatesExtra);
+      default: return 0;
+    }
+  })();
+
+  const colorPrice = isSemi ? (table.semiColor[form.colorOption] ?? 0) : 0;
+  const bgPrice = isChibi ? (table.chibiBackground[form.bgOption] ?? 0)
+    : isSemi ? (table.semiBackground[form.bgOption] ?? 0)
+    : 0;
+
+  const scopeAndOptionsTotal = isChibi ? chibiServicePrice + bgPrice : basePrice + colorPrice + bgPrice;
+
+  const charMultiplier = form.characters > 1
+    ? (form.characters - 1) * (
+        isSemi ? round(scopeAndOptionsTotal * 0.80 + table.extraCharacterFlatSemi)
+        : isChibi ? round(scopeAndOptionsTotal * 0.80 + table.extraCharacterFlatChibi)
+        : 0
+      )
+    : 0;
+
+  const subtotal = round(scopeAndOptionsTotal + charMultiplier);
+  // Base estimated total x 1.5 when commercial: the fee is 50% of the subtotal.
+  const commercialFee = form.usageType === "Commercial Use" ? round(subtotal * COMMERCIAL_SURCHARGE_RATE) : 0;
+
+  let dueDateRate = 0;
+  if (form.dueDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.ceil((new Date(form.dueDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    dueDateRate = diffDays > 14 ? 0.10 : 0.18;
+  }
+  const priorityFee = form.dueDate ? round(subtotal * dueDateRate) : 0;
+  const total = round(subtotal + commercialFee + priorityFee);
+
+  return { basePrice, chibiServicePrice, colorPrice, bgPrice, charMultiplier, subtotal, commercialFee, dueDateRate, priorityFee, total };
+};
+
+// USD -> EUR. EUR is always derived from the independent USD price.
+const usdToEur = (usd: number) => roundToDecimals(usd * EUR_PER_USD, 2);
 
 const isCurrencyCode = (value: unknown): value is CurrencyCode =>
   typeof value === "string" && Object.prototype.hasOwnProperty.call(CURRENCIES, value);
@@ -169,15 +338,6 @@ const readStoredCurrency = (): CurrencyCode => {
   }
 };
 
-const roundTo = (value: number, decimals: number) => {
-  const factor = 10 ** decimals;
-  return Math.round((value + Number.EPSILON) * factor) / factor;
-};
-
-// PHP -> currency, using the given rate (defaults to the current rate).
-const convertFromPhp = (php: number, code: CurrencyCode, rate: number = CURRENCIES[code].phpPerUnit) =>
-  code === "PHP" ? Math.round(php) : roundTo(php / rate, CURRENCIES[code].decimals);
-
 const formatAmount = (amount: number, code: CurrencyCode) => {
   const { symbol, decimals } = CURRENCIES[code];
   return `${symbol}${amount.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
@@ -186,9 +346,6 @@ const formatAmount = (amount: number, code: CurrencyCode) => {
 type CurrencyContextValue = {
   currency: CurrencyCode;
   setCurrency: (code: CurrencyCode) => void;
-  rate: number;
-  convertFromPhp: (php: number) => number;
-  money: (php: number) => string;
 };
 
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
@@ -214,16 +371,7 @@ function CurrencyProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const value = useMemo<CurrencyContextValue>(() => {
-    const rate = CURRENCIES[currency].phpPerUnit;
-    return {
-      currency,
-      setCurrency,
-      rate,
-      convertFromPhp: (php) => convertFromPhp(php, currency, rate),
-      money: (php) => formatAmount(convertFromPhp(php, currency, rate), currency),
-    };
-  }, [currency]);
+  const value = useMemo<CurrencyContextValue>(() => ({ currency, setCurrency }), [currency]);
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
 }
@@ -232,6 +380,31 @@ const useCurrency = (): CurrencyContextValue => {
   const context = useContext(CurrencyContext);
   if (!context) throw new Error("useCurrency must be used inside <CurrencyProvider>.");
   return context;
+};
+
+// Email check used by the commission form (the worker applies the same rules).
+// Returns "" when the address is fine, otherwise a message for the client.
+const EMAIL_LOCAL_PATTERN = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/;
+const EMAIL_LABEL_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
+const getEmailError = (value: string): string => {
+  const email = value.trim();
+  if (!email) return "Please enter your email address.";
+  if (/\s/.test(email)) return "Email addresses can't contain spaces.";
+  const at = email.indexOf("@");
+  if (at === -1) return "Your email needs an \"@\" (for example you@example.com).";
+  if (at !== email.lastIndexOf("@")) return "Your email can only contain one \"@\".";
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  if (!local) return "Add the part before the \"@\" (for example you@example.com).";
+  if (!domain) return "Add your email domain after the \"@\" (for example you@example.com).";
+  if (email.length > 254 || local.length > 64) return "That email address is too long.";
+  if (!EMAIL_LOCAL_PATTERN.test(local)) return "The part before the \"@\" has characters or dots that aren't allowed.";
+  const labels = domain.split(".");
+  if (labels.length < 2 || !labels.every((label) => EMAIL_LABEL_PATTERN.test(label))) {
+    return "The domain after the \"@\" doesn't look right (for example example.com).";
+  }
+  if (!/^[A-Za-z]{2,63}$/.test(labels[labels.length - 1])) return "The domain ending (like .com) doesn't look right.";
+  return "";
 };
 
 // Admin side: read the price exactly as the client saw it when they submitted.
@@ -454,7 +627,7 @@ function HeroCarousel() {
             className={`hero-carousel-slide ${idx === currentIndex ? "active" : ""}`}
             aria-hidden={idx !== currentIndex}
           >
-            <img src={item.data} alt={item.alt || `Featured artwork ${idx + 1}`} />
+            <img src={item.data} alt={item.alt || `Featured artwork ${idx + 1}`} style={frameImageStyle(frameFromSlide(item))} />
           </div>
         ))}
 
@@ -792,8 +965,9 @@ const AdminField = ({ label, hint, children }: { label: React.ReactNode; hint?: 
 const Field = ({ label, hint, children }: { label: React.ReactNode; hint?: string; children: React.ReactNode }) => <label className="field"><span>{label}</span>{hint && <small>{hint}</small>}{children}</label>;
 
 function Commission({ go }: { go: (page: Page) => void }) {
-  const { currency, rate, money, convertFromPhp: toSelected } = useCurrency();
+  const { currency } = useCurrency();
   const [step, setStep] = useState(1);
+  const [emailTouched, setEmailTouched] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -849,90 +1023,15 @@ function Commission({ go }: { go: (page: Page) => void }) {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const basePrice = form.artStyle === "Chibi" 
-    ? (form.baseOption === "Headshot" ? 170 
-      : form.baseOption === "Fullbody" ? 200 : 0) 
-    : form.artStyle === "Semi-Realistic" 
-    ? (form.baseOption === "Headshot" ? 250 
-      : form.baseOption === "Bust-up" ? 380 
-      : form.baseOption === "Waist-up" ? 520 
-      : form.baseOption === "Thigh-up" ? 680 : 0)
-    : 0;
-
-  const calculateChibiServicePrice = () => {
-    if (form.artStyle !== "Chibi" || !form.chibiService) return 0;
-
-    switch (form.chibiService) {
-      case "Solo Deals":
-        return basePrice;
-      case "Sticker set": {
-        const discount = 20 + (form.stickerCount - 4) * 10;
-        return (basePrice * form.stickerCount) - discount;
-      }
-      case "Acrylic Merch":
-        return basePrice + 50;
-      case "Badges/Pins/Pfp Design":
-        return basePrice + 30;
-      case "Character Reference sheet":
-        return (basePrice * 4) + 30;
-      case "2D Model character sheet":
-        return (basePrice * 5) + 300;
-      case "YCH":
-        return Math.max(0, basePrice - 10);
-      case "Alternate outfits/expressions":
-        return (basePrice * form.alternativesCount) + 30;
-      default:
-        return 0;
-    }
-  };
-
-  const chibiServicePrice = calculateChibiServicePrice();
-
-  const colorPrice = form.artStyle === "Semi-Realistic" 
-    ? (form.colorOption === "Rendered" ? 475 
-      : form.colorOption === "Plain" ? 280 : 0)
-    : 0;
-
-  const bgPrice = form.artStyle === "Chibi" 
-    ? (form.bgOption === "Complex" ? 50 
-      : form.bgOption === "Plain" ? 0
-      : form.bgOption === "None/Transparent" ? 0 : 0) 
-    : form.artStyle === "Semi-Realistic" 
-    ? (form.bgOption === "Complex" ? 220 
-      : form.bgOption === "Plain" ? 150 
-      : form.bgOption === "None/Transparent" ? 680 : 0)
-    : 0;
-  
-  const scopeAndOptionsTotal = form.artStyle === "Chibi"
-    ? chibiServicePrice + bgPrice
-    : basePrice + colorPrice + bgPrice;
-
-  const charMultiplier = form.characters > 1 
-    ? (form.characters - 1) * (
-        form.artStyle === "Semi-Realistic" 
-          ? Math.round(scopeAndOptionsTotal * 0.80 + 50) 
-          : form.artStyle === "Chibi" 
-          ? Math.round(scopeAndOptionsTotal * 0.80 + 35) 
-          : 0
-      ) 
-    : 0;
-  
-  const subtotal = scopeAndOptionsTotal + charMultiplier;
-  const commercialFee = form.usageType === "Commercial Use" ? 500 : 0;
-
-  const getDueDatePercentage = () => {
-    if (!form.dueDate) return 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const targetDate = new Date(form.dueDate);
-    const diffTime = targetDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 14 ? 0.10 : 0.18;
-  };
-
-  const dueDateRate = getDueDatePercentage();
-  const priorityFee = form.dueDate ? Math.round(subtotal * dueDateRate) : 0;
-  const total = subtotal + commercialFee + priorityFee;
+  // PHP and USD are priced from their own lists. EUR is the USD price converted.
+  const priceTable = currency === "PHP" ? PRICE_TABLES.PHP : PRICE_TABLES.USD;
+  const pricing = calculatePricing(form, priceTable, currency === "PHP" ? 0 : 2);
+  const { basePrice, chibiServicePrice, colorPrice, bgPrice, charMultiplier, commercialFee, dueDateRate, priorityFee, total } = pricing;
+  // Amounts above are in the list's own currency; show them in the chosen one.
+  const money = (amount: number) => formatAmount(currency === "EUR" ? usdToEur(amount) : amount, currency);
+  const chibiBaseOptions = Object.entries(priceTable.chibiBase);
+  const semiBaseOptions = Object.entries(priceTable.semiBase);
+  const emailError = getEmailError(form.email);
   const estimateBreakdown = (
     <>
       <p><span>{form.artStyle ? `${form.artStyle} (${form.baseOption || "Select base"})` : "Base scope"}</span><b>{money(basePrice)}</b></p>
@@ -956,16 +1055,20 @@ function Commission({ go }: { go: (page: Page) => void }) {
       {(form.usageType === "Commercial Use" || form.dueDate) && (
         <>
           <p className="estimate-subheading"><span>Additional Fees</span></p>
-          {form.usageType === "Commercial Use" && <p><span>Commercial license</span><b>+{money(commercialFee)}</b></p>}
+          {form.usageType === "Commercial Use" && <p><span>Commercial license ({Math.round(COMMERCIAL_SURCHARGE_RATE * 100)}%)</span><b>+{money(commercialFee)}</b></p>}
           {form.dueDate && <p><span>Priority due date fee ({dueDateRate === 0.1 ? "10%" : "18%"})</span><b>+{money(priorityFee)}</b></p>}
         </>
       )}
     </>
   );
 
-  const currencyNote = currency !== "PHP" ? (
+  const currencyNote = currency === "USD" ? (
     <p className="fine-print currency-note">
-      Prices are converted from PHP at {CURRENCIES[currency].symbol}1 = ₱{rate}. Your total is saved as {formatAmount(toSelected(total), currency)} {currency} (₱{total.toLocaleString()} PHP).
+      International pricing is set in US dollars. Your total is saved as {money(total)} USD.
+    </p>
+  ) : currency === "EUR" ? (
+    <p className="fine-print currency-note">
+      International pricing is set in US dollars ({formatAmount(total, "USD")} USD for this request) and converted to euro at {CURRENCIES.EUR.symbol}1 = ${roundToDecimals(1 / EUR_PER_USD, 4)}. Your total is saved as {money(total)} EUR.
     </p>
   ) : null;
 
@@ -988,7 +1091,13 @@ function Commission({ go }: { go: (page: Page) => void }) {
       return;
     }
     if (step === 2 && (!form.name || !form.email || !form.usageType)) {
+      setEmailTouched(true);
       alert("Please fill in your name, email, and usage type.");
+      return;
+    }
+    if (step === 2 && emailError) {
+      setEmailTouched(true);
+      alert(emailError);
       return;
     }
     if (step === 3) {
@@ -1017,10 +1126,18 @@ function Commission({ go }: { go: (page: Page) => void }) {
   };
 
   const handleFinalSubmit = async () => {
+    if (emailError) {
+      setEmailTouched(true);
+      setStep(2);
+      alert(emailError);
+      return;
+    }
+    // Foreign requests keep a peso equivalent (reference rate) so the admin list stays comparable.
+    const usdTotal = currency === "EUR" ? calculatePricing(form, PRICE_TABLES.USD, 2).total : total;
     const request: CommissionRequest = {
       id: Date.now(),
       name: form.name,
-      email: form.email,
+      email: form.email.trim(),
       social: form.social,
       type: `${form.artStyle} - ${form.baseOption}${form.chibiService ? ` (${form.chibiService})` : ""}`,
       finish: form.artStyle === "Chibi" ? "Rendered (Default)" : form.colorOption,
@@ -1033,9 +1150,9 @@ function Commission({ go }: { go: (page: Page) => void }) {
       references,
       // Lock in exactly what the client saw so the record never shifts later.
       currency,
-      totalAmount: toSelected(total),
-      exchangeRate: rate,
-      totalPhp: total,
+      totalAmount: currency === "EUR" ? usdToEur(usdTotal) : total,
+      exchangeRate: CURRENCIES[currency].phpPerUnit,
+      totalPhp: currency === "PHP" ? total : Math.round(usdTotal * PHP_PER_USD_REFERENCE),
       submittedAt: new Date().toISOString(),
       stage: 0,
     };
@@ -1118,7 +1235,18 @@ function Commission({ go }: { go: (page: Page) => void }) {
                   <input value={form.name} onChange={(e) => setValue("name", e.target.value)} placeholder="Your name" />
                 </Field>
                 <Field label={<>Email address <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
-                  <input type="email" value={form.email} onChange={(e) => setValue("email", e.target.value)} placeholder="you@example.com" />
+                  <input
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    value={form.email}
+                    onChange={(e) => setValue("email", e.target.value)}
+                    onBlur={() => setEmailTouched(true)}
+                    placeholder="you@example.com"
+                    aria-invalid={emailTouched && Boolean(emailError)}
+                    aria-describedby={emailTouched && emailError ? "email-error" : undefined}
+                  />
+                  {emailTouched && emailError && <small id="email-error" className="field-error" role="alert">{emailError}</small>}
                 </Field>
                 <Field label="Social media handle"><input value={form.social} onChange={(e) => setValue("social", e.target.value)} placeholder="@username" /></Field>
                 
@@ -1169,23 +1297,15 @@ function Commission({ go }: { go: (page: Page) => void }) {
                   <label className="field" style={{ marginBottom: "8px" }}><span>Base Scope <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></span></label>
                   <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                     {form.artStyle === "Chibi" ? (
-                      [
-                        ["Headshot", 170], 
-                        ["Fullbody", 200]
-                      ].map(([name, price]) => (
+                      chibiBaseOptions.map(([name, price]) => (
                         <button type="button" className={`choice-card ${form.baseOption === name ? "selected" : ""}`} aria-pressed={form.baseOption === name} onClick={() => setValue("baseOption", name)} key={name} style={{ width: "100%" }}>
-                          <span className="radio" /><strong>{name}</strong><b>{money(Number(price))}</b><small>Chibi tier (Rendered by default)</small>
+                          <span className="radio" /><strong>{name}</strong><b>{money(price)}</b><small>Chibi tier (Rendered by default)</small>
                         </button>
                       ))
                     ) : form.artStyle === "Semi-Realistic" ? (
-                      [
-                        ["Headshot", 250], 
-                        ["Bust-up", 380], 
-                        ["Waist-up", 520], 
-                        ["Thigh-up", 680]
-                      ].map(([name, price]) => (
+                      semiBaseOptions.map(([name, price]) => (
                         <button type="button" className={`choice-card ${form.baseOption === name ? "selected" : ""}`} aria-pressed={form.baseOption === name} onClick={() => setValue("baseOption", name)} key={name} style={{ width: "100%" }}>
-                          <span className="radio" /><strong>{name}</strong><b>{money(Number(price))}</b><small>Semi-realism tier</small>
+                          <span className="radio" /><strong>{name}</strong><b>{money(price)}</b><small>Semi-realism tier</small>
                         </button>
                       ))
                     ) : (
@@ -1848,6 +1968,9 @@ function ImageSetBoard({
   setSize,
   coverLabel = "Cover",
   addLabel,
+  variant = "gallery",
+  frames,
+  onFrameChange,
 }: {
   images: string[];
   previewIndex: number;
@@ -1864,6 +1987,9 @@ function ImageSetBoard({
   setSize: number;
   coverLabel?: string;
   addLabel: string;
+  variant?: "gallery" | "carousel";
+  frames?: SlideFrame[];
+  onFrameChange?: (index: number, frame: SlideFrame) => void;
 }) {
   const dragFrom = useRef<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
@@ -1871,10 +1997,41 @@ function ImageSetBoard({
   const atMin = images.length <= 1;
   const previewSrc = images[previewIndex];
   const busy = processing || loadingSet;
+  const isCarousel = variant === "carousel";
+  const framed = isCarousel && Boolean(frames) && Boolean(onFrameChange);
+  const activeFrame = frames?.[previewIndex] ?? DEFAULT_FRAME;
+  const stageRef = useRef<HTMLDivElement | null>(null);
+
+  // Click or drag on the preview to place the focal point.
+  const placeFocus = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const box = stageRef.current?.getBoundingClientRect();
+    if (!box || !box.width || !box.height || !onFrameChange) return;
+    onFrameChange(previewIndex, {
+      ...activeFrame,
+      x: Math.round(clampNumber(((event.clientX - box.left) / box.width) * 100, 0, 100, 50)),
+      y: Math.round(clampNumber(((event.clientY - box.top) / box.height) * 100, 0, 100, 50)),
+    });
+  };
 
   return (
-    <div className="publish-preview">
-      <img src={previewSrc || placeholder} alt="Upload preview" />
+    <div className={`publish-preview${isCarousel ? " set-board-carousel" : ""}`}>
+      {framed && previewSrc ? (
+        <div
+          ref={stageRef}
+          className="set-frame-stage"
+          onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); placeFocus(event); }}
+          onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) placeFocus(event); }}
+          onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
+        >
+          <img src={previewSrc} alt="Upload preview" draggable={false} style={frameImageStyle(activeFrame)} />
+          <span className="set-focus-marker" style={{ left: `${activeFrame.x}%`, top: `${activeFrame.y}%` }} aria-hidden="true" />
+        </div>
+      ) : (
+        <img src={previewSrc || placeholder} alt="Upload preview" />
+      )}
+      {isCarousel && previewSrc && (
+        <p className="set-preview-caption">Slide {previewIndex + 1} of {images.length}. Framed like the home hero, so edges may be cropped on smaller screens.</p>
+      )}
 
       {images.length > 0 && (
         <>
@@ -1915,9 +2072,14 @@ function ImageSetBoard({
                   aria-label={`Show image ${index + 1}${index === 0 ? ` (${coverLabel})` : ""}`}
                   onClick={() => onPreview(index)}
                 >
-                  <img src={src} alt="" />
-                  {index === 0 && <b>{coverLabel}</b>}
+                  <img src={src} alt="" style={framed ? frameImageStyle(frames?.[index] ?? DEFAULT_FRAME) : undefined} />
+                  {isCarousel ? <b>{index === 0 ? `1 · ${coverLabel}` : index + 1}</b> : index === 0 && <b>{coverLabel}</b>}
                 </button>
+              </li>
+            ))}
+            {isCarousel && Array.from({ length: Math.max(0, MAX_SET_IMAGES - images.length) }, (_, slot) => (
+              <li key={`empty-${slot}`} className="set-slot-empty" aria-hidden="true">
+                <span className="set-thumb empty">{images.length + slot + 1}</span>
               </li>
             ))}
           </ul>
@@ -1970,6 +2132,7 @@ function ImageSetBoard({
 function CarouselManager() {
   const [slides, setSlides] = useState<string[]>([]);
   const [alts, setAlts] = useState<string[]>([]);
+  const [frames, setFrames] = useState<SlideFrame[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1987,6 +2150,7 @@ function CarouselManager() {
       const next = data.slice(0, MAX_SET_IMAGES);
       setSlides(next.map((slide) => slide.data).filter(Boolean));
       setAlts(next.map((slide) => slide.alt || ""));
+      setFrames(next.map((slide) => frameFromSlide(slide)));
       setPreviewIndex(0);
       setDirty(false);
     } catch (loadError) {
@@ -2000,9 +2164,10 @@ function CarouselManager() {
     void loadSlides();
   }, []);
 
-  const setOrder = (next: string[], nextAlts: string[], focus: number) => {
+  const setOrder = (next: string[], nextAlts: string[], focus: number, nextFrames: SlideFrame[] = frames) => {
     setSlides(next);
     setAlts(nextAlts);
+    setFrames(next.map((_, position) => nextFrames[position] ?? DEFAULT_FRAME));
     setPreviewIndex(Math.max(0, Math.min(focus, next.length - 1)));
     setDirty(true);
   };
@@ -2021,7 +2186,9 @@ function CarouselManager() {
         const data = await compressImage(picked[0]);
         const next = [...slides];
         next[previewIndex] = data;
-        setOrder(next, alts, previewIndex);
+        const nextFrames = [...frames];
+        nextFrames[previewIndex] = DEFAULT_FRAME;
+        setOrder(next, alts, previewIndex, nextFrames);
         return;
       }
       const room = MAX_SET_IMAGES - slides.length;
@@ -2037,7 +2204,7 @@ function CarouselManager() {
       if (picked.length > room) {
         setError(`Kept the first ${room} photo${room === 1 ? "" : "s"}. A carousel set can have at most ${MAX_SET_IMAGES}.`);
       }
-      setOrder([...slides, ...added], [...alts, ...added.map(() => "")], slides.length);
+      setOrder([...slides, ...added], [...alts, ...added.map(() => "")], slides.length, [...frames, ...added.map(() => DEFAULT_FRAME)]);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : String(uploadError));
     } finally {
@@ -2051,7 +2218,7 @@ function CarouselManager() {
       setError("Keep at least one photo in the carousel.");
       return;
     }
-    setOrder(slides.filter((_, position) => position !== index), alts.filter((_, position) => position !== index), index);
+    setOrder(slides.filter((_, position) => position !== index), alts.filter((_, position) => position !== index), index, frames.filter((_, position) => position !== index));
   };
 
   const move = (index: number, delta: number) => {
@@ -2061,7 +2228,9 @@ function CarouselManager() {
     const nextAlts = [...alts];
     [next[index], next[target]] = [next[target], next[index]];
     [nextAlts[index], nextAlts[target]] = [nextAlts[target], nextAlts[index]];
-    setOrder(next, nextAlts, target);
+    const nextFrames = [...frames];
+    [nextFrames[index], nextFrames[target]] = [nextFrames[target], nextFrames[index]];
+    setOrder(next, nextAlts, target, nextFrames);
   };
 
   const reorder = (from: number, to: number) => {
@@ -2069,9 +2238,25 @@ function CarouselManager() {
     const nextAlts = [...alts];
     const [moved] = next.splice(from, 1);
     const [movedAlt] = nextAlts.splice(from, 1);
+    const nextFrames = [...frames];
+    const [movedFrame] = nextFrames.splice(from, 1);
     next.splice(to, 0, moved);
     nextAlts.splice(to, 0, movedAlt);
-    setOrder(next, nextAlts, to);
+    nextFrames.splice(to, 0, movedFrame);
+    setOrder(next, nextAlts, to, nextFrames);
+  };
+
+  const updateFrame = (index: number, frame: SlideFrame) => {
+    setFrames((current) => {
+      const next = slides.map((_, position) => current[position] ?? DEFAULT_FRAME);
+      next[index] = {
+        x: clampNumber(frame.x, 0, 100, DEFAULT_FRAME.x),
+        y: clampNumber(frame.y, 0, 100, DEFAULT_FRAME.y),
+        zoom: clampNumber(frame.zoom, MIN_ZOOM, MAX_ZOOM, DEFAULT_FRAME.zoom),
+      };
+      return next;
+    });
+    setDirty(true);
   };
 
   const setSize = slides.reduce((total, src) => total + dataUrlBytes(src), 0);
@@ -2093,7 +2278,10 @@ function CarouselManager() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          slides: slides.map((data, index) => ({ data, alt: alts[index] || `Featured artwork ${index + 1}` })),
+          slides: slides.map((data, index) => {
+            const frame = frames[index] ?? DEFAULT_FRAME;
+            return { data, alt: alts[index] || `Featured artwork ${index + 1}`, focusX: frame.x, focusY: frame.y, zoom: frame.zoom };
+          }),
         }),
       });
       setDirty(false);
@@ -2144,7 +2332,32 @@ function CarouselManager() {
             setSize={setSize}
             coverLabel="First"
             addLabel={addLabel}
+            variant="carousel"
+            frames={frames}
+            onFrameChange={updateFrame}
           />
+          {slides.length > 0 && (
+            <fieldset className="carousel-frame-controls">
+              <legend>Framing for slide {previewIndex + 1}</legend>
+              <p>Click or drag on the preview to choose the focus point, or fine-tune below. The home hero uses exactly this framing.</p>
+              <label>
+                <span>Horizontal focus <b>{Math.round((frames[previewIndex] ?? DEFAULT_FRAME).x)}%</b></span>
+                <input type="range" min={0} max={100} step={1} value={(frames[previewIndex] ?? DEFAULT_FRAME).x}
+                  onChange={(event) => updateFrame(previewIndex, { ...(frames[previewIndex] ?? DEFAULT_FRAME), x: Number(event.target.value) })} />
+              </label>
+              <label>
+                <span>Vertical focus <b>{Math.round((frames[previewIndex] ?? DEFAULT_FRAME).y)}%</b></span>
+                <input type="range" min={0} max={100} step={1} value={(frames[previewIndex] ?? DEFAULT_FRAME).y}
+                  onChange={(event) => updateFrame(previewIndex, { ...(frames[previewIndex] ?? DEFAULT_FRAME), y: Number(event.target.value) })} />
+              </label>
+              <label>
+                <span>Zoom <b>{(frames[previewIndex] ?? DEFAULT_FRAME).zoom.toFixed(2)}×</b></span>
+                <input type="range" min={MIN_ZOOM} max={MAX_ZOOM} step={0.05} value={(frames[previewIndex] ?? DEFAULT_FRAME).zoom}
+                  onChange={(event) => updateFrame(previewIndex, { ...(frames[previewIndex] ?? DEFAULT_FRAME), zoom: Number(event.target.value) })} />
+              </label>
+              <button type="button" className="carousel-frame-reset" onClick={() => updateFrame(previewIndex, DEFAULT_FRAME)}>Reset framing</button>
+            </fieldset>
+          )}
           {slides.length > 0 && (
             <label className="carousel-alt-field">
               Alt text for this slide
@@ -2785,7 +2998,7 @@ function RequestDetail({ request, close }: { request: CommissionRequest; close: 
             ["Due date", request.dueDate], 
             ["Estimate", (() => { const price = getRequestPrice(request); return price.isForeign ? `${price.original} ${price.currency} ≈ ${price.php} PHP` : `${price.php} PHP`; })()],
             ...(getRequestPrice(request).isForeign
-              ? [["Rate at submission", `1 ${getRequestPrice(request).currency} = ₱${getRequestPrice(request).rate} PHP (saved with this request)`]]
+              ? [["Rate at submission", `1 ${getRequestPrice(request).currency} ≈ ₱${getRequestPrice(request).rate} PHP (reference rate; the client was quoted in ${getRequestPrice(request).currency})`]]
               : []),
             ["Project notes", request.notes]
           ].map(([label, answer]) => (
