@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import logo from "./assets/kyuu-logo.png";
 import titleHero from "./assets/title-hero.png";
@@ -554,9 +554,11 @@ const SKELETON_HEIGHTS = [220, 300, 180, 260, 320, 200];
 
 function Home() {
   // The worker returns thumbnails here (not full-size images), which keeps the gallery fast.
+  // On mobile (<= 860px / touch) the tiles show only the artwork; the overlay is hidden in CSS.
   const { items: published, loading, error } = useApiData<PublishedItem>("/api/gallery");
   const [selected, setSelected] = useState<GalleryItem | null>(null);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [upgrading, setUpgrading] = useState(false);
   const cols = useColumnCount();
 
   const items: GalleryItem[] = useMemo(() => published
@@ -586,19 +588,30 @@ function Home() {
     return result;
   }, [items, cols]);
 
+  // The gallery list only carries thumbnails. When an artwork opens, show the thumbnail instantly,
+  // then swap in the full-resolution set from /api/gallery/:id/images (for single- and multi-image items).
   useEffect(() => {
     if (!selected || !("image" in selected)) {
       setSelectedImages([]);
+      setUpgrading(false);
       return;
     }
     setSelectedImages(selected.image ? [selected.image] : []);
-    if (!selected.imageCount || selected.imageCount < 2) return;
     let active = true;
+    setUpgrading(true);
     apiRequest<{ images: string[] }>(`/api/gallery/${selected.id}/images`)
-      .then((data) => {
-        if (active && Array.isArray(data.images) && data.images.length) setSelectedImages(data.images);
+      .then(async (data) => {
+        if (!active || !Array.isArray(data.images) || !data.images.length) return;
+        // Decode the first full image before swapping so the thumbnail never flashes to blank.
+        try {
+          const probe = new Image();
+          probe.src = data.images[0];
+          await probe.decode();
+        } catch { /* decoding is best-effort; the <img> will still load it */ }
+        if (active) setSelectedImages(data.images);
       })
-      .catch((loadError) => console.error("Failed to load the full image set:", loadError));
+      .catch((loadError) => console.error("Failed to load the full-resolution images:", loadError))
+      .finally(() => { if (active) setUpgrading(false); });
     return () => { active = false; };
   }, [selected]);
 
@@ -663,7 +676,7 @@ function Home() {
         <div className="modal-backdrop" onMouseDown={() => setSelected(null)}>
           <div className="project-modal" role="dialog" aria-modal="true" aria-labelledby="project-title" onMouseDown={(e) => e.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="Close artwork details" autoFocus onClick={() => setSelected(null)}><Icon name="close" /></button>
-            <ImageCarousel key={selected.id} images={selectedImages} title={selected.title} />
+            <ImageCarousel key={selected.id} images={selectedImages} title={selected.title} loadingFull={upgrading} />
             <div className="project-copy">
               <p className="kicker">{selected.type} · Featured project</p>
               <h2 id="project-title">{selected.title}</h2>
@@ -759,18 +772,79 @@ type GalleryItem =
       format?: string;
     };
 
-function ImageCarousel({ images, title }: { images: string[]; title: string }) {
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 4;
+const ZOOM_STEP = 0.5;
+
+function ImageCarousel({ images, title, loadingFull = false }: { images: string[]; title: string; loadingFull?: boolean }) {
   const [index, setIndex] = useState(0);
+  const [zoom, setZoom] = useState(ZOOM_MIN);
+  const [dragging, setDragging] = useState(false);
   const touchStart = useRef<number | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const zoomRef = useRef(ZOOM_MIN);
+  const frameRef = useRef(0);
+  // Where (0-1) the viewport centre sits inside the zoomed canvas; keeps zoom centred instead of jumping to a corner.
+  const anchor = useRef({ x: 0.5, y: 0.5 });
+  const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const total = images.length;
 
   useEffect(() => { setIndex(0); }, [images]);
 
   const step = (delta: number) => setIndex((current) => (current + delta + total) % total);
 
+  const captureAnchor = () => {
+    const view = viewportRef.current;
+    if (!view) return;
+    anchor.current = {
+      x: view.scrollWidth > view.clientWidth ? (view.scrollLeft + view.clientWidth / 2) / view.scrollWidth : 0.5,
+      y: view.scrollHeight > view.clientHeight ? (view.scrollTop + view.clientHeight / 2) / view.scrollHeight : 0.5,
+    };
+  };
+
+  // After every zoom change put the remembered centre back in the middle of the viewport.
+  useLayoutEffect(() => {
+    const view = viewportRef.current;
+    if (!view) return;
+    view.scrollLeft = anchor.current.x * view.scrollWidth - view.clientWidth / 2;
+    view.scrollTop = anchor.current.y * view.scrollHeight - view.clientHeight / 2;
+  }, [zoom]);
+
+  const zoomTo = (target: number) => {
+    const to = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, target));
+    const from = zoomRef.current;
+    window.cancelAnimationFrame(frameRef.current);
+    if (to === from) return;
+    captureAnchor();
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const duration = calm ? 0 : 200;
+    const startedAt = performance.now();
+    const tick = (now: number) => {
+      const t = duration === 0 ? 1 : Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const value = t >= 1 ? to : from + (to - from) * eased;
+      zoomRef.current = value;
+      setZoom(value);
+      if (t < 1) frameRef.current = window.requestAnimationFrame(tick);
+    };
+    frameRef.current = window.requestAnimationFrame(tick);
+  };
+
+  // A new image (or a new set) always starts fitted and unzoomed.
+  useEffect(() => {
+    window.cancelAnimationFrame(frameRef.current);
+    anchor.current = { x: 0.5, y: 0.5 };
+    zoomRef.current = ZOOM_MIN;
+    setZoom(ZOOM_MIN);
+  }, [index, images]);
+
+  useEffect(() => () => window.cancelAnimationFrame(frameRef.current), []);
+
   useEffect(() => {
     if (total < 2) return;
     const onKey = (event: KeyboardEvent) => {
+      // While zoomed, the arrow keys pan the image instead of changing it.
+      if (zoomRef.current > ZOOM_MIN + 0.001) return;
       if (event.key === "ArrowLeft") setIndex((current) => (current - 1 + total) % total);
       if (event.key === "ArrowRight") setIndex((current) => (current + 1) % total);
     };
@@ -781,6 +855,9 @@ function ImageCarousel({ images, title }: { images: string[]; title: string }) {
   if (total === 0) {
     return <div className="project-image"><ArtVisual art="placeholder" label={title} /></div>;
   }
+
+  const isZoomed = zoom > ZOOM_MIN + 0.001;
+  const percent = Math.round(zoom * 100);
 
   return (
     <div
@@ -793,10 +870,45 @@ function ImageCarousel({ images, title }: { images: string[]; title: string }) {
         if (touchStart.current === null || total < 2) return;
         const distance = event.changedTouches[0].clientX - touchStart.current;
         touchStart.current = null;
+        // Swiping pans a zoomed image; it only changes slides when the image is fitted.
+        if (zoomRef.current > ZOOM_MIN + 0.001) return;
         if (Math.abs(distance) > 45) step(distance < 0 ? 1 : -1);
       }}
     >
-      <img className="gallery-real-image" src={images[index]} alt={total > 1 ? `${title}, image ${index + 1} of ${total}` : title} />
+      <div
+        ref={viewportRef}
+        className={`zoom-viewport${isZoomed ? " is-zoomed" : ""}${dragging ? " is-dragging" : ""}`}
+        tabIndex={isZoomed ? 0 : -1}
+        aria-label={isZoomed ? "Zoomed artwork. Scroll or drag to pan." : undefined}
+        onDoubleClick={() => zoomTo(zoomRef.current > ZOOM_MIN + 0.001 ? ZOOM_MIN : 2)}
+        onPointerDown={(event) => {
+          const view = viewportRef.current;
+          if (!view || event.pointerType !== "mouse" || event.button !== 0 || zoomRef.current <= ZOOM_MIN + 0.001) return;
+          drag.current = { x: event.clientX, y: event.clientY, left: view.scrollLeft, top: view.scrollTop };
+          view.setPointerCapture(event.pointerId);
+          setDragging(true);
+        }}
+        onPointerMove={(event: ReactPointerEvent<HTMLDivElement>) => {
+          const view = viewportRef.current;
+          if (!view || !drag.current) return;
+          view.scrollLeft = drag.current.left - (event.clientX - drag.current.x);
+          view.scrollTop = drag.current.top - (event.clientY - drag.current.y);
+        }}
+        onPointerUp={() => { drag.current = null; setDragging(false); }}
+        onPointerCancel={() => { drag.current = null; setDragging(false); }}
+      >
+        <div className="zoom-canvas" style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%` }}>
+          <img
+            className="zoom-image"
+            src={images[index]}
+            alt={total > 1 ? `${title}, image ${index + 1} of ${total}` : title}
+            decoding="async"
+            draggable={false}
+          />
+        </div>
+      </div>
+
+      {loadingFull && <span className="zoom-status" role="status">Loading full resolution…</span>}
 
       {total > 1 && (
         <>
@@ -821,6 +933,16 @@ function ImageCarousel({ images, title }: { images: string[]; title: string }) {
           <p className="sr-only" aria-live="polite">Image {index + 1} of {total}</p>
         </>
       )}
+
+      <div className="zoom-controls" role="group" aria-label="Zoom artwork">
+        <button type="button" className="zoom-btn" aria-label="Zoom out" disabled={zoom <= ZOOM_MIN + 0.001} onClick={() => zoomTo(zoomRef.current - ZOOM_STEP)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /></svg>
+        </button>
+        <button type="button" className="zoom-reset" aria-label={`Reset zoom (currently ${percent}%)`} disabled={!isZoomed} onClick={() => zoomTo(ZOOM_MIN)}>{percent}%</button>
+        <button type="button" className="zoom-btn" aria-label="Zoom in" disabled={zoom >= ZOOM_MAX - 0.001} onClick={() => zoomTo(zoomRef.current + ZOOM_STEP)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
+      </div>
     </div>
   );
 }
