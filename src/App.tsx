@@ -1072,7 +1072,7 @@ const compressReference = (file: File): Promise<string> =>
   });
 
 function Commission({ go }: { go: (page: Page) => void }) {
-  const { currency, rates, ratesLive, money, convert } = useCurrency();
+  const { currency, rates, money, convert } = useCurrency();
   const [step, setStep] = useState(1);
   const [fill, setFill] = useState(0);
   const [form, setForm] = useState<CommissionForm>(EMPTY_FORM);
@@ -1489,15 +1489,7 @@ function Commission({ go }: { go: (page: Page) => void }) {
                   {order.fees.length === 0 && form.license !== "Commercial" && <div className="cf-list-row"><span>None</span><span>{rowAmount(0)}</span></div>}
                 </div>
                 <div className="cf-total"><span>ESTIMATED TOTAL</span><strong>{formatAmount(displayedTotal, currency)}</strong></div>
-                <p className="cf-note">* Commercial Type price is not included in the estimated total.</p>
-                {currency !== "USD" && (
-                  <p className="cf-rate-note">
-                    {currency === "ROBUX"
-                      ? `Robux rate: $25 = ${(25 * ROBUX_PER_USD).toLocaleString("en-US")} R$ and $30 = ${(30 * ROBUX_PER_USD).toLocaleString("en-US")} R$.`
-                      : `Prices are set in USD and converted at ${ratesLive ? "today’s" : "an approximate"} rate: $1 = ${CURRENCIES[currency].symbol}${unitsPerUsd(currency, rates).toLocaleString("en-US", { maximumFractionDigits: 4 })}.`}
-                  </p>
-                )}
-                <p className="cf-rate-note">GCash is the accepted payment platform. Final confirmation is sent after review.</p>
+                {form.license === "Commercial" && <p className="cf-note">* Commercial Type price is not included in the estimated total.</p>}
                 {submitError && <p className="cf-banner" role="alert">{submitError}</p>}
               </div>
             )}
@@ -3124,8 +3116,8 @@ const SOCIAL_LINKS = {
   email: "mailto:kyuukyuuji@gmail.com",
   instagram: "https://www.instagram.com/jeii_ji",
   facebook: "https://www.facebook.com/christinejoy.morata02/",
-  tiktok: "https://www.tiktok.com/@kyuukyuuji",
-  discord: "https://discord.com/users/780783345486659586",
+  tiktok: "",
+  discord: "",
 };
 
 type SocialKey = "facebook" | "instagram" | "tiktok" | "discord" | "mail";

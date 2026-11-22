@@ -361,7 +361,8 @@ h1 em,  h2 em { color: var(--orange); }
   :root { --nav-h: 68px; }
 }
 .app-theme { background-color: var(--paper); }
-.app-theme ::selection { background: var(--gold); color: var(--text); }
+::selection { background: rgb(160 160 160 / .45); color: inherit; }
+::-moz-selection { background: rgb(160 160 160 / .45); color: inherit; }
 .app-theme :is(h1, h2) em { text-decoration: underline; text-decoration-color: var(--gold); text-decoration-thickness: 2px; text-underline-offset: .14em; }
 .app-theme .btn { position: relative; border-radius: 999px; transition: transform .2s, box-shadow .2s, background .2s, color .2s, border-color .2s; }
 .app-theme .btn-ghost { text-decoration: none; }
