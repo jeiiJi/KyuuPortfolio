@@ -179,7 +179,38 @@ const number = (value, min, max, fallback) => {
   return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
 };
 
-const SUPPORTED_CURRENCIES = ["PHP", "USD", "EUR"];
+// USD is the default. EUR and PHP are live fiat conversions of the USD price; ROBUX is a fixed rate
+// ($25 = 2,500 and $30 = 3,000, i.e. 100 Robux per US dollar).
+const SUPPORTED_CURRENCIES = ["USD", "EUR", "PHP", "ROBUX"];
+const DEFAULT_CURRENCY = "USD";
+const ROBUX_PER_USD = 100;
+const FALLBACK_RATES = { EUR: 0.92, PHP: 58 }; // approximate; only used when the rate provider is down
+const RATES_URL = "https://open.er-api.com/v6/latest/USD"; // free, no API key
+const RATES_TTL_SECONDS = 60 * 60;
+
+// Live USD -> EUR / PHP rates, cached at the edge for an hour so most requests never leave Cloudflare.
+const getRates = async (ctx) => {
+  const cache = caches.default;
+  const cacheKey = new Request("https://rates.internal/usd");
+  const cached = await cache.match(cacheKey);
+  if (cached) return cached.json();
+  let payload;
+  try {
+    const response = await fetch(RATES_URL, { cf: { cacheTtl: RATES_TTL_SECONDS } });
+    const data = await response.json();
+    const eur = Number(data?.rates?.EUR);
+    const php = Number(data?.rates?.PHP);
+    if (!response.ok || !(eur > 0) || !(php > 0)) throw new Error("bad rate payload");
+    payload = { base: "USD", rates: { EUR: eur, PHP: php }, robuxPerUsd: ROBUX_PER_USD, live: true, updatedAt: new Date().toISOString() };
+  } catch (error) {
+    console.error("Exchange rate lookup failed, using fallback rates:", error);
+    // Fallbacks are returned but not cached for long, so the next request tries the provider again.
+    return { base: "USD", rates: FALLBACK_RATES, robuxPerUsd: ROBUX_PER_USD, live: false, updatedAt: null };
+  }
+  const toCache = new Response(JSON.stringify(payload), { headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${RATES_TTL_SECONDS}` } });
+  if (ctx?.waitUntil) ctx.waitUntil(cache.put(cacheKey, toCache)); else await cache.put(cacheKey, toCache);
+  return payload;
+};
 
 // Adds the currency columns to older databases the first time the worker runs.
 // (migrations/0001_add_currency_to_commissions.sql does the same thing for wrangler.)
@@ -237,15 +268,16 @@ const cleanCommission = (data) => {
 
   // The currency the client chose, the total they were shown in it, and the rate used.
   // Stored as sent so historical records never shift when rates change later.
-  const currency = SUPPORTED_CURRENCIES.includes(data.currency) ? data.currency : "PHP";
-  const totalPhp = Math.round(number(data.totalPhp, 0, 10_000_000, 0));
+  // exchangeRate = PHP per 1 unit of the chosen currency.
+  const currency = SUPPORTED_CURRENCIES.includes(data.currency) ? data.currency : DEFAULT_CURRENCY;
   const exchangeRate = currency === "PHP" ? 1 : number(data.exchangeRate, 0, 100000, 0);
   if (currency !== "PHP" && !(exchangeRate > 0)) {
     throw new HttpError(400, "The exchange rate for the selected currency is missing.");
   }
-  const totalAmount = currency === "PHP"
-    ? totalPhp
-    : Math.round(number(data.totalAmount, 0, 1_000_000_000, 0) * 100) / 100;
+  const totalAmount = Math.round(number(data.totalAmount, 0, 1_000_000_000, 0) * 100) / 100;
+  // Peso equivalent for the admin list: trust the client's figure, otherwise derive it from the rate.
+  const sentPhp = Math.round(number(data.totalPhp, 0, 10_000_000, 0));
+  const totalPhp = currency === "PHP" ? Math.round(totalAmount) : sentPhp || Math.round(totalAmount * exchangeRate);
 
   const id = Number(data.id);
   return {
@@ -271,7 +303,7 @@ const cleanCommission = (data) => {
 };
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
 
@@ -312,8 +344,10 @@ export default {
         const username = text(body.username, 256);
         const password = text(body.password, 256);
 
-        const userOk = username === "kyuuji";
-        const passwordOk = password === "kYu9j1@36t2P";
+        // Prefer ADMIN_USERNAME / ADMIN_PASSWORD secrets (wrangler secret put ...). The old hard-coded
+        // values still work until you set them, but they should be moved out of this file.
+        const userOk = username === (env.ADMIN_USERNAME || "kyuuji");
+        const passwordOk = password === (env.ADMIN_PASSWORD || "kYu9j1@36t2P");
 
         if (!userOk || !passwordOk) {
           await env.DB.batch([
@@ -332,6 +366,11 @@ export default {
 
       if (needsAdmin(request.method, path) && !(await hasAdminSession(request, env))) {
         return Response.json({ error: "Please log in as admin to do that." }, { status: 401, headers: corsHeaders });
+      }
+
+      if (path === "/api/rates" && request.method === "GET") {
+        const rates = await getRates(ctx);
+        return Response.json(rates, { headers: { ...corsHeaders, "Cache-Control": `public, max-age=${rates.live ? 600 : 30}` } });
       }
 
       if (path === "/api/commissions" && request.method === "GET") {
@@ -356,6 +395,9 @@ export default {
 
       if (path === "/api/commissions" && request.method === "POST") {
         const c = cleanCommission(await readJson(request));
+        if (c.type.startsWith("Semi-Realistic")) {
+          throw new HttpError(400, "Semi-Realistic commissions are no longer available. Please choose Chibi.");
+        }
         await ensureCurrencyColumns(env);
 
         await env.DB.prepare(`

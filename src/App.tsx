@@ -1,12 +1,12 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
-import logo from "./assets/inkdrop-logo.png";
-import brandName from "./assets/brand-name.png";
+import logo from "./assets/kyuu-logo.png";
+import titleHero from "./assets/title-hero.png";
+import chibiHero from "./assets/chibi-hero.png";
 import placeholder from "./assets/placeholder.svg";
-import chibiReference from "./assets/Untitled201_20261021205439.png";
 const API_URL = "";
 
-type Page = "home" | "guide" | "commission" | "admin";
+type Page = "home" | "about" | "guide" | "commission" | "admin";
 type CommissionRequest = {
   id: number; name: string; email: string; social: string; type: string; finish: string;
   characters: number; background: string; commercial: boolean; priority: boolean;
@@ -22,28 +22,18 @@ type PublishedItem = {
   imageCount?: number; tools?: string; format?: string;
   publishedAt: string;
 };
-type CarouselSlide = { position: number; data: string; alt: string; version?: number; focusX?: number; focusY?: number; zoom?: number };
-// Framing for one hero slide: focal point (0-100 % from the left/top) and zoom (1 = fit to cover).
+// Framing for one image: focal point (0-100 % from the left/top) and zoom (1 = fit to cover).
 type SlideFrame = { x: number; y: number; zoom: number };
 const DEFAULT_FRAME: SlideFrame = { x: 50, y: 50, zoom: 1 };
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 3;
 const clampNumber = (value: unknown, min: number, max: number, fallback: number) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
 };
-const frameFromSlide = (slide: Partial<CarouselSlide>): SlideFrame => ({
-  x: clampNumber(slide.focusX, 0, 100, DEFAULT_FRAME.x),
-  y: clampNumber(slide.focusY, 0, 100, DEFAULT_FRAME.y),
-  zoom: clampNumber(slide.zoom, MIN_ZOOM, MAX_ZOOM, DEFAULT_FRAME.zoom),
-});
-// Used by BOTH the home hero and the admin preview so the two always frame an image identically.
 const frameImageStyle = (frame: SlideFrame): CSSProperties => ({
   objectPosition: `${frame.x}% ${frame.y}%`,
   transformOrigin: `${frame.x}% ${frame.y}%`,
   transform: frame.zoom > 1 ? `scale(${frame.zoom})` : undefined,
 });
-type GallerySelection = { category: "Chibi" | "Semi-Realistic"; facet: "Scope" | "Services" | "Color Finish"; value: string };
 type AdminLibraryItem = {
   id: number; title: string; description: string; image?: string;
   category?: string; publishedAt?: string;
@@ -110,7 +100,7 @@ const Btn = ({ children, kind = "primary", onClick, type = "button", className =
 
 const apiRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(`${API_URL}${path}`, { credentials: "same-origin", ...init });
-  if (response.status === 401) window.dispatchEvent(new Event("inkyuu:signed-out"));
+  if (response.status === 401) window.dispatchEvent(new Event("kyuuji:signed-out"));
   const text = await response.text();
   let data: unknown;
 
@@ -162,169 +152,135 @@ function useApiData<T>(path: string) {
   return { items, error, loading };
 }
 // ---------------------------------------------------------------------------
-// Multi-currency + independent pricing
+// Currency + pricing
 //
-// PHP and USD are two SEPARATE price lists (see PRICE_TABLES below):
-//   - PHP is tailored for local clients / meet-ups.
-//   - USD is set on its own for international clients. It is NOT PHP / rate.
-// EUR has no price list of its own: it is the USD price translated into euro
-// with EUR_PER_USD.
-//
-// To re-quote, edit PRICE_TABLES.USD (or PRICE_TABLES.PHP) and/or the rates
-// below. Records that were already submitted keep what they were saved with.
+// Everything is priced in USD first. The two base prices are the only "real" numbers:
+//   Headshot = $25, Full Body = $30.
+// Every add-on / discount below is a share of the selected base price, so changing a base price
+// re-quotes the whole menu. Other currencies are conversions of the USD amount:
+//   EUR, PHP  -> live fiat rates from the worker (/api/rates), with a fallback if it is unreachable
+//   ROBUX     -> fixed rate, $25 = 2,500 R$ and $30 = 3,000 R$ (100 R$ per $1)
+// Submitted records keep the currency, total and rate the client was shown.
 // ---------------------------------------------------------------------------
-type CurrencyCode = "PHP" | "USD" | "EUR";
+type CurrencyCode = "USD" | "EUR" | "PHP" | "ROBUX";
+type FiatRates = { EUR: number; PHP: number }; // units of currency per 1 USD
 
-// Standard conversion used to derive EUR from the USD price (1 USD = X EUR).
-const EUR_PER_USD = 1.12;
-// Reference only: lets the admin see a rough peso equivalent of USD / EUR
-// requests. It is never used to price anything shown to a client.
-const PHP_PER_USD_REFERENCE = 63.59;
+const ROBUX_PER_USD = 100;
+// Only used when /api/rates cannot be reached. Approximate on purpose; live rates replace them.
+const FALLBACK_RATES: FiatRates = { EUR: 0.92, PHP: 58 };
+const RATES_CACHE_KEY = "kyuuji:rates";
+const RATES_CACHE_MS = 30 * 60 * 1000;
 
-const CURRENCIES: Record<CurrencyCode, { symbol: string; label: string; phpPerUnit: number; decimals: number }> = {
-  PHP: { symbol: "₱", label: "Philippine peso", phpPerUnit: 1, decimals: 0 },
-  USD: { symbol: "$", label: "US dollar", phpPerUnit: PHP_PER_USD_REFERENCE, decimals: 2 },
-  EUR: { symbol: "€", label: "Euro", phpPerUnit: roundToDecimals(PHP_PER_USD_REFERENCE / EUR_PER_USD, 2), decimals: 2 },
+const CURRENCIES: Record<CurrencyCode, { symbol: string; label: string; short: string; decimals: number }> = {
+  USD: { symbol: "$", label: "US dollar", short: "$ USD", decimals: 2 },
+  EUR: { symbol: "€", label: "Euro", short: "€ EURO", decimals: 2 },
+  PHP: { symbol: "₱", label: "Philippine peso", short: "₱ PHP", decimals: 0 },
+  ROBUX: { symbol: "R$", label: "Robux", short: "ROBUX", decimals: 0 },
 };
 const CURRENCY_CODES = Object.keys(CURRENCIES) as CurrencyCode[];
-const CURRENCY_STORAGE_KEY = "inkyuu:currency";
+const CURRENCY_STORAGE_KEY = "kyuuji:currency";
 
 function roundToDecimals(value: number, decimals: number) {
   const factor = 10 ** decimals;
   return Math.round((value + Number.EPSILON) * factor) / factor;
 }
 
-// Every number that makes up a quote. PHP and USD each get their own copy.
-type PriceTable = {
-  chibiBase: Record<string, number>;
-  semiBase: Record<string, number>;
-  semiColor: Record<string, number>;
-  chibiBackground: Record<string, number>;
-  semiBackground: Record<string, number>;
-  stickerDiscountBase: number;   // discount for a 4-sticker set ...
-  stickerDiscountStep: number;   // ... plus this much for every extra sticker
-  acrylicExtra: number;
-  badgesExtra: number;
-  referenceSheetExtra: number;
-  modelSheetExtra: number;
-  ychDiscount: number;
-  alternatesExtra: number;
-  extraCharacterFlatChibi: number;  // each extra character costs 80% of the scope total + this
-  extraCharacterFlatSemi: number;
+const BASE_PRICES_USD: Record<string, number> = { Headshot: 25, Fullbody: 30 };
+const BASE_LABELS: Record<string, string> = { Headshot: "Headshot", Fullbody: "Full Body" };
+const MAX_CHARACTERS = 6;
+
+// Shares of the selected base price.
+const ADDON_RATES = {
+  stickerDiscountBase: 0.12,  // discount for a 4-sticker set ...
+  stickerDiscountStep: 0.06,  // ... plus this much for every extra sticker
+  acrylicExtra: 0.30,
+  badgesExtra: 0.18,
+  referenceSheetExtra: 0.18,
+  modelSheetExtra: 1.75,
+  ychDiscount: 0.06,
+  alternatesExtra: 0.18,
+  extraCharacterFlat: 0.20,   // each extra character costs 80% of the scope total + this
+  complexBackground: 0.30,
 };
 
-// Commercial use adds 50% of the base estimated total (no fixed price).
-const COMMERCIAL_SURCHARGE_RATE = 0.5;
+const CHIBI_SERVICE_OPTIONS = [
+  { value: "Solo Deals", label: "Solo Deals" },
+  { value: "Sticker set", label: "Sticker set" },
+  { value: "Acrylic Merch", label: "Acrylic Merch" },
+  { value: "Badges/Pins/Pfp Design", label: "Badges/Pins/Pfp Design" },
+  { value: "Character Reference sheet", label: "Character Reference sheet" },
+  { value: "2D Model character sheet", label: "2D Model character sheet" },
+  { value: "YCH", label: "YCH (Your Character Here)" },
+  { value: "Alternate outfits/expressions", label: "Alternate outfits/expressions" },
+];
+const BACKGROUND_OPTIONS = [
+  { value: "None/Transparent", label: "None / Transparent" },
+  { value: "Plain", label: "Plain Solid Color" },
+  { value: "Complex", label: "Complex Background" },
+];
 
-const PRICE_TABLES: Record<"PHP" | "USD", PriceTable> = {
-  // Local clients / meet-ups (pesos).
-  PHP: {
-    chibiBase: { Headshot: 170, Fullbody: 200 },
-    semiBase: { Headshot: 250, "Bust-up": 380, "Waist-up": 520, "Thigh-up": 680 },
-    semiColor: { Rendered: 475, Plain: 280 },
-    chibiBackground: { Complex: 50, Plain: 0, "None/Transparent": 0 },
-    semiBackground: { Complex: 220, Plain: 150, "None/Transparent": 680 },
-    stickerDiscountBase: 20,
-    stickerDiscountStep: 10,
-    acrylicExtra: 50,
-    badgesExtra: 30,
-    referenceSheetExtra: 30,
-    modelSheetExtra: 300,
-    ychDiscount: 10,
-    alternatesExtra: 30,
-    extraCharacterFlatChibi: 35,
-    extraCharacterFlatSemi: 50,
-  },
-  // International clients (US dollars). Set these on their own, independent of
-  // the peso list. The values below are starting figures: change them freely.
-  USD: {
-    chibiBase: { Headshot: 8, Fullbody: 10 },
-    semiBase: { Headshot: 15, "Bust-up": 23, "Waist-up": 35, "Thigh-up": 40 },
-    semiColor: { Rendered: 15, Plain: 9 },
-    chibiBackground: { Complex: 2, Plain: 0, "None/Transparent": 0 },
-    semiBackground: { Complex: 7, Plain: 5, "None/Transparent": 21 },
-    stickerDiscountBase: 1,
-    stickerDiscountStep: 0.5,
-    acrylicExtra: 2,
-    badgesExtra: 1,
-    referenceSheetExtra: 1,
-    modelSheetExtra: 8,
-    ychDiscount: 0.5,
-    alternatesExtra: 3,
-    extraCharacterFlatChibi: 3,
-    extraCharacterFlatSemi: 2,
-  },
-};
+const usd = (value: number) => roundToDecimals(value, 2);
 
-type PricingInput = {
-  artStyle: string; baseOption: string; chibiService: string; stickerCount: number;
-  alternativesCount: number; colorOption: string; bgOption: string; characters: number;
-  usageType: string; dueDate: string;
-};
-
-// Works out the quote from one price list. All amounts come back in that list's
-// own currency (PHP list -> pesos, USD list -> dollars).
-const calculatePricing = (form: PricingInput, table: PriceTable, decimals: number) => {
-  const round = (value: number) => roundToDecimals(value, decimals);
-  const isChibi = form.artStyle === "Chibi";
-  const isSemi = form.artStyle === "Semi-Realistic";
-
-  const basePrice = isChibi ? (table.chibiBase[form.baseOption] ?? 0)
-    : isSemi ? (table.semiBase[form.baseOption] ?? 0)
-    : 0;
-
-  const chibiServicePrice = (() => {
-    if (!isChibi || !form.chibiService) return 0;
-    switch (form.chibiService) {
-      case "Solo Deals": return basePrice;
-      case "Sticker set": {
-        const discount = table.stickerDiscountBase + (form.stickerCount - 4) * table.stickerDiscountStep;
-        return round(basePrice * form.stickerCount - discount);
-      }
-      case "Acrylic Merch": return round(basePrice + table.acrylicExtra);
-      case "Badges/Pins/Pfp Design": return round(basePrice + table.badgesExtra);
-      case "Character Reference sheet": return round(basePrice * 4 + table.referenceSheetExtra);
-      case "2D Model character sheet": return round(basePrice * 5 + table.modelSheetExtra);
-      case "YCH": return Math.max(0, round(basePrice - table.ychDiscount));
-      case "Alternate outfits/expressions": return round(basePrice * form.alternativesCount + table.alternatesExtra);
-      default: return 0;
-    }
-  })();
-
-  const colorPrice = isSemi ? (table.semiColor[form.colorOption] ?? 0) : 0;
-  const bgPrice = isChibi ? (table.chibiBackground[form.bgOption] ?? 0)
-    : isSemi ? (table.semiBackground[form.bgOption] ?? 0)
-    : 0;
-
-  const scopeAndOptionsTotal = isChibi ? chibiServicePrice + bgPrice : basePrice + colorPrice + bgPrice;
-
-  const charMultiplier = form.characters > 1
-    ? (form.characters - 1) * (
-        isSemi ? round(scopeAndOptionsTotal * 0.80 + table.extraCharacterFlatSemi)
-        : isChibi ? round(scopeAndOptionsTotal * 0.80 + table.extraCharacterFlatChibi)
-        : 0
-      )
-    : 0;
-
-  const subtotal = round(scopeAndOptionsTotal + charMultiplier);
-  // Base estimated total x 1.5 when commercial: the fee is 50% of the subtotal.
-  const commercialFee = form.usageType === "Commercial Use" ? round(subtotal * COMMERCIAL_SURCHARGE_RATE) : 0;
-
-  let dueDateRate = 0;
-  if (form.dueDate) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const diffDays = Math.ceil((new Date(form.dueDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    dueDateRate = diffDays > 14 ? 0.10 : 0.18;
+// Total price of a Chibi service in USD, base price included (same rules as the old PHP/USD lists).
+const servicePriceUsd = (service: string, base: number, stickerCount: number, alternativesCount: number) => {
+  switch (service) {
+    case "Solo Deals": return base;
+    case "Sticker set": return usd(base * stickerCount - base * (ADDON_RATES.stickerDiscountBase + (stickerCount - 4) * ADDON_RATES.stickerDiscountStep));
+    case "Acrylic Merch": return usd(base + base * ADDON_RATES.acrylicExtra);
+    case "Badges/Pins/Pfp Design": return usd(base + base * ADDON_RATES.badgesExtra);
+    case "Character Reference sheet": return usd(base * 4 + base * ADDON_RATES.referenceSheetExtra);
+    case "2D Model character sheet": return usd(base * 5 + base * ADDON_RATES.modelSheetExtra);
+    case "YCH": return Math.max(0, usd(base - base * ADDON_RATES.ychDiscount));
+    case "Alternate outfits/expressions": return usd(base * alternativesCount + base * ADDON_RATES.alternatesExtra);
+    default: return base;
   }
-  const priorityFee = form.dueDate ? round(subtotal * dueDateRate) : 0;
-  const total = round(subtotal + commercialFee + priorityFee);
-
-  return { basePrice, chibiServicePrice, colorPrice, bgPrice, charMultiplier, subtotal, commercialFee, dueDateRate, priorityFee, total };
+};
+// What the service adds on top of the base scope (this is the number shown in the dropdown).
+const serviceFeeUsd = (service: string, baseOption: string, stickerCount: number, alternativesCount: number) => {
+  const base = BASE_PRICES_USD[baseOption] ?? BASE_PRICES_USD.Headshot;
+  return usd(servicePriceUsd(service, base, stickerCount, alternativesCount) - base);
+};
+const backgroundFeeUsd = (background: string, baseOption: string) => {
+  const base = BASE_PRICES_USD[baseOption] ?? BASE_PRICES_USD.Headshot;
+  return background === "Complex" ? usd(base * ADDON_RATES.complexBackground) : 0;
 };
 
-// USD -> EUR. EUR is always derived from the independent USD price.
-const usdToEur = (usd: number) => roundToDecimals(usd * EUR_PER_USD, 2);
+type OrderInput = {
+  baseOption: string; chibiService: string; stickerCount: number; alternativesCount: number;
+  bgOption: string; characters: number; dueDate: string;
+};
+type OrderLine = { key: string; label: string; usd: number };
+
+const dueDateFeeRate = (dueDate: string) => {
+  if (!dueDate) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(`${dueDate}T00:00`);
+  const diffDays = Math.ceil((due.getTime() - today.getTime()) / 86400000);
+  return diffDays > 14 ? 0.10 : 0.18;
+};
+
+const buildOrder = (form: OrderInput) => {
+  const base = BASE_PRICES_USD[form.baseOption] ?? 0;
+  const serviceFee = form.chibiService && base ? serviceFeeUsd(form.chibiService, form.baseOption, form.stickerCount, form.alternativesCount) : 0;
+  const bgFee = base ? backgroundFeeUsd(form.bgOption, form.baseOption) : 0;
+  const scopeTotal = usd(base + serviceFee + bgFee);
+  const extraCharacterCost = form.characters > 1 ? usd((form.characters - 1) * (scopeTotal * 0.8 + base * ADDON_RATES.extraCharacterFlat)) : 0;
+  const subtotal = usd(scopeTotal + extraCharacterCost);
+  const priorityRate = dueDateFeeRate(form.dueDate);
+  const priorityFee = usd(subtotal * priorityRate);
+
+  const serviceNote = form.chibiService === "Sticker set" ? ` (${form.stickerCount} stickers)`
+    : form.chibiService === "Alternate outfits/expressions" ? ` (${form.alternativesCount} options)` : "";
+  const lines: OrderLine[] = [];
+  if (base) lines.push({ key: "base", label: `Chibi – ${BASE_LABELS[form.baseOption] ?? form.baseOption}`, usd: base });
+  if (form.chibiService) lines.push({ key: "service", label: `${form.chibiService}${serviceNote}`, usd: serviceFee });
+  if (form.bgOption) lines.push({ key: "bg", label: `${BACKGROUND_OPTIONS.find((o) => o.value === form.bgOption)?.label ?? form.bgOption} background`, usd: bgFee });
+  if (form.characters > 1) lines.push({ key: "chars", label: `${form.characters - 1} extra character${form.characters > 2 ? "s" : ""}`, usd: extraCharacterCost });
+  const fees: OrderLine[] = [];
+  if (priorityFee > 0) fees.push({ key: "priority", label: `Priority due date fee (${Math.round(priorityRate * 100)}%)`, usd: priorityFee });
+  return { lines, fees, subtotal, priorityFee, priorityRate, totalUsd: usd(subtotal + priorityFee) };
+};
 
 const isCurrencyCode = (value: unknown): value is CurrencyCode =>
   typeof value === "string" && Object.prototype.hasOwnProperty.call(CURRENCIES, value);
@@ -332,26 +288,54 @@ const isCurrencyCode = (value: unknown): value is CurrencyCode =>
 const readStoredCurrency = (): CurrencyCode => {
   try {
     const stored = window.localStorage.getItem(CURRENCY_STORAGE_KEY);
-    return isCurrencyCode(stored) ? stored : "PHP";
+    return isCurrencyCode(stored) ? stored : "USD";
   } catch {
-    return "PHP"; // storage blocked (private mode, etc.)
+    return "USD"; // storage blocked (private mode, etc.)
   }
 };
 
 const formatAmount = (amount: number, code: CurrencyCode) => {
   const { symbol, decimals } = CURRENCIES[code];
-  return `${symbol}${amount.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+  const text = Math.abs(amount).toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  return `${amount < 0 ? "−" : ""}${symbol}${text}`;
 };
+
+// Units of `code` per 1 USD.
+const unitsPerUsd = (code: CurrencyCode, rates: FiatRates) =>
+  code === "USD" ? 1 : code === "ROBUX" ? ROBUX_PER_USD : rates[code];
+const convertUsd = (amountUsd: number, code: CurrencyCode, rates: FiatRates) =>
+  roundToDecimals(amountUsd * unitsPerUsd(code, rates), CURRENCIES[code].decimals);
+// PHP per 1 unit of `code` (how admin records store the exchange rate).
+const phpPerUnit = (code: CurrencyCode, rates: FiatRates) => roundToDecimals(rates.PHP / unitsPerUsd(code, rates), 6);
 
 type CurrencyContextValue = {
   currency: CurrencyCode;
   setCurrency: (code: CurrencyCode) => void;
+  rates: FiatRates;
+  ratesLive: boolean;
+  convert: (amountUsd: number) => number;
+  money: (amountUsd: number) => string;
 };
-
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
+
+const readCachedRates = (): { rates: FiatRates; live: boolean } | null => {
+  try {
+    const raw = window.sessionStorage.getItem(RATES_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - Number(parsed.at) > RATES_CACHE_MS) return null;
+    if (!(parsed.rates?.EUR > 0) || !(parsed.rates?.PHP > 0)) return null;
+    return { rates: { EUR: Number(parsed.rates.EUR), PHP: Number(parsed.rates.PHP) }, live: Boolean(parsed.live) };
+  } catch {
+    return null;
+  }
+};
 
 function CurrencyProvider({ children }: { children: React.ReactNode }) {
   const [currency, setCurrencyState] = useState<CurrencyCode>(readStoredCurrency);
+  const cached = useMemo(readCachedRates, []);
+  const [rates, setRates] = useState<FiatRates>(cached?.rates ?? FALLBACK_RATES);
+  const [ratesLive, setRatesLive] = useState(cached?.live ?? false);
 
   const setCurrency = (code: CurrencyCode) => {
     setCurrencyState(code);
@@ -362,7 +346,6 @@ function CurrencyProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Keep other open tabs in step with the choice.
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
       if (event.key === CURRENCY_STORAGE_KEY) setCurrencyState(readStoredCurrency());
@@ -371,7 +354,28 @@ function CurrencyProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const value = useMemo<CurrencyContextValue>(() => ({ currency, setCurrency }), [currency]);
+  // Live fiat rates (cached 30 minutes per tab, and cached again at the edge by the worker).
+  useEffect(() => {
+    if (cached) return;
+    let active = true;
+    apiRequest<{ rates: FiatRates; live: boolean }>("/api/rates")
+      .then((data) => {
+        if (!active || !(data?.rates?.EUR > 0) || !(data?.rates?.PHP > 0)) return;
+        setRates({ EUR: data.rates.EUR, PHP: data.rates.PHP });
+        setRatesLive(Boolean(data.live));
+        try {
+          window.sessionStorage.setItem(RATES_CACHE_KEY, JSON.stringify({ at: Date.now(), rates: data.rates, live: data.live }));
+        } catch { /* ignore */ }
+      })
+      .catch((rateError) => console.error("Could not load live exchange rates (using fallback rates):", rateError));
+    return () => { active = false; };
+  }, [cached]);
+
+  const value = useMemo<CurrencyContextValue>(() => ({
+    currency, setCurrency, rates, ratesLive,
+    convert: (amountUsd) => convertUsd(amountUsd, currency, rates),
+    money: (amountUsd) => formatAmount(convertUsd(amountUsd, currency, rates), currency),
+  }), [currency, rates, ratesLive]);
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
 }
@@ -381,6 +385,19 @@ const useCurrency = (): CurrencyContextValue => {
   if (!context) throw new Error("useCurrency must be used inside <CurrencyProvider>.");
   return context;
 };
+
+function CurrencySelect({ id }: { id?: string }) {
+  const { currency, setCurrency } = useCurrency();
+  return (
+    <label className="currency-picker">
+      <span className="sr-only">Currency</span>
+      <select id={id} className="currency-select" value={currency} onChange={(event) => setCurrency(event.target.value as CurrencyCode)} aria-label="Choose currency">
+        {CURRENCY_CODES.map((code) => <option key={code} value={code}>{CURRENCIES[code].short}</option>)}
+      </select>
+    </label>
+  );
+}
+
 
 // Email check used by the commission form (the worker applies the same rules).
 // Returns "" when the address is fine, otherwise a message for the client.
@@ -407,6 +424,7 @@ const getEmailError = (value: string): string => {
   return "";
 };
 
+// Admin side: read the price exactly as the client saw it when they submitted.
 // Admin side: read the price exactly as the client saw it when they submitted.
 // Records saved before multi-currency existed have no currency fields and are PHP.
 const getRequestPrice = (request: CommissionRequest) => {
@@ -435,19 +453,22 @@ function RequestPrice({ request }: { request: CommissionRequest }) {
   );
 }
 
+
 function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
   const [open, setOpen] = useState(false);
-  const { currency, setCurrency } = useCurrency();
+  const [stuck, setStuck] = useState(false);
+
+  // The navbar casts a soft shadow once the page scrolls.
+  useEffect(() => {
+    const onScroll = () => setStuck(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
   }, [open]);
 
   useEffect(() => {
@@ -461,276 +482,109 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
     setOpen(false);
     if (page !== "home") {
       go("home");
-      setTimeout(() => {
-        document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
+      setTimeout(() => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" }), 120);
     } else {
       document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
     }
   };
 
   return (
-    <header className="navbar">
+    <header className={`navbar${stuck ? " is-stuck" : ""}`}>
       <div className="nav-inner">
-        <div className="nav-actions left-action">
-          <button
-            type="button"
-            className="menu-button"
-            aria-label={open ? "Close menu" : "Open menu"}
-            aria-expanded={open}
-            aria-controls="primary-nav"
-            onClick={() => setOpen(!open)}
-          >
+        <div className="nav-left">
+          <button type="button" className="menu-button" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} aria-controls="primary-nav" onClick={() => setOpen(!open)}>
             <Icon name={open ? "close" : "menu"} />
+          </button>
+          <button type="button" className="brand" onClick={() => { go("home"); setOpen(false); }} aria-label="Kyuuji home">
+            <img src={logo} alt="Kyuuji" />
           </button>
         </div>
 
-        <button className="brand" onClick={() => { go("home"); setOpen(false); }} aria-label="Inkyuu home">
-          <img className="brand-symbol" src={logo} alt="" />
-          <img className="brand-wordmark" src={brandName} alt="Inkyuu" />
-        </button>
-
-        {open && (
-          <div className="nav-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
-        )}
+        {open && <div className="nav-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />}
 
         <nav id="primary-nav" className={open ? "nav-links open" : "nav-links"} aria-label="Main navigation">
-          <button
-            type="button"
-            onClick={() => {
-              if (page !== "home") go("home");
-              else window.scrollTo({ top: 0, behavior: "smooth" });
-              setOpen(false);
-            }}
-          >
+          <button type="button" className={page === "home" ? "active" : ""} aria-current={page === "home" ? "page" : undefined}
+            onClick={() => { if (page !== "home") go("home"); else window.scrollTo({ top: 0, behavior: "smooth" }); setOpen(false); }}>
             Home
           </button>
-          <button
-            type="button"
-            onClick={() => scrollToSection("about-section")}
-          >
+          <button type="button" onClick={() => scrollToSection("home-gallery-section")}>Gallery</button>
+          <button type="button" className={page === "about" ? "active" : ""} aria-current={page === "about" ? "page" : undefined} onClick={() => { go("about"); setOpen(false); }}>
             About
-          </button>
-          <button
-            type="button"
-            onClick={() => scrollToSection("home-gallery-section")}
-          >
-            Gallery
           </button>
 
           <div className="drawer-footer-panel">
             <div className="drawer-currency">
               <span className="drawer-social-label">Currency |</span>
-              <label className="currency-picker">
-                <span className="sr-only">Currency</span>
-                <select
-                  className="currency-select"
-                  value={currency}
-                  onChange={(event) => setCurrency(event.target.value as CurrencyCode)}
-                  aria-label="Choose currency"
-                >
-                  {CURRENCY_CODES.map((code) => (
-                    <option key={code} value={code}>{CURRENCIES[code].symbol} {code}</option>
-                  ))}
-                </select>
-              </label>
+              <CurrencySelect />
             </div>
             <div className="drawer-footer-socials">
-              <span className="drawer-social-label">Contacts |</span>
-              <a href="mailto:kyuukyuuji@gmail.com" aria-label="Email">
-                <Icon name="mail" size={19} />
-              </a>
-              <a href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer" aria-label="Instagram">
-                <Icon name="instagram" size={19} />
-              </a>
-              <a href="https://www.facebook.com/christinejoy.morata02/" target="_blank" rel="noreferrer" aria-label="Facebook">
-                <Icon name="facebook" size={19} />
-              </a>
+              <span className="drawer-social-label">Socials |</span>
+              <SocialLinks />
             </div>
           </div>
         </nav>
 
         <div className="nav-actions">
-          <label className="currency-picker">
-            <span className="sr-only">Currency</span>
-            <select
-              className="currency-select"
-              value={currency}
-              onChange={(event) => setCurrency(event.target.value as CurrencyCode)}
-              aria-label="Choose currency"
-            >
-              {CURRENCY_CODES.map((code) => (
-                <option key={code} value={code}>{CURRENCIES[code].symbol} {code}</option>
-              ))}
-            </select>
-          </label>
-          <Btn onClick={() => { go("commission"); setOpen(false); }}>
-            Commission Now
-          </Btn>
+          <CurrencySelect />
+          <button type="button" className="btn-pill btn-dark" onClick={() => { go("commission"); setOpen(false); }}>Commission Now</button>
         </div>
       </div>
     </header>
   );
 }
 
+
 function ArtVisual({ art, label }: { art: string; label: string }) {
   return <div className={`art-visual art-${art}`}><img src={placeholder} alt={label} /></div>;
 }
 
-function HeroCarousel() {
-  const { items: slides } = useApiData<CarouselSlide>("/api/carousel");
-  const carouselSlides = useMemo(() => slides.slice(0, 5), [slides]);
-
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
-  const touchStart = useRef<number | null>(null);
-
-  const count = carouselSlides.length;
-
+// Number of masonry columns: 3 on desktop, 2 on tablets and phones.
+function useColumnCount() {
+  const read = () => (typeof window !== "undefined" && window.innerWidth >= 900 ? 3 : 2);
+  const [count, setCount] = useState(read);
   useEffect(() => {
-    setCurrentIndex((prev) => (count === 0 ? 0 : prev % count));
-  }, [count]);
-
-  useEffect(() => {
-    if (!isPlaying || count <= 1) return;
-    const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % count);
-    }, 4500);
-    return () => clearInterval(timer);
-  }, [isPlaying, count]);
-
-  if (count === 0) {
-    return null;
-  }
-
-  const prevSlide = () => setCurrentIndex((prev) => (prev - 1 + count) % count);
-  const nextSlide = () => setCurrentIndex((prev) => (prev + 1) % count);
-
-  return (
-    <section className="hero-carousel-section" aria-label="Featured Artworks Carousel">
-      <div 
-        className="hero-carousel-container"
-        onTouchStart={(e) => { touchStart.current = e.touches[0].clientX; }}
-        onTouchEnd={(e) => {
-          if (touchStart.current === null || count <= 1) return;
-          const dist = e.changedTouches[0].clientX - touchStart.current;
-          touchStart.current = null;
-          if (Math.abs(dist) > 40) {
-            if (dist < 0) nextSlide();
-            else prevSlide();
-          }
-        }}
-      >
-        {carouselSlides.map((item, idx) => (
-          <div
-            key={`${item.position}-${item.version ?? 0}`}
-            className={`hero-carousel-slide ${idx === currentIndex ? "active" : ""}`}
-            aria-hidden={idx !== currentIndex}
-          >
-            <img src={item.data} alt={item.alt || `Featured artwork ${idx + 1}`} style={frameImageStyle(frameFromSlide(item))} />
-          </div>
-        ))}
-
-        {count > 1 && (
-          <div className="hero-carousel-dots" role="group" aria-label="Slide Selection">
-            {carouselSlides.map((_, idx) => (
-              <button
-                key={idx}
-                type="button"
-                className={`hero-carousel-dot ${idx === currentIndex ? "active" : ""}`}
-                aria-label={`Go to slide ${idx + 1}`}
-                aria-current={idx === currentIndex}
-                onClick={() => setCurrentIndex(idx)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {count > 1 && (
-        <div className="hero-carousel-controls">
-          <button 
-            type="button" 
-            className="hero-control-btn" 
-            aria-label="Previous artwork"
-            onClick={prevSlide}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-
-          <button 
-            type="button" 
-            className="hero-control-btn" 
-            aria-label={isPlaying ? "Pause carousel" : "Play carousel"}
-            onClick={() => setIsPlaying(!isPlaying)}
-          >
-            <Icon name={isPlaying ? "pause" : "play"} size={16} />
-          </button>
-
-          <button 
-            type="button" 
-            className="hero-control-btn" 
-            aria-label="Next artwork"
-            onClick={nextSlide}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-        </div>
-      )}
-    </section>
-  );
+    const onResize = () => setCount(read());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return count;
 }
 
-function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }) {
-  const { items: published } = useApiData<PublishedItem>("/api/gallery");
-  
-  const [filter, setFilter] = useState<"Chibi" | "Semi-Realistic">("Chibi");
-  const [scopeValue, setScopeValue] = useState("");
-  const [contextValue, setContextValue] = useState("");
+const SKELETON_HEIGHTS = [220, 300, 180, 260, 320, 200];
+
+function Home() {
+  // The worker returns thumbnails here (not full-size images), which keeps the gallery fast.
+  const { items: published, loading, error } = useApiData<PublishedItem>("/api/gallery");
   const [selected, setSelected] = useState<GalleryItem | null>(null);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const cols = useColumnCount();
 
-  const allItems: GalleryItem[] = published.map((item) => ({
-    id: item.id,
-    title: item.title,
-    type: item.category?.startsWith("Semi-Realistic") ? "Semi-Realistic" : "Chibi",
-    desc: item.description,
-    image: item.image,
-    imageCount: item.imageCount,
-    size: "medium",
-    tags: ["published", item.category || "Chibi", item.scope, item.service || item.category?.match(/\(([^)]+)\)/)?.[1], item.colorFinish].filter((tag): tag is string => Boolean(tag)),
-    publishedAt: item.publishedAt,
-    scope: item.scope,
-    service: item.service || item.category?.match(/\(([^)]+)\)/)?.[1],
-    colorFinish: item.colorFinish,
-    tools: item.tools,
-    format: item.format,
-  }));
+  const items: GalleryItem[] = useMemo(() => published
+    // Semi-Realistic is no longer offered, so any old entries stay out of the public gallery.
+    .filter((item) => !item.category?.startsWith("Semi-Realistic"))
+    .map((item) => ({
+      id: item.id,
+      title: item.title,
+      type: "Chibi",
+      desc: item.description,
+      image: item.image,
+      imageCount: item.imageCount,
+      size: "medium",
+      tags: ["published", item.category || "Chibi", item.scope, item.service || item.category?.match(/\(([^)]+)\)/)?.[1]].filter((tag): tag is string => Boolean(tag)),
+      publishedAt: item.publishedAt,
+      scope: item.scope,
+      service: item.service || item.category?.match(/\(([^)]+)\)/)?.[1],
+      colorFinish: item.colorFinish,
+      tools: item.tools,
+      format: item.format,
+    })), [published]);
 
-  const scopeOptions = filter === "Chibi" ? ["Headshot", "Fullbody"] : ["Headshot", "Bust-up", "Waist-up", "Thigh-up"];
-  const contextLabel = filter === "Chibi" ? "Service" : "Color Finish";
-  const contextOptions = filter === "Chibi"
-    ? ["Solo Deals", "Sticker set", "Acrylic Merch", "Badges/Pins/Pfp Design", "Character Reference sheet", "2D Model character sheet", "YCH", "Alternate outfits/expressions"]
-    : ["Rendered", "Plain", "Monochrome"];
-
-  const visible = allItems.filter((item) => {
-    if (item.type !== filter) return false;
-    if (scopeValue && item.scope !== scopeValue) return false;
-    if (!contextValue) return true;
-    const value = filter === "Chibi" ? item.service : item.colorFinish;
-    return value === contextValue;
-  });
-
-  const visual = (item: GalleryItem) => {
-    if ("image" in item && item.image) {
-      return <img className="gallery-real-image" src={item.image} alt={item.title} />;
-    }
-    return <ArtVisual art="placeholder" label={item.title} />;
-  };
+  // Round-robin keeps reading order left to right; the alternating top padding gives the staggered look.
+  const columns = useMemo(() => {
+    const result: { item: GalleryItem; index: number }[][] = Array.from({ length: cols }, () => []);
+    items.forEach((item, index) => result[index % cols].push({ item, index }));
+    return result;
+  }, [items, cols]);
 
   useEffect(() => {
     if (!selected || !("image" in selected)) {
@@ -748,117 +602,130 @@ function Home({ go }: { go: (page: Page, selection?: GallerySelection) => void }
     return () => { active = false; };
   }, [selected]);
 
-  const canvasCards: { icon: IconName; title: string; desc: string; selection: GallerySelection }[] = [
-    { icon: "brush", title: "Character art", desc: "Originals, fan art & portraits", selection: { category: "Semi-Realistic", facet: "Scope", value: "Headshot" } },
-    { icon: "pen", title: "Chibi cuties", desc: "Tiny style, big personality", selection: { category: "Chibi", facet: "Scope", value: "Headshot" } },
-    { icon: "spark", title: "Merch design", desc: "Stickers, cards & keepsakes", selection: { category: "Chibi", facet: "Services", value: "Sticker set" } },
-    { icon: "grid", title: "Visual stories", desc: "Covers, scenes & key art", selection: { category: "Semi-Realistic", facet: "Color Finish", value: "Rendered" } },
-  ];
-
   return (
-    <>
-      <main id="main-content" tabIndex={-1}>
-        <HeroCarousel />
+    <main id="main-content" tabIndex={-1}>
+      <section className="home-hero" aria-label="Portfolio">
+        <h1 className="home-title">
+          <img src={titleHero} alt="Kyuuji Portfolio" decoding="async" />
+        </h1>
+        <div className="home-hero-row">
+          <p className="home-tagline">Let’s squish your favorite characters into cute little beans!</p>
+          <img className="home-chibi" src={chibiHero} alt="Two chibi characters" decoding="async" />
+        </div>
+      </section>
 
-        <section id="about-section" className="about-strip">
-          <div className="wrap intro-grid">
-            <div className="portrait-card"><ArtVisual art="artist" label="Illustrated portrait of the artist" /><span className="seal">ID<br />Artist</span></div>
-            <div className="intro-copy">
-              <p className="kicker">About Me</p><h2>Hi, I'm Kyuu. I draw feelings you can keep.</h2>
-              <p>I'm a digital illustrator who loves expressive faces, cozy color stories, and the magic of turning your favorite idea into something unmistakably yours.</p>
-              <div className="quick-terms">
-                <div>
-                  <span>01</span>
-                  <p><strong>Kind collaboration</strong>Clear communication from sketch to final.</p>
-                </div>
-                <div>
-                  <span>02</span>
-                  <p><strong>Made for you</strong> Personal use is included; commercial use is quoted.</p>
-                </div>
-                <div>
-                  <span>03</span>
-                  <p><strong>High-res files</strong> Delivered ready for print, web, or licensing.</p>
-                </div>
-              </div>
+      <section id="home-gallery-section" className="gallery-section" aria-labelledby="gallery-heading">
+        <h2 id="gallery-heading" className="gallery-heading">Gallery - {new Date().getFullYear()}</h2>
+
+        <div className="gallery-masonry" style={{ "--cols": cols } as CSSProperties} aria-busy={loading}>
+          {loading && Array.from({ length: cols }, (_, columnIndex) => (
+            <div className="gallery-masonry-col" key={`skeleton-${columnIndex}`} aria-hidden="true">
+              {[0, 1].map((row) => <div className="gallery-skeleton" key={row} style={{ height: SKELETON_HEIGHTS[(columnIndex * 2 + row) % SKELETON_HEIGHTS.length] }} />)}
             </div>
-          </div>
-        </section>
+          ))}
 
-        <section id="home-gallery-section" className="section wrap">
-          <div className="filter-bar" style={{ position: "static", background: "transparent", border: "none", marginBottom: "20px" }}>
-            <div className="filter-toggle sliding-filter" role="group" aria-label="Filter artwork">
-              <div className={`filter-slider-indicator ${filter === "Semi-Realistic" ? "slide-right" : ""}`} aria-hidden="true" />
-              {(["Chibi", "Semi-Realistic"] as const).map((item) => (
-                <button key={item} type="button" className={`filter-btn ${filter === item ? "active" : ""}`} aria-pressed={filter === item} onClick={() => { setFilter(item); setScopeValue(""); setContextValue(""); }}>
-                  {item}<span>{allItems.filter((art) => art.type === item).length}</span>
+          {!loading && columns.map((column, columnIndex) => (
+            <div className="gallery-masonry-col" key={columnIndex}>
+              {column.map(({ item, index }) => (
+                <button
+                  type="button"
+                  className={`gallery-tile tone-${index % 3}`}
+                  style={{ "--i": Math.floor(index / cols) } as CSSProperties}
+                  key={item.id}
+                  onClick={() => setSelected(item)}
+                  aria-label={`View ${item.title} details${item.service ? ` (${item.service})` : ""}`}
+                >
+                  {"image" in item && item.image
+                    ? <img className="gallery-real-image" src={item.image} alt={item.title} loading="lazy" decoding="async" />
+                    : <ArtVisual art="placeholder" label={item.title} />}
+                  <span className="gallery-overlay">
+                    <span className="gallery-overlay-meta">
+                      {item.service && <span className="gallery-chip">{item.service}</span>}
+                      {item.scope && <span className="gallery-chip">{item.scope}</span>}
+                    </span>
+                    <span className="gallery-overlay-title">{item.title}</span>
+                    <span className="gallery-overlay-cta">View artwork <Icon name="arrow" size={16} /></span>
+                  </span>
                 </button>
               ))}
             </div>
-          </div>
+          ))}
 
-          <div className="sub-filter-bar" style={{ marginBottom: "30px", borderRadius: "8px" }}>
-            <strong className="sub-filter-label">Filter</strong>
-            <label className="sub-filter-select">
-              <span className="sr-only">Scope</span>
-              <select aria-label="Scope" value={scopeValue} onChange={(event) => setScopeValue(event.target.value)}>
-                <option value="">Scope</option>
-                {scopeOptions.map((value) => <option key={value} value={value}>{value}</option>)}
-              </select>
-            </label>
-            <label className="sub-filter-select">
-              <span className="sr-only">{contextLabel}</span>
-              <select aria-label={contextLabel} value={contextValue} onChange={(event) => setContextValue(event.target.value)}>
-                <option value="">{contextLabel}</option>
-                {contextOptions.map((value) => <option key={value} value={value}>{value}</option>)}
-              </select>
-            </label>
-            <button type="button" className="sub-filter-clear" onClick={() => { setScopeValue(""); setContextValue(""); }}>Clear filters</button>
-          </div>
+          {!loading && items.length === 0 && (
+            <div className="gallery-empty" role={error ? "alert" : undefined}>
+              <p>{error ? "The gallery couldn’t be loaded right now. Please try again in a moment." : "No artwork has been published yet."}</p>
+            </div>
+          )}
+        </div>
+      </section>
 
-          <div className="gallery-grid" style={{ paddingTop: 0 }}>
-            {visible.map((item) => (
-              <button className={`gallery-card gallery-image-only ${item.size}`} key={item.id} onClick={() => setSelected(item)} aria-label={`View ${item.title} details`}>
-                {visual(item)}
-                <span className="gallery-hover">View artwork <Icon name="arrow" /></span>
-              </button>
-            ))}
-            {visible.length === 0 && (
-              <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "60px 0", color: "var(--muted)" }}>
-                <p>No {[scopeValue, contextValue, filter].filter(Boolean).join(" ")} artwork has been added yet.</p>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {selected && (
-          <div className="modal-backdrop" onMouseDown={() => setSelected(null)}>
-            <div className="project-modal" role="dialog" aria-modal="true" aria-labelledby="project-title" onMouseDown={(e) => e.stopPropagation()}>
-              <button type="button" className="modal-close" aria-label="Close artwork details" autoFocus onClick={() => setSelected(null)}><Icon name="close" /></button>
-              <ImageCarousel key={selected.id} images={selectedImages} title={selected.title} />
-              <div className="project-copy">
-                <p className="kicker">{selected.type} · Featured project</p>
-                <h2 id="project-title">{selected.title}</h2>
-                <p>{selected.desc}</p>
-                <div className="tags">{selected.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
-                <div className="project-meta">
-                  <span>Published<strong>{"publishedAt" in selected ? selected.publishedAt : "2025"}</strong></span>
-                  {"tools" in selected && selected.tools && <span>Tools<strong>{selected.tools}</strong></span>}
-                  {"format" in selected && selected.format && <span>Format<strong>{selected.format}</strong></span>}
-                </div>
+      {selected && (
+        <div className="modal-backdrop" onMouseDown={() => setSelected(null)}>
+          <div className="project-modal" role="dialog" aria-modal="true" aria-labelledby="project-title" onMouseDown={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close" aria-label="Close artwork details" autoFocus onClick={() => setSelected(null)}><Icon name="close" /></button>
+            <ImageCarousel key={selected.id} images={selectedImages} title={selected.title} />
+            <div className="project-copy">
+              <p className="kicker">{selected.type} · Featured project</p>
+              <h2 id="project-title">{selected.title}</h2>
+              <p>{selected.desc}</p>
+              <div className="tags">{selected.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+              <div className="project-meta">
+                <span>Published<strong>{"publishedAt" in selected ? selected.publishedAt : "2026"}</strong></span>
+                {"tools" in selected && selected.tools && <span>Tools<strong>{selected.tools}</strong></span>}
+                {"format" in selected && selected.format && <span>Format<strong>{selected.format}</strong></span>}
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
+    </main>
+  );
+}
 
-        <section className="home-commission-cta">
-          <div className="wrap">
-            <h2>Ready to bring your idea to life?</h2>
-            <p>Tell me what you’re imagining and receive a personalized quote.</p>
+
+// The old home-page "About" strip, now a standalone page reached from the navbar.
+function About({ go }: { go: (page: Page) => void }) {
+  const openGallery = () => {
+    go("home");
+    window.setTimeout(() => document.getElementById("home-gallery-section")?.scrollIntoView({ behavior: "smooth" }), 120);
+  };
+
+  return (
+    <main id="main-content" tabIndex={-1} className="page-main about-page">
+      <section className="wrap about-hero">
+        <div>
+          <p className="kicker">About Me</p>
+          <h1>Hi, I'm Kyuu. I draw feelings you can keep.</h1>
+          <p>I'm a digital illustrator who loves expressive faces, cozy color stories, and the magic of turning your favorite idea into something unmistakably yours.</p>
+          <div className="hero-actions">
             <Btn onClick={() => go("commission")}>Commission now <Icon name="arrow" /></Btn>
+            <Btn kind="outline" onClick={openGallery}>View the gallery</Btn>
           </div>
-        </section>
-      </main>
-    </>
+        </div>
+        <div className="about-portrait portrait-card">
+          <ArtVisual art="artist" label="Illustrated portrait of the artist" />
+          <span className="seal">ID<br />Artist</span>
+        </div>
+      </section>
+
+      <section className="wrap about-terms">
+        <p className="kicker">Working together</p>
+        <div className="quick-terms">
+          <div>
+            <span>01</span>
+            <p><strong>Kind collaboration</strong>Clear communication from sketch to final.</p>
+          </div>
+          <div>
+            <span>02</span>
+            <p><strong>Made for you</strong> Personal use is included; commercial use is quoted.</p>
+          </div>
+          <div>
+            <span>03</span>
+            <p><strong>High-res files</strong> Delivered ready for print, web, or licensing.</p>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }
 
@@ -964,549 +831,698 @@ const AdminField = ({ label, hint, children }: { label: React.ReactNode; hint?: 
 
 const Field = ({ label, hint, children }: { label: React.ReactNode; hint?: string; children: React.ReactNode }) => <label className="field"><span>{label}</span>{hint && <small>{hint}</small>}{children}</label>;
 
-function Commission({ go }: { go: (page: Page) => void }) {
-  const { currency } = useCurrency();
-  const [step, setStep] = useState(1);
-  const [emailTouched, setEmailTouched] = useState(false);
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    social: "",
-    dueDate: "",
-    artStyle: "",
-    usageType: "",
-    baseOption: "",
-    chibiService: "",
-    stickerCount: 4,
-    alternativesCount: 2,
-    ychTheme: "",
-    colorOption: "",
-    bgOption: "",
-    characters: 1,
-    backgroundDetails: "",
-    additionalDetails: "",
-    confirm1: false,
-    confirm2: false,
-    confirm3: false,
-  });
-  const [references, setReferences] = useState<string[]>([]);
-  const { items: requests, error: requestError, loading: requestsLoading } = useApiData<CommissionRequest>("/api/commissions");
+// ---------------------------------------------------------------------------
+// Form building blocks for the commission flow
+// ---------------------------------------------------------------------------
 
-  const setValue = (key: keyof typeof form, value: any) => {
-    if (key === "artStyle" && value === "Semi-Realistic" && form.artStyle !== "Semi-Realistic") {
-      if (requestsLoading) {
-        alert("Commission availability is still loading. Please try again in a moment.");
-        return;
-      }
-      const activeSemiCount = requests.filter(r => !r.historyType && r.type.startsWith("Semi-Realistic")).length;
-      
-      if (activeSemiCount >= 5) {
-        alert("Semi-Realistic commissions are currently unavailable as all active and reservation slots are fully occupied.");
-        return;
-      } else if (activeSemiCount >= 3) {
-        alert("All active Semi-Realistic slots are currently taken. Your order will be placed in a reserved slot.");
-      }
-    }
-    if (key === "artStyle") {
-      setForm((prev) => ({
-        ...prev,
-        artStyle: value,
-        baseOption: "",
-        chibiService: "",
-        ychTheme: "",
-        colorOption: "",
-        bgOption: "",
-      }));
+// Red validation message (#e20808, 20px). The wrapper animates open so the layout flexes instead of jumping.
+function FieldError({ id, message }: { id: string; message?: string }) {
+  const last = useRef("");
+  if (message) last.current = message;
+  return (
+    <div className={`fe${message ? " show" : ""}`} id={id} role="alert" aria-live="polite">
+      <span>{last.current}</span>
+    </div>
+  );
+}
+
+// Text input with a floating placeholder: it sits on the line, then lifts above it (inside the same box)
+// while the line moves down to make room.
+function FloatInput({ id, label, value, onChange, onBlur, error, required, type = "text", prefix, aside, alwaysFloat, inputMode, autoComplete, maxLength, min, dataField }: {
+  id: string; label: string; value: string; onChange: (value: string) => void; onBlur?: () => void;
+  error?: string; required?: boolean; type?: string; prefix?: string; aside?: React.ReactNode; alwaysFloat?: boolean;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]; autoComplete?: string; maxLength?: number; min?: string; dataField?: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  const floated = focused || value !== "" || Boolean(alwaysFloat);
+  return (
+    <div className="cf-group" data-field={dataField ?? id}>
+      <div className={`ff${floated ? " is-floated" : ""}${error ? " is-invalid" : ""}${aside ? " has-aside" : ""}${prefix ? " has-prefix" : ""}`}>
+        <label className="ff-label" htmlFor={id}>{label}</label>
+        <div className="ff-row">
+          {prefix && <span className="ff-prefix" aria-hidden="true">{prefix}</span>}
+          <input
+            id={id} className="ff-input" type={type} value={value} inputMode={inputMode} autoComplete={autoComplete} maxLength={maxLength} min={min}
+            aria-invalid={Boolean(error)} aria-describedby={`${id}-error`} aria-required={required}
+            onChange={(event) => onChange(event.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => { setFocused(false); onBlur?.(); }}
+          />
+        </div>
+        {aside}
+        {required && <span className="cf-star" aria-hidden="true">*</span>}
+      </div>
+      {!aside && <FieldError id={`${id}-error`} message={error} />}
+    </div>
+  );
+}
+
+type CustomSelectOption = { value: string; label: string; hint?: string };
+function CustomSelect({ value, onChange, options, placeholder, ariaLabel, invalid, onClose, id }: {
+  value: string; onChange: (value: string) => void; options: CustomSelectOption[]; placeholder: string; ariaLabel: string;
+  invalid?: boolean; onClose?: () => void; id?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLUListElement | null>(null);
+  const wasOpen = useRef(false);
+  const selectedIndex = options.findIndex((option) => option.value === value);
+  const selected = selectedIndex >= 0 ? options[selectedIndex] : null;
+
+  // Tell the parent when the list closes so it can validate ("touched").
+  useEffect(() => {
+    if (wasOpen.current && !open) onClose?.();
+    wasOpen.current = open;
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent | TouchEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("touchstart", onDown); };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || active < 0) return;
+    (listRef.current?.children[active] as HTMLElement | undefined)?.scrollIntoView({ block: "nearest" });
+  }, [open, active]);
+
+  const openList = () => { setActive(selectedIndex >= 0 ? selectedIndex : 0); setOpen(true); };
+  const choose = (index: number) => {
+    const option = options[index];
+    if (option) onChange(option.value);
+    setOpen(false);
+  };
+  const onKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!open) {
+      if (["ArrowDown", "ArrowUp", "Enter", " "].includes(event.key)) { event.preventDefault(); openList(); }
       return;
     }
-    setForm((prev) => ({ ...prev, [key]: value }));
+    if (event.key === "ArrowDown") { event.preventDefault(); setActive((i) => Math.min(options.length - 1, i + 1)); }
+    else if (event.key === "ArrowUp") { event.preventDefault(); setActive((i) => Math.max(0, i - 1)); }
+    else if (event.key === "Home") { event.preventDefault(); setActive(0); }
+    else if (event.key === "End") { event.preventDefault(); setActive(options.length - 1); }
+    else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); choose(active); }
+    else if (event.key === "Escape" || event.key === "Tab") { setOpen(false); }
+    else if (event.key.length === 1) {
+      const next = options.findIndex((option) => option.label.toLowerCase().startsWith(event.key.toLowerCase()));
+      if (next >= 0) setActive(next);
+    }
   };
 
-  // PHP and USD are priced from their own lists. EUR is the USD price converted.
-  const priceTable = currency === "PHP" ? PRICE_TABLES.PHP : PRICE_TABLES.USD;
-  const pricing = calculatePricing(form, priceTable, currency === "PHP" ? 0 : 2);
-  const { basePrice, chibiServicePrice, colorPrice, bgPrice, charMultiplier, commercialFee, dueDateRate, priorityFee, total } = pricing;
-  // Amounts above are in the list's own currency; show them in the chosen one.
-  const money = (amount: number) => formatAmount(currency === "EUR" ? usdToEur(amount) : amount, currency);
-  const chibiBaseOptions = Object.entries(priceTable.chibiBase);
-  const semiBaseOptions = Object.entries(priceTable.semiBase);
-  const emailError = getEmailError(form.email);
-  const estimateBreakdown = (
-    <>
-      <p><span>{form.artStyle ? `${form.artStyle} (${form.baseOption || "Select base"})` : "Base scope"}</span><b>{money(basePrice)}</b></p>
-      {form.artStyle === "Chibi" ? (
-        <p><span>Chibi finish</span><b>Rendered (Free)</b></p>
-      ) : (
-        <p><span>{form.colorOption || "Color finish"}</span><b>+{money(colorPrice)}</b></p>
+  return (
+    <div ref={rootRef} className={`cs${open ? " is-open" : ""}${invalid ? " is-invalid" : ""}`}>
+      <button
+        id={id}
+        type="button"
+        className={`cs-trigger${selected ? "" : " is-placeholder"}`}
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-invalid={invalid}
+        onClick={(event) => { event.preventDefault(); if (open) setOpen(false); else openList(); }}
+        onKeyDown={onKeyDown}
+      >
+        <span>{selected ? selected.label : placeholder}</span>
+        <span className="cs-chevron" aria-hidden="true" />
+      </button>
+      {open && (
+        <ul ref={listRef} className="cs-list" role="listbox" aria-label={ariaLabel}>
+          {options.map((option, index) => (
+            <li
+              key={option.value}
+              role="option"
+              aria-selected={option.value === value}
+              className={`cs-option${index === active ? " is-active" : ""}`}
+              onMouseEnter={() => setActive(index)}
+              onClick={(event) => { event.preventDefault(); event.stopPropagation(); choose(index); }}
+            >
+              <span>{option.label}</span>
+              {option.hint && <span className="cs-fee">{option.hint}</span>}
+            </li>
+          ))}
+        </ul>
       )}
-      {form.chibiService && (
-        <p>
-          <span>
-            Service: {form.chibiService}
-            {form.chibiService === "Sticker set" ? ` (${form.stickerCount} stickers)` : ""}
-            {form.chibiService === "Alternate outfits/expressions" ? ` (${form.alternativesCount} options)` : ""}
-          </span>
-          <b>+{money(chibiServicePrice)}</b>
-        </p>
-      )}
-      <p><span>{form.bgOption || "Background"} background</span><b>+{money(bgPrice)}</b></p>
-      {form.characters > 0 && <p><span>{form.characters} character{form.characters > 1 ? "s" : ""}</span><b>+{money(charMultiplier)}</b></p>}
-      {(form.usageType === "Commercial Use" || form.dueDate) && (
-        <>
-          <p className="estimate-subheading"><span>Additional Fees</span></p>
-          {form.usageType === "Commercial Use" && <p><span>Commercial license ({Math.round(COMMERCIAL_SURCHARGE_RATE * 100)}%)</span><b>+{money(commercialFee)}</b></p>}
-          {form.dueDate && <p><span>Priority due date fee ({dueDateRate === 0.1 ? "10%" : "18%"})</span><b>+{money(priorityFee)}</b></p>}
-        </>
-      )}
-    </>
+    </div>
   );
+}
 
-  const currencyNote = currency === "USD" ? (
-    <p className="fine-print currency-note">
-      International pricing is set in US dollars. Your total is saved as {money(total)} USD.
-    </p>
-  ) : currency === "EUR" ? (
-    <p className="fine-print currency-note">
-      International pricing is set in US dollars ({formatAmount(total, "USD")} USD for this request) and converted to euro at {CURRENCIES.EUR.symbol}1 = ${roundToDecimals(1 / EUR_PER_USD, 4)}. Your total is saved as {money(total)} EUR.
-    </p>
-  ) : null;
 
-  const uploadReferences = (files: FileList | null) => {
-    if (!files) return;
-    Array.from(files).slice(0, 10 - references.length).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => setReferences((current) => [...current, String(reader.result)].slice(0, 10));
-      reader.readAsDataURL(file);
+// Due date and due time are both optional (the priority fee only applies when a date is given).
+const DUE_DATE_REQUIRED = false;
+const MAX_REFERENCES = 10;
+const MAX_REFERENCES_BYTES = 1_900_000; // the worker rejects reference sets larger than this
+const SOCIAL_APPS = ["Instagram", "Facebook", "TikTok", "Discord"];
+const YCH_THEMES: [string, string][] = [["Cozy Tea Time", "tea"], ["Pocket Mascot", "scout"], ["Cheerful Orange", "orange"]];
+const STEP_TITLES = ["Terms of Service Agreement & Confirmation", "General Information", "Commission Order Details", "Review & Checkout"];
+const TOTAL_STEPS = 4;
+
+type CommissionForm = {
+  confirm1: boolean; confirm2: boolean; confirm3: boolean;
+  name: string; email: string; socialApp: string; socialHandle: string;
+  dueDate: string; dueTime: string; license: string;
+  baseOption: string; chibiService: string; stickerCount: number; alternativesCount: number; ychTheme: string;
+  bgOption: string; characters: number; notes: string;
+};
+const EMPTY_FORM: CommissionForm = {
+  confirm1: false, confirm2: false, confirm3: false,
+  name: "", email: "", socialApp: "", socialHandle: "", dueDate: "", dueTime: "", license: "",
+  baseOption: "", chibiService: "", stickerCount: 4, alternativesCount: 2, ychTheme: "",
+  bgOption: "", characters: 1, notes: "",
+};
+const STEP_FIELDS: Record<number, string[]> = {
+  1: ["confirm1", "confirm2", "confirm3"],
+  2: ["name", "email", "socialHandle", "socialApp", "dueDate", "dueTime", "license"],
+  3: ["baseOption", "chibiService", "ychTheme", "bgOption", "characters", "references", "notes"],
+  4: [],
+};
+
+const formatTime12 = (time: string) => {
+  const [h, m] = time.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return time;
+  return `${pad2(h % 12 === 0 ? 12 : h % 12)}:${pad2(m)} ${h >= 12 ? "PM" : "AM"}`;
+};
+
+// Every input has a rule. Returns { fieldKey: message } for the fields that are currently invalid.
+const validateCommission = (form: CommissionForm, referenceError: string): Record<string, string> => {
+  const errors: Record<string, string> = {};
+  if (!form.confirm1) errors.confirm1 = "Please confirm you have read the Commission Guide.";
+  if (!form.confirm2) errors.confirm2 = "Please accept the payment terms to continue.";
+  if (!form.confirm3) errors.confirm3 = "Please agree to follow the guide’s rules.";
+
+  const name = form.name.trim();
+  if (!name) errors.name = "Please enter your name.";
+  else if (name.length < 2) errors.name = "Your name needs at least 2 characters.";
+  else if (name.length > 120) errors.name = "Please keep your name under 120 characters.";
+
+  const emailError = getEmailError(form.email);
+  if (emailError) errors.email = emailError;
+
+  const handle = form.socialHandle.trim().replace(/^@+/, "");
+  if (!handle) errors.socialHandle = "Please enter your social media username.";
+  else if (!/^[A-Za-z0-9._-]{2,60}$/.test(handle)) errors.socialHandle = "Use 2–60 letters, numbers, dots, dashes or underscores.";
+  if (!form.socialApp) errors.socialApp = "Please select a social app.";
+
+  const today = todayInput();
+  if (!form.dueDate) {
+    if (DUE_DATE_REQUIRED) errors.dueDate = "Please choose a due date.";
+  } else if (!/^\d{4}-\d{2}-\d{2}$/.test(form.dueDate) || Number.isNaN(new Date(`${form.dueDate}T00:00`).getTime())) {
+    errors.dueDate = "That date doesn’t look right.";
+  } else if (form.dueDate < today) {
+    errors.dueDate = "The due date can’t be in the past.";
+  }
+  if (form.dueTime && form.dueDate === today) {
+    const now = new Date();
+    if (form.dueTime < `${pad2(now.getHours())}:${pad2(now.getMinutes())}`) errors.dueTime = "That time has already passed today.";
+  }
+  if (!form.license) errors.license = "Please select a license type.";
+
+  if (!form.baseOption) errors.baseOption = "Please choose Headshot or Full Body.";
+  if (!form.chibiService) errors.chibiService = "Please select a Chibi service.";
+  if (form.chibiService === "YCH" && !form.ychTheme) errors.ychTheme = "Please pick a YCH theme.";
+  if (!form.bgOption) errors.bgOption = "Please select a background style.";
+  if (!Number.isInteger(form.characters) || form.characters < 1 || form.characters > MAX_CHARACTERS) errors.characters = `Choose between 1 and ${MAX_CHARACTERS} characters.`;
+  if (referenceError) errors.references = referenceError;
+  if (form.notes.length > 1000) errors.notes = "Please keep your notes under 1,000 characters.";
+  return errors;
+};
+
+// Smaller than the admin gallery compressor: reference photos only need to be readable, and the whole
+// set has to fit in one request.
+const compressReference = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const data = encodeImage(img, 900, 0.6);
+      if (data) resolve(data);
+      else reject(new Error("This browser can’t resize images."));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error(`${file.name} couldn’t be read as an image.`));
+    };
+    img.src = url;
+  });
+
+function Commission({ go }: { go: (page: Page) => void }) {
+  const { currency, rates, ratesLive, money, convert } = useCurrency();
+  const [step, setStep] = useState(1);
+  const [fill, setFill] = useState(0);
+  const [form, setForm] = useState<CommissionForm>(EMPTY_FORM);
+  const [references, setReferences] = useState<string[]>([]);
+  const [referenceError, setReferenceError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [done, setDone] = useState(false);
+
+  const setValue = <K extends keyof CommissionForm>(key: K, value: CommissionForm[K]) => {
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      // Switching service resets the sub-options that belong to the old one.
+      if (key === "chibiService") next.ychTheme = value === "YCH" ? prev.ychTheme : "";
+      return next;
+    });
+  };
+  const touch = (...keys: string[]) => setTouched((prev) => {
+    if (keys.every((key) => prev[key])) return prev;
+    const next = { ...prev };
+    keys.forEach((key) => { next[key] = true; });
+    return next;
+  });
+
+  const errors = useMemo(() => validateCommission(form, referenceError), [form, referenceError]);
+  const shown = (key: string) => (touched[key] ? errors[key] : undefined);
+
+  // The progress bar follows the page: 25% → 50% → 75% → 100%, animated by CSS.
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setFill((step / TOTAL_STEPS) * 100));
+    return () => window.cancelAnimationFrame(frame);
+  }, [step]);
+
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }, [step]);
+
+  // Pricing (all in USD, converted for display)
+  const order = useMemo(() => buildOrder(form), [form]);
+  const rowAmount = (amountUsd: number) => money(amountUsd);
+  const displayedTotal = useMemo(
+    () => roundToDecimals([...order.lines, ...order.fees].reduce((sum, line) => sum + convert(line.usd), 0), CURRENCIES[currency].decimals),
+    [order, convert, currency]
+  );
+  const feeHint = (amountUsd: number) => (amountUsd === 0 ? "Included" : `${amountUsd > 0 ? "+" : "−"}${money(Math.abs(amountUsd))}`);
+  const referenceScope = form.baseOption || "Headshot";
+  const serviceOptions: CustomSelectOption[] = CHIBI_SERVICE_OPTIONS.map((option) => ({
+    ...option, hint: feeHint(serviceFeeUsd(option.value, referenceScope, form.stickerCount, form.alternativesCount)),
+  }));
+  const backgroundOptions: CustomSelectOption[] = BACKGROUND_OPTIONS.map((option) => ({
+    ...option, hint: feeHint(backgroundFeeUsd(option.value, referenceScope)),
+  }));
+
+  const uploadReferences = async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    const picked = Array.from(files).filter((file) => file.type.startsWith("image/"));
+    touch("references");
+    if (!picked.length) { setReferenceError("Please choose image files (PNG, JPG, WEBP…)."); return; }
+    const room = MAX_REFERENCES - references.length;
+    if (room <= 0) { setReferenceError(`You can upload up to ${MAX_REFERENCES} images.`); return; }
+    setUploading(true);
+    setReferenceError("");
+    try {
+      const added: string[] = [];
+      for (const file of picked.slice(0, room)) added.push(await compressReference(file));
+      const next = [...references, ...added];
+      const size = next.reduce((sum, image) => sum + image.length, 0);
+      if (size > MAX_REFERENCES_BYTES) {
+        setReferenceError("Those images are too large to send together. Remove a few or use smaller files.");
+        return;
+      }
+      setReferences(next);
+      if (picked.length > room) setReferenceError(`Only ${MAX_REFERENCES} images are allowed, so the extra files were skipped.`);
+    } catch (uploadError) {
+      setReferenceError(uploadError instanceof Error ? uploadError.message : String(uploadError));
+    } finally {
+      setUploading(false);
+    }
+  };
+  const removeReference = (index: number) => {
+    setReferences((current) => current.filter((_, i) => i !== index));
+    setReferenceError("");
+  };
+
+  const focusFirstInvalid = (keys: string[]) => {
+    const first = keys.find((key) => errors[key]);
+    if (!first) return;
+    window.requestAnimationFrame(() => {
+      const holder = document.querySelector<HTMLElement>(`[data-field="${first}"]`);
+      holder?.scrollIntoView({ behavior: "smooth", block: "center" });
+      holder?.querySelector<HTMLElement>("input, button, textarea")?.focus({ preventScroll: true });
     });
   };
 
-  const removeReference = (index: number) => {
-    setReferences((current) => current.filter((_, i) => i !== index));
+  const goNext = () => {
+    const keys = STEP_FIELDS[step];
+    touch(...keys);
+    if (keys.some((key) => errors[key])) { focusFirstInvalid(keys); return; }
+    setStep((current) => Math.min(TOTAL_STEPS, current + 1));
   };
 
-  const handleNext = () => {
-    if (step === 1 && (!form.confirm1 || !form.confirm2 || !form.confirm3)) {
-      alert("Please check all three confirmation boxes to proceed.");
-      return;
-    }
-    if (step === 2 && (!form.name || !form.email || !form.usageType)) {
-      setEmailTouched(true);
-      alert("Please fill in your name, email, and usage type.");
-      return;
-    }
-    if (step === 2 && emailError) {
-      setEmailTouched(true);
-      alert(emailError);
-      return;
-    }
-    if (step === 3) {
-      if (!form.artStyle) {
-        alert("Please select an Art Style.");
-        return;
-      }
-      if (!form.baseOption || !form.bgOption) {
-        alert("Please select your base scope and background style.");
-        return;
-      }
-      if (form.artStyle === "Chibi" && !form.chibiService) {
-        alert("Please select a Chibi Solo Deal / Service.");
-        return;
-      }
-      if (form.artStyle === "Chibi" && form.chibiService === "YCH" && !form.ychTheme) {
-        alert("Please select a YCH theme.");
-        return;
-      }
-      if (form.artStyle === "Semi-Realistic" && !form.colorOption) {
-        alert("Please select your color finish.");
-        return;
-      }
-    }
-    setStep((prev) => Math.min(5, prev + 1));
+  const clearForm = () => {
+    const dirty = JSON.stringify(form) !== JSON.stringify(EMPTY_FORM) || references.length > 0;
+    if (dirty && !window.confirm("Clear everything you’ve entered?")) return;
+    setForm(EMPTY_FORM);
+    setReferences([]);
+    setReferenceError("");
+    setTouched({});
+    setSubmitError("");
+    setStep(1);
   };
 
-  const handleFinalSubmit = async () => {
-    if (emailError) {
-      setEmailTouched(true);
-      setStep(2);
-      alert(emailError);
-      return;
+  const handleSubmit = async () => {
+    // Re-check every page; if something is wrong, jump to the page that has it.
+    for (let page = 1; page <= 3; page++) {
+      const keys = STEP_FIELDS[page];
+      if (keys.some((key) => errors[key])) {
+        touch(...keys);
+        setStep(page);
+        focusFirstInvalid(keys);
+        return;
+      }
     }
-    // Foreign requests keep a peso equivalent (reference rate) so the admin list stays comparable.
-    const usdTotal = currency === "EUR" ? calculatePricing(form, PRICE_TABLES.USD, 2).total : total;
+    setSubmitting(true);
+    setSubmitError("");
+    const handle = form.socialHandle.trim().replace(/^@+/, "");
+    const usdTotal = order.totalUsd;
     const request: CommissionRequest = {
       id: Date.now(),
-      name: form.name,
+      name: form.name.trim(),
       email: form.email.trim(),
-      social: form.social,
-      type: `${form.artStyle} - ${form.baseOption}${form.chibiService ? ` (${form.chibiService})` : ""}`,
-      finish: form.artStyle === "Chibi" ? "Rendered (Default)" : form.colorOption,
+      social: `${form.socialApp}: @${handle}`,
+      type: `Chibi - ${form.baseOption}${form.chibiService ? ` (${form.chibiService})` : ""}`,
+      finish: "Rendered (Default)",
       characters: form.characters,
       background: form.bgOption,
-      commercial: form.usageType === "Commercial Use",
+      commercial: form.license === "Commercial",
       priority: Boolean(form.dueDate),
       dueDate: form.dueDate,
-      notes: `Usage: ${form.usageType}\nService: ${form.chibiService || "N/A"}${form.chibiService === "Alternate outfits/expressions" ? ` (${form.alternativesCount} alternatives)` : ""}${form.ychTheme ? `\nYCH Theme: ${form.ychTheme}` : ""}\nBg Details: ${form.backgroundDetails}\nNotes: ${form.additionalDetails}\nConfirmed all terms: Yes`,
+      notes: [
+        `License: ${form.license}`,
+        `Service: ${form.chibiService || "N/A"}${form.chibiService === "Alternate outfits/expressions" ? ` (${form.alternativesCount} alternatives)` : ""}${form.chibiService === "Sticker set" ? ` (${form.stickerCount} stickers)` : ""}`,
+        form.ychTheme ? `YCH Theme: ${form.ychTheme}` : "",
+        form.dueDate && form.dueTime ? `Due time: ${formatTime12(form.dueTime)}` : "",
+        `Notes: ${form.notes.trim() || "None"}`,
+        "Confirmed all terms: Yes",
+      ].filter(Boolean).join("\n"),
       references,
       // Lock in exactly what the client saw so the record never shifts later.
       currency,
-      totalAmount: currency === "EUR" ? usdToEur(usdTotal) : total,
-      exchangeRate: CURRENCIES[currency].phpPerUnit,
-      totalPhp: currency === "PHP" ? total : Math.round(usdTotal * PHP_PER_USD_REFERENCE),
+      totalAmount: displayedTotal,
+      exchangeRate: phpPerUnit(currency, rates),
+      totalPhp: currency === "PHP" ? displayedTotal : Math.round(usdTotal * rates.PHP),
       submittedAt: new Date().toISOString(),
       stage: 0,
     };
-
     try {
       await apiRequest<{ success: boolean }>("/api/commissions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request)
+        body: JSON.stringify(request),
       });
-
-      alert("Your commission request is successfully submitted!");
-      go("home");
+      setDone(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error("Submission Error Details:", error);
-      alert(`Failed to save request: ${error instanceof Error ? error.message : String(error)}`);
+      setSubmitError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const maxChars = form.artStyle === "Chibi" ? 4 : form.artStyle === "Semi-Realistic" ? 2 : 4;
+  const baseChoices = Object.keys(BASE_PRICES_USD);
+  const checks: { key: "confirm1" | "confirm2" | "confirm3"; text: string }[] = [
+    { key: "confirm1", text: "I confirm that I have accessed, read, and fully understood the rules and regulations provided in the official Commission Guide." },
+    { key: "confirm2", text: "I explicitly accept the payment terms, including the 20% mid-project downpayment and the mandatory 3-day final payment window upon artwork completion." },
+    { key: "confirm3", text: "I explicitly agree to follow all rules, regulations, and operational terms outlined within the guide for the duration of this project." },
+  ];
+
+  if (done) {
+    return (
+      <main id="main-content" tabIndex={-1} className="page-main cf-page">
+        <div className="cf-wrap">
+          <img className="cf-logo" src={titleHero} alt="Kyuuji Portfolio" />
+          <div className="cf-card cf-done">
+            <h2>Request sent!</h2>
+            <p>Thank you, {form.name.trim() || "friend"}! Your commission request was submitted. You’ll receive a personalized quote after it’s reviewed.</p>
+            <button type="button" className="btn-pill btn-dark" onClick={() => go("home")}>Back to Home</button>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <main id="main-content" tabIndex={-1} className="page-main commission-page">
-      <section className="page-hero wrap">
-        <p className="kicker">Commission Request Form</p>
-        <h1>Let's make something <em>yours.</em></h1>
-        <p>Step-by-step studio commission intake modeled after live Google Forms.</p>
-      </section>
+    <main id="main-content" tabIndex={-1} className="page-main cf-page">
+      <div className="cf-wrap">
+        <img className="cf-logo" src={titleHero} alt="Kyuuji Portfolio" />
 
-      <div className={`wrap commission-layout ${step > 2 && step < 5 ? "has-estimate" : "without-estimate"}`}>
-        <div className="commission-form">
-          <div className="commission-progress">
-            <div>
-              <span className="commission-progress-step">Section {step} of 5</span>
-              <h3 style={{ margin: "2px 0 0", fontFamily: "DM Serif Display", fontSize: "20px" }}>
-                {step === 1 && "Terms of Service Agreement & Confirmation"}
-                {step === 2 && "General Information"}
-                {step === 3 && `${form.artStyle || "Art"} Scope & Options`}
-                {step === 4 && "Project References & Final Notes"}
-                {step === 5 && "Review & Checkout"}
-              </h3>
-            </div>
-            <div className="commission-progress-track">
-              <div className="commission-progress-fill" style={{ width: `${(step / 5) * 100}%` }} />
-            </div>
-          </div>
+        <header className="cf-header"><h1>{STEP_TITLES[step - 1]}</h1></header>
 
-          {step === 1 && (
-            <div className="form-section form-section-accent">
-              <div className="form-number">01</div>
-              <div>
-                <h2>Terms of Service Agreement & Confirmation <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></h2>
-                <p style={{ fontSize: "14px", color: "var(--muted)", lineHeight: "1.6", marginTop: "6px" }}>
-                  Please review and check each box below to proceed with your application. By checking these requirements, you acknowledge that you have read the official Commission Guide and explicitly agree to follow these operational boundaries throughout our project.
+        <form noValidate onSubmit={(event) => { event.preventDefault(); if (step < TOTAL_STEPS) goNext(); else void handleSubmit(); }}>
+          <div className="cf-card" key={step}>
+            {step === 1 && (
+              <div className="cf-step">
+                <p className="cf-lede">
+                  Please review and check each box below to proceed with your application. By checking these requirements, you acknowledge that you have read the official{" "}
+                  <a href="#guide" target="_blank" rel="noreferrer">Commission Guide</a> and explicitly agree to follow these operational boundaries throughout our project.
                 </p>
+                <div className="cf-checks">
+                  {checks.map(({ key, text }) => (
+                    <div className="cf-group" data-field={key} key={key}>
+                      <label className={`cf-check${shown(key) ? " is-invalid" : ""}`}>
+                        <input type="checkbox" checked={form[key]} onChange={(event) => { setValue(key, event.target.checked); touch(key); }} aria-describedby={`${key}-error`} aria-required />
+                        <span className="cf-checkbox" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" /></svg></span>
+                        <span>{text}</span>
+                        <span className="cf-star" aria-hidden="true">*</span>
+                      </label>
+                      <FieldError id={`${key}-error`} message={shown(key)} />
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "20px" }}>
-                <label className="check-row" style={{ margin: 0 }}>
-                  <input type="checkbox" checked={form.confirm1} onChange={(e) => setValue("confirm1", e.target.checked)} />
-                  <span><strong>Guide Review <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></strong><small>I confirm that I have accessed, read, and fully understood the rules and regulations provided in the official Commission Guide.</small></span>
-                </label>
-                <label className="check-row" style={{ margin: 0 }}>
-                  <input type="checkbox" checked={form.confirm2} onChange={(e) => setValue("confirm2", e.target.checked)} />
-                  <span><strong>Payment Terms <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></strong><small>I explicitly accept the payment terms, including the 20% mid-project downpayment and the mandatory 3-day final payment window upon artwork completion.</small></span>
-                </label>
-                <label className="check-row" style={{ margin: 0 }}>
-                  <input type="checkbox" checked={form.confirm3} onChange={(e) => setValue("confirm3", e.target.checked)} />
-                  <span><strong>Operational Boundaries <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></strong><small>I explicitly agree to follow all rules, regulations, and operational terms outlined within the guide for the duration of this project.</small></span>
-                </label>
-              </div>
-            </div>
-          )}
+            )}
 
-          {step === 2 && (
-            <div className="form-section form-section-accent">
-              <div className="form-number">02</div>
-              <div><h2>General Information</h2><p>Provide your contact details and usage preferences.</p></div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <Field label={<>Name / Nickname <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
-                  <input value={form.name} onChange={(e) => setValue("name", e.target.value)} placeholder="Your name" />
-                </Field>
-                <Field label={<>Email address <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
-                  <input
-                    type="email"
-                    inputMode="email"
-                    autoComplete="email"
-                    value={form.email}
-                    onChange={(e) => setValue("email", e.target.value)}
-                    onBlur={() => setEmailTouched(true)}
-                    placeholder="you@example.com"
-                    aria-invalid={emailTouched && Boolean(emailError)}
-                    aria-describedby={emailTouched && emailError ? "email-error" : undefined}
-                  />
-                  {emailTouched && emailError && <small id="email-error" className="field-error" role="alert">{emailError}</small>}
-                </Field>
-                <Field label="Social media handle"><input value={form.social} onChange={(e) => setValue("social", e.target.value)} placeholder="@username" /></Field>
-                
-                <Field label="Planned due date (Optional)" hint="NOTE: Expected commissioned pieces will be labeled as PRIORITY. In PRIORITY, it will be prioritized over non-prioritized pieces, and will be charged an extra 18% of total price (or 10% if the due date is more than 14 days away).">
-                  <input type="date" value={form.dueDate} onChange={(e) => setValue("dueDate", e.target.value)} />
-                </Field>
-                <Field label={<>Usage Type <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
-                  <select value={form.usageType} onChange={(e) => setValue("usageType", e.target.value)}>
-                    <option value="" disabled>-- Select Usage Type --</option>
-                    <option value="Personal Use">Personal Use</option>
-                    <option value="Commercial Use">Commercial Use</option>
-                  </select>
-                </Field>
-              </div>
-            </div>
-          )}
+            {step === 2 && (
+              <div className="cf-step">
+                <div className="cf-group">
+                  <h2 className="cf-section-title">Personal Information</h2>
+                  <p className="cf-section-note">Please provide and fill up all necessary contact details and preferences.</p>
+                  <div className="cf-fields">
+                    <FloatInput id="name" label="Name" required value={form.name} autoComplete="name" maxLength={120}
+                      onChange={(v) => setValue("name", v)} onBlur={() => touch("name")} error={shown("name")} />
+                    <FloatInput id="email" label="Email" required type="email" inputMode="email" autoComplete="email" value={form.email}
+                      onChange={(v) => setValue("email", v)} onBlur={() => touch("email")} error={shown("email")} />
+                    <div className="cf-group" data-field="socialHandle">
+                      <FloatInput id="socialHandle" label="Social Media" required prefix="@" value={form.socialHandle} maxLength={61} autoComplete="off"
+                        onChange={(v) => setValue("socialHandle", v)} onBlur={() => touch("socialHandle")} error={shown("socialHandle")}
+                        aside={
+                          <div data-field="socialApp">
+                            <CustomSelect id="socialApp" ariaLabel="Social app" placeholder="Select Social App" value={form.socialApp}
+                              onChange={(v) => { setValue("socialApp", v); touch("socialApp"); }} onClose={() => touch("socialApp")} invalid={Boolean(shown("socialApp"))}
+                              options={SOCIAL_APPS.map((app) => ({ value: app, label: app }))} />
+                          </div>
+                        } />
+                      <FieldError id="socialHandle-error" message={shown("socialHandle")} />
+                      <FieldError id="socialApp-error" message={shown("socialApp")} />
+                    </div>
+                  </div>
+                </div>
 
-          {step === 3 && (
-            <div className="form-section form-section-accent">
-              <div className="form-number">03</div>
-              <div><h2>Art Style, Scope & Options</h2><p>Choose your art style, then select a composition and its matching options.</p></div>
-              
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <div className="field">
-                  <span>Art Style <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></span>
-                  <div className="art-style-grid">
-                    {[
-                      { name: "Chibi", art: "scout", description: "Cute, expressive character art" },
-                      { name: "Semi-Realistic", art: "sunset", description: "Detailed portraits and illustrations" },
-                    ].map(({ name, art, description }) => (
-                      <button
-                        key={name}
-                        type="button"
-                        className={`art-style-card ${form.artStyle === name ? "selected" : ""}`}
-                        aria-pressed={form.artStyle === name}
-                        onClick={() => setValue("artStyle", name)}
-                      >
-                        {name === "Chibi"
-                          ? <div className="art-visual art-chibi-reference"><img src={chibiReference} alt="Chibi style example artwork" /></div>
-                          : <ArtVisual art={art} label={`${name} example artwork`} />}
-                        <span className="art-style-copy"><strong>{name}</strong><small>{description}</small></span>
+                <div className="cf-group">
+                  <h2 className="cf-section-title">Project Due Date</h2>
+                  <p className="cf-section-note">Expected commissioned pieces will be labeled as PRIORITY. In PRIORITY, it will be prioritized over non-prioritized pieces, and will be charged an extra 18% of total price (or 10% if the due date is more than 14 days away).</p>
+                  <div className="ff-datetime">
+                    <FloatInput id="dueDate" label={DUE_DATE_REQUIRED ? "MM-DD-YYYY" : "MM-DD-YYYY (optional)"} type="date" alwaysFloat required={DUE_DATE_REQUIRED} min={todayInput()} value={form.dueDate}
+                      onChange={(v) => setValue("dueDate", v)} onBlur={() => touch("dueDate")} error={shown("dueDate")} />
+                    <FloatInput id="dueTime" label="00 : 00 AM (optional)" type="time" alwaysFloat value={form.dueTime}
+                      onChange={(v) => setValue("dueTime", v)} onBlur={() => touch("dueTime")} error={shown("dueTime")} />
+                  </div>
+                </div>
+
+                <div className="cf-group" data-field="license">
+                  <h2 className="cf-section-title">License Type</h2>
+                  <p className="cf-section-note">Commissioned pieces intended for business, branding, or profit-generating purposes will be labeled as <b>Commercial</b>, which grants commercial usage rights and will incur additional fees (to be discussed), while pieces intended strictly for private, non-profit use will be labeled as <b>Personal</b>.</p>
+                  <div className="cf-rel">
+                    <CustomSelect id="license" ariaLabel="License type" placeholder="Select License Type" value={form.license}
+                      onChange={(v) => { setValue("license", v); touch("license"); }} onClose={() => touch("license")} invalid={Boolean(shown("license"))}
+                      options={[{ value: "Personal", label: "Personal" }, { value: "Commercial", label: "Commercial" }]} />
+                    <span className="cf-star" aria-hidden="true">*</span>
+                  </div>
+                  <FieldError id="license-error" message={shown("license")} />
+                </div>
+              </div>
+            )}
+
+            {step === 3 && (
+              <div className="cf-step">
+                <div className="cf-group" data-field="baseOption">
+                  <span className="cf-label" id="base-scope-label">Base Scope<span className="cf-req" aria-hidden="true">*</span></span>
+                  <div className={`cf-radio-cards${shown("baseOption") ? " is-invalid" : ""}`} role="radiogroup" aria-labelledby="base-scope-label">
+                    {baseChoices.map((name) => (
+                      <button type="button" role="radio" aria-checked={form.baseOption === name} className="cf-radio" key={name}
+                        onClick={() => { setValue("baseOption", name); touch("baseOption"); }}>
+                        <span className="cf-radio-dot" aria-hidden="true" />
+                        <span className="cf-radio-img"><img src={placeholder} alt="" /></span>
+                        <span className="cf-radio-caption">{BASE_LABELS[name]} ({money(BASE_PRICES_USD[name])})</span>
                       </button>
                     ))}
                   </div>
+                  <FieldError id="baseOption-error" message={shown("baseOption")} />
                 </div>
 
-                <div>
-                  <label className="field" style={{ marginBottom: "8px" }}><span>Base Scope <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></span></label>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    {form.artStyle === "Chibi" ? (
-                      chibiBaseOptions.map(([name, price]) => (
-                        <button type="button" className={`choice-card ${form.baseOption === name ? "selected" : ""}`} aria-pressed={form.baseOption === name} onClick={() => setValue("baseOption", name)} key={name} style={{ width: "100%" }}>
-                          <span className="radio" /><strong>{name}</strong><b>{money(price)}</b><small>Chibi tier (Rendered by default)</small>
-                        </button>
-                      ))
-                    ) : form.artStyle === "Semi-Realistic" ? (
-                      semiBaseOptions.map(([name, price]) => (
-                        <button type="button" className={`choice-card ${form.baseOption === name ? "selected" : ""}`} aria-pressed={form.baseOption === name} onClick={() => setValue("baseOption", name)} key={name} style={{ width: "100%" }}>
-                          <span className="radio" /><strong>{name}</strong><b>{money(price)}</b><small>Semi-realism tier</small>
-                        </button>
-                      ))
-                    ) : (
-                      <p style={{ color: "var(--muted)", fontSize: "14px" }}>Choose an Art Style to see the available scopes and options.</p>
-                    )}
-                  </div>
+                <div className="cf-group" data-field="chibiService">
+                  <span className="cf-label">Chibi Service<span className="cf-req" aria-hidden="true">*</span></span>
+                  <CustomSelect id="chibiService" ariaLabel="Chibi service" placeholder="--Select Chibi Service --" value={form.chibiService}
+                    onChange={(v) => { setValue("chibiService", v); touch("chibiService"); }} onClose={() => touch("chibiService")}
+                    invalid={Boolean(shown("chibiService"))} options={serviceOptions} />
+                  <p className="cf-hint">Fees shown are added to the {BASE_LABELS[referenceScope]} price.</p>
+                  <FieldError id="chibiService-error" message={shown("chibiService")} />
                 </div>
 
-                {form.artStyle === "Chibi" ? (
-                  <>
-                    <Field label={<>Chibi Solo Deal / Service <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
-                      <select value={form.chibiService} onChange={(e) => setValue("chibiService", e.target.value)}>
-                        <option value="" disabled>-- Select Chibi Service --</option>
-                        <option value="Solo Deals">Solo Deals</option>
-                        <option value="Sticker set">Sticker set</option>
-                        <option value="Acrylic Merch">Acrylic Merch</option>
-                        <option value="Badges/Pins/Pfp Design">Badges/Pins/Pfp Design</option>
-                        <option value="Character Reference sheet">Character Reference sheet</option>
-                        <option value="2D Model character sheet">2D Model character sheet</option>
-                        <option value="YCH">YCH (Your Character Here)</option>
-                        <option value="Alternate outfits/expressions">Alternate outfits/expressions</option>
-                      </select>
-                    </Field>
-
-                    {form.chibiService === "Sticker set" && (
-                      <Field label={<>Sticker Count (4 to 9 stickers) <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
-                        <div className="stepper" style={{ maxWidth: "160px" }}>
-                          <button type="button" onClick={() => setValue("stickerCount", Math.max(4, form.stickerCount - 1))}>−</button>
-                          <strong>{form.stickerCount}</strong>
-                          <button type="button" onClick={() => setValue("stickerCount", Math.min(9, form.stickerCount + 1))}>+</button>
-                        </div>
-                      </Field>
-                    )}
-
-                    {form.chibiService === "Alternate outfits/expressions" && (
-                      <Field label={<>Number of Alternatives (2 to 6 options) <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
-                        <div className="stepper" style={{ maxWidth: "160px" }}>
-                          <button type="button" onClick={() => setValue("alternativesCount", Math.max(2, form.alternativesCount - 1))}>−</button>
-                          <strong>{form.alternativesCount}</strong>
-                          <button type="button" onClick={() => setValue("alternativesCount", Math.min(6, form.alternativesCount + 1))}>+</button>
-                        </div>
-                      </Field>
-                    )}
-
-                    {form.chibiService === "YCH" && (
-                      <div>
-                        <label className="field" style={{ marginBottom: "8px" }}><span>Select YCH Theme <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></span></label>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
-                          {[
-                            ["Cozy Tea Time", "tea"],
-                            ["Pocket Mascot", "scout"],
-                            ["Cheerful Orange", "orange"]
-                          ].map(([themeName, artKey]) => (
-                            <button
-                              type="button"
-                              key={themeName}
-                              className={`choice-card ${form.ychTheme === themeName ? "selected" : ""}`}
-                              aria-pressed={form.ychTheme === themeName}
-                              onClick={() => setValue("ychTheme", themeName)}
-                              style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "12px", textAlign: "center" }}
-                            >
-                              <div style={{ width: "100%", height: "70px", marginBottom: "8px", borderRadius: "6px", overflow: "hidden" }}>
-                                <ArtVisual art={artKey} label={themeName} />
-                              </div>
-                              <strong>{themeName}</strong>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <Field label={<>Color Finish <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
-                    <select value={form.colorOption} onChange={(e) => setValue("colorOption", e.target.value)}>
-                      <option value="" disabled>-- Select Color Finish --</option>
-                      <option value="Rendered">Rendered</option>
-                      <option value="Plain">Plain Color</option>
-                      <option value="Monochrome">Monochrome</option>
-                    </select>
-                  </Field>
-                )}
-
-                <Field label={<>Background Style <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
-                  <select value={form.bgOption} onChange={(e) => setValue("bgOption", e.target.value)}>
-                    <option value="" disabled>-- Select Background Style --</option>
-                    <option value="None/Transparent">None / Transparent</option>
-                    <option value="Plain">Plain Solid Color</option>
-                    <option value="Complex">Complex Background</option>
-                  </select>
-                </Field>
-
-                <Field label={<>Number of Characters (Max {maxChars}) <span className="req" aria-hidden="true">*</span><span className="sr-only"> (required)</span></>}>
-                  <div className="stepper">
-                    <button type="button" onClick={() => setValue("characters", Math.max(1, form.characters - 1))}>−</button>
-                    <strong>{form.characters}</strong>
-                    <button type="button" onClick={() => setValue("characters", Math.min(maxChars, form.characters + 1))}>+</button>
-                  </div>
-                </Field>
-              </div>
-            </div>
-          )}
-
-          {step === 4 && (
-            <div className="form-section form-section-accent">
-              <div className="form-number">04</div>
-              <div><h2>Project references & final notes</h2><p>Provide specific details and upload visual references (up to 10 images).</p></div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <Field label="Background details"><textarea rows={3} value={form.backgroundDetails} onChange={(e) => setValue("backgroundDetails", e.target.value)} placeholder="Describe background elements or props..." /></Field>
-                <Field label="Additional details"><textarea rows={4} value={form.additionalDetails} onChange={(e) => setValue("additionalDetails", e.target.value)} placeholder="Pose description, clothing styles, mood..." /></Field>
-                <Field label="Reference images (Max 10 files)" hint={`Uploaded: ${references.length} / 10`}>
-                  <input type="file" accept="image/*" multiple onChange={(e) => uploadReferences(e.target.files)} />
-                </Field>
-                {references.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "10px" }}>
-                    {references.map((image, index) => (
-                      <div key={index} style={{ position: "relative" }}>
-                        <img src={image} alt={`Reference ${index + 1}`} style={{ width: "80px", height: "80px", objectFit: "cover", border: "1px solid var(--gold)" }} />
-                        <button type="button" onClick={() => removeReference(index)} style={{ position: "absolute", top: 0, right: 0, background: "rgba(0,0,0,0.7)", color: "#fff", border: "none", cursor: "pointer", padding: "2px 6px", fontSize: "10px" }}>✕</button>
-                      </div>
-                    ))}
+                {form.chibiService === "Sticker set" && (
+                  <div className="cf-group">
+                    <span className="cf-label">Sticker Count (4 to 9 stickers)</span>
+                    <div className="cf-stepper small">
+                      <button type="button" aria-label="Fewer stickers" disabled={form.stickerCount <= 4} onClick={() => setValue("stickerCount", Math.max(4, form.stickerCount - 1))}>−</button>
+                      <output aria-live="polite">{form.stickerCount}</output>
+                      <button type="button" aria-label="More stickers" disabled={form.stickerCount >= 9} onClick={() => setValue("stickerCount", Math.min(9, form.stickerCount + 1))}>+</button>
+                    </div>
                   </div>
                 )}
-              </div>
-            </div>
-          )}
+                {form.chibiService === "Alternate outfits/expressions" && (
+                  <div className="cf-group">
+                    <span className="cf-label">Number of Alternatives (2 to 6 options)</span>
+                    <div className="cf-stepper small">
+                      <button type="button" aria-label="Fewer alternatives" disabled={form.alternativesCount <= 2} onClick={() => setValue("alternativesCount", Math.max(2, form.alternativesCount - 1))}>−</button>
+                      <output aria-live="polite">{form.alternativesCount}</output>
+                      <button type="button" aria-label="More alternatives" disabled={form.alternativesCount >= 6} onClick={() => setValue("alternativesCount", Math.min(6, form.alternativesCount + 1))}>+</button>
+                    </div>
+                  </div>
+                )}
+                {form.chibiService === "YCH" && (
+                  <div className="cf-group" data-field="ychTheme">
+                    <span className="cf-label" id="ych-label">Select YCH Theme<span className="cf-req" aria-hidden="true">*</span></span>
+                    <div className={`cf-radio-cards${shown("ychTheme") ? " is-invalid" : ""}`} role="radiogroup" aria-labelledby="ych-label" style={{ paddingLeft: 0 }}>
+                      {YCH_THEMES.map(([themeName, artKey]) => (
+                        <button type="button" role="radio" aria-checked={form.ychTheme === themeName} className="cf-radio" key={themeName}
+                          onClick={() => { setValue("ychTheme", themeName); touch("ychTheme"); }}>
+                          <span className="cf-radio-dot" aria-hidden="true" />
+                          <span className="cf-radio-img"><ArtVisual art={artKey} label={themeName} /></span>
+                          <span className="cf-radio-caption">{themeName}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <FieldError id="ychTheme-error" message={shown("ychTheme")} />
+                  </div>
+                )}
 
-          {step === 5 && (
-            <div className="form-section form-section-accent">
-              <div className="form-number">05</div>
-              <div>
-                <h2>Review & Checkout</h2>
-                <p style={{ fontSize: "14px", color: "var(--muted)", lineHeight: "1.6", marginTop: "6px" }}>
-                  Review your total and submit your request.
-                </p>
-              </div>
-              
-              <div className="checkout-summary estimate-card">
-                <div className="estimate-top"><span>Order Summary · {currency}</span><Icon name="spark" /></div>
-                <h2>{money(total)}</h2>
-                <div className="estimate-lines">{estimateBreakdown}</div>
-                <div className="estimate-total"><span>Estimated total</span><strong>{money(total)}</strong></div>
-              {currencyNote}
-              </div>
+                <div className="cf-group" data-field="bgOption">
+                  <span className="cf-label">Background Style<span className="cf-req" aria-hidden="true">*</span></span>
+                  <CustomSelect id="bgOption" ariaLabel="Background style" placeholder="--Select Background Style --" value={form.bgOption}
+                    onChange={(v) => { setValue("bgOption", v); touch("bgOption"); }} onClose={() => touch("bgOption")}
+                    invalid={Boolean(shown("bgOption"))} options={backgroundOptions} />
+                  <FieldError id="bgOption-error" message={shown("bgOption")} />
+                </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "20px" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "10px" }}>
-                  <Btn type="button" kind="outline" onClick={() => setStep(2)}>Edit General Info</Btn>
-                  <Btn type="button" kind="outline" onClick={() => setStep(3)}>Edit Scope & Options</Btn>
+                <div className="cf-group" data-field="characters">
+                  <span className="cf-label">Number of Characters in Canvas (Max: {MAX_CHARACTERS})<span className="cf-req" aria-hidden="true">*</span></span>
+                  <div className="cf-stepper">
+                    <button type="button" aria-label="Fewer characters" disabled={form.characters <= 1} onClick={() => setValue("characters", Math.max(1, form.characters - 1))}>−</button>
+                    <output aria-live="polite">{form.characters}</output>
+                    <button type="button" aria-label="More characters" disabled={form.characters >= MAX_CHARACTERS} onClick={() => setValue("characters", Math.min(MAX_CHARACTERS, form.characters + 1))}>+</button>
+                  </div>
+                  <FieldError id="characters-error" message={shown("characters")} />
+                </div>
+
+                <div className="cf-group" data-field="references">
+                  <span className="cf-label">Reference Images (Max: {MAX_REFERENCES} Files)</span>
+                  <p className="cf-file-count">Uploaded: {references.length} / {MAX_REFERENCES}{uploading ? " · processing…" : ""}</p>
+                  <div className={`cf-file${shown("references") ? " is-invalid" : ""}`}>
+                    <label htmlFor="references">Choose Files</label>
+                    <input id="references" type="file" accept="image/*" multiple disabled={uploading || references.length >= MAX_REFERENCES}
+                      onChange={(event) => { const input = event.target; const files = input.files; void uploadReferences(files).then(() => { input.value = ""; }); }} />
+                    <span>{references.length ? `${references.length} file${references.length > 1 ? "s" : ""} chosen` : "No File(s) Chosen"}</span>
+                  </div>
+                  {references.length > 0 && (
+                    <div className="cf-refs">
+                      {references.map((image, index) => (
+                        <div className="cf-ref" key={`${index}-${image.slice(-16)}`}>
+                          <img src={image} alt={`Reference ${index + 1}`} />
+                          <button type="button" aria-label={`Remove reference ${index + 1}`} onClick={() => removeReference(index)}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <FieldError id="references-error" message={shown("references")} />
+                </div>
+
+                <div className="cf-group" data-field="notes">
+                  <label className="cf-label" htmlFor="notes">Additional Notes (optional)</label>
+                  <textarea id="notes" className="cf-textarea" rows={3} maxLength={1100} value={form.notes} placeholder="Pose, outfit, mood, background details…"
+                    aria-invalid={Boolean(shown("notes"))} aria-describedby="notes-error"
+                    onChange={(event) => setValue("notes", event.target.value)} onBlur={() => touch("notes")} />
+                  <FieldError id="notes-error" message={shown("notes")} />
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {step > 2 && step < 5 && (
-            <aside className="estimate-card estimate-card-mobile">
-              <div className="estimate-top"><span>Live Estimate · {currency}</span><Icon name="spark" /></div>
-              <h2>{money(total)}</h2>
-              <div className="estimate-lines">{estimateBreakdown}</div>
-              <div className="estimate-total"><span>Estimated total</span><strong>{money(total)}</strong></div>
-              {currencyNote}
-              <p className="fine-print">GCASH is the accepted payment platform. Final confirmation is sent after admin review.</p>
-            </aside>
-          )}
-
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "20px" }}>
-            {step > 1 ? (
-              <Btn type="button" kind="outline" onClick={() => setStep((prev) => Math.max(1, prev - 1))}>Back</Btn>
-            ) : <div />}
-
-            {step < 5 ? (
-              <button 
-                type="button" 
-                className="btn btn-primary" 
-                onClick={handleNext}
-              >
-                Next <Icon name="arrow" />
-              </button>
-            ) : (
-              <button 
-                type="button" 
-                className="btn btn-primary submit-btn"
-                onClick={handleFinalSubmit}
-              >
-                Submit <Icon name="arrow" />
-              </button>
+            {step === 4 && (
+              <div className="cf-summary">
+                <h2>ORDER SUMMARY</h2>
+                <div className="cf-list-block">
+                  <div className="cf-list-head"><span>Order List</span><span>Price List</span></div>
+                  {order.lines.map((line) => (
+                    <div className="cf-list-row" key={line.key}>
+                      <span>{line.label}</span>
+                      <span>{line.key !== "base" && line.usd === 0 ? "Included" : line.usd < 0 ? `−${rowAmount(Math.abs(line.usd))}` : line.key === "base" ? rowAmount(line.usd) : `+${rowAmount(line.usd)}`}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="cf-list-block">
+                  <div className="cf-list-head"><span>Additional Fee(s)</span></div>
+                  {order.fees.map((fee) => (
+                    <div className="cf-list-row" key={fee.key}><span>{fee.label}</span><span>+{rowAmount(fee.usd)}</span></div>
+                  ))}
+                  {form.license === "Commercial" && (
+                    <div className="cf-list-row"><span>Commercial license</span><span>To be discussed</span></div>
+                  )}
+                  {order.fees.length === 0 && form.license !== "Commercial" && <div className="cf-list-row"><span>None</span><span>{rowAmount(0)}</span></div>}
+                </div>
+                <div className="cf-total"><span>ESTIMATED TOTAL</span><strong>{formatAmount(displayedTotal, currency)}</strong></div>
+                <p className="cf-note">* Commercial Type price is not included in the estimated total.</p>
+                {currency !== "USD" && (
+                  <p className="cf-rate-note">
+                    {currency === "ROBUX"
+                      ? `Robux rate: $25 = ${(25 * ROBUX_PER_USD).toLocaleString("en-US")} R$ and $30 = ${(30 * ROBUX_PER_USD).toLocaleString("en-US")} R$.`
+                      : `Prices are set in USD and converted at ${ratesLive ? "today’s" : "an approximate"} rate: $1 = ${CURRENCIES[currency].symbol}${unitsPerUsd(currency, rates).toLocaleString("en-US", { maximumFractionDigits: 4 })}.`}
+                  </p>
+                )}
+                <p className="cf-rate-note">GCash is the accepted payment platform. Final confirmation is sent after review.</p>
+                {submitError && <p className="cf-banner" role="alert">{submitError}</p>}
+              </div>
             )}
           </div>
-        </div>
 
-        {step > 2 && step < 5 && <aside className="estimate-card estimate-card-desktop">
-          <div className="estimate-top"><span>Live Estimate · {currency}</span><Icon name="spark" /></div>
-          <h2>{money(total)}</h2>
-          <div className="estimate-lines">{estimateBreakdown}</div>
-          <div className="estimate-total"><span>Estimated total</span><strong>{money(total)}</strong></div>
-              {currencyNote}
-          <p className="fine-print">GCASH is the accepted payment platform. Final confirmation is sent after admin review.</p>
-        </aside>}
+          <div className="cf-controls">
+            <button type="button" className="cf-clear" onClick={clearForm}>Clear Form</button>
+            <div className="cf-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((step / TOTAL_STEPS) * 100)} aria-label="Form progress">
+              <div className="cf-fill" style={{ width: `${fill}%` }} />
+            </div>
+            <span className="cf-page-label">Page {step} of {TOTAL_STEPS}</span>
+            <div className="cf-buttons">
+              {step > 1 && <button type="button" className="btn-pill btn-main" onClick={() => setStep((current) => Math.max(1, current - 1))}>Back</button>}
+              <button type="submit" className="btn-pill btn-main" disabled={submitting || uploading}>
+                {step < TOTAL_STEPS ? "Next" : submitting ? "Submitting…" : "Submit"}
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
     </main>
   );
 }
+
+
 
 const POLICY_SECTIONS = [
   { id: "policy-rules", numeral: "I", title: "Rules & Regulations" },
@@ -1741,34 +1757,22 @@ function Guide({ go }: { go: (page: Page) => void }) {
   );
 }
 
-type FilterKind = "scope" | "service" | "colorFinish";
+type FilterKind = "scope" | "service";
 type ActiveTag = { kind: FilterKind; value: string };
 
-const ART_STYLES = ["Chibi", "Semi-Realistic"];
-const SCOPES_BY_STYLE: Record<string, string[]> = {
-  "Chibi": ["Headshot", "Fullbody"],
-  "Semi-Realistic": ["Headshot", "Bust-up", "Waist-up", "Thigh-up"],
-};
+const CHIBI_SCOPES = ["Headshot", "Fullbody"];
 const CHIBI_SERVICES = ["Solo Deals", "Sticker set", "Acrylic Merch", "Badges/Pins/Pfp Design", "Character Reference sheet", "2D Model character sheet", "YCH", "Alternate outfits/expressions"];
-const COLOR_FINISHES = ["Rendered", "Plain", "Monochrome"];
 const TOOL_PRESETS = ["Clip Studio Paint", "Procreate", "Adobe Photoshop", "Krita", "Paint Tool SAI", "MediBang Paint", "Ibis Paint X", "Adobe Illustrator"];
 const FORMAT_PRESETS = ["Digital illustration", "Digital print", "Sticker sheet", "Acrylic merch", "Pin / Badge", "Photocard", "Reference sheet", "2D model sheet"];
-const KIND_LABEL: Record<FilterKind, string> = { scope: "Scope", service: "Service", colorFinish: "Finish" };
+const KIND_LABEL: Record<FilterKind, string> = { scope: "Scope", service: "Service" };
 
-const itemArtStyle = (item: AdminLibraryItem) => {
-  if (item.artStyle) return item.artStyle;
-  if (/semi/i.test(item.category || "")) return "Semi-Realistic";
-  if (/chibi/i.test(item.category || "")) return "Chibi";
-  return "";
-};
 const itemService = (item: AdminLibraryItem) => item.service || item.category?.match(/\(([^)]+)\)/)?.[1] || "";
 
-const matchesFilters = (item: AdminLibraryItem, artStyle: string, tags: ActiveTag[]) => {
-  if (artStyle && itemArtStyle(item) !== artStyle) return false;
-  for (const kind of ["scope", "service", "colorFinish"] as FilterKind[]) {
+const matchesFilters = (item: AdminLibraryItem, tags: ActiveTag[]) => {
+  for (const kind of ["scope", "service"] as FilterKind[]) {
     const picked = tags.filter((tag) => tag.kind === kind).map((tag) => tag.value);
     if (!picked.length) continue;
-    const value = kind === "scope" ? item.scope : kind === "service" ? itemService(item) : item.colorFinish;
+    const value = kind === "scope" ? item.scope : itemService(item);
     if (!value || !picked.includes(value)) return false;
   }
   return true;
@@ -1888,17 +1892,10 @@ function ActionMenu({ label, onEdit, onDelete }: { label: string; onEdit: () => 
   );
 }
 
-function LibraryFilterBar({ artStyle, tags, onArtStyle, onToggleTag, onClear }: {
-  artStyle: string; tags: ActiveTag[]; onArtStyle: (value: string) => void;
-  onToggleTag: (tag: ActiveTag) => void; onClear: () => void;
+function LibraryFilterBar({ tags, onToggleTag, onClear }: {
+  tags: ActiveTag[]; onToggleTag: (tag: ActiveTag) => void; onClear: () => void;
 }) {
   const [drawer, setDrawer] = useState<"scope" | "service" | null>(null);
-  const scopeOptions = artStyle ? SCOPES_BY_STYLE[artStyle] : Array.from(new Set(Object.values(SCOPES_BY_STYLE).flat()));
-  const serviceLabel = artStyle === "Chibi" ? "Service" : artStyle === "Semi-Realistic" ? "Color Finish" : "Service / Color Finish";
-  const serviceGroups: { kind: FilterKind; label: string; options: string[] }[] = [];
-  if (artStyle !== "Semi-Realistic") serviceGroups.push({ kind: "service", label: "Service (Chibi)", options: CHIBI_SERVICES });
-  if (artStyle !== "Chibi") serviceGroups.push({ kind: "colorFinish", label: "Color Finish (Semi-Realistic)", options: COLOR_FINISHES });
-
   const isOn = (kind: FilterKind, value: string) => tags.some((tag) => tag.kind === kind && tag.value === value);
   const toggleDrawer = (name: "scope" | "service") => setDrawer((current) => (current === name ? null : name));
   const pill = (kind: FilterKind, value: string) => (
@@ -1911,31 +1908,19 @@ function LibraryFilterBar({ artStyle, tags, onArtStyle, onToggleTag, onClear }: 
     <div className="library-filter">
       <div className="library-filter-row">
         <strong className="sub-filter-label">Filter</strong>
-        <label className="sub-filter-select">
-          <span className="sr-only">Art Style</span>
-          <select value={artStyle} onChange={(event) => { setDrawer(null); onArtStyle(event.target.value); }}>
-            <option value="">Art Style</option>
-            {ART_STYLES.map((style) => <option key={style} value={style}>{style}</option>)}
-          </select>
-        </label>
         <button type="button" className={`filter-pill-btn ${drawer === "scope" ? "open" : ""}`} aria-expanded={drawer === "scope"} aria-controls="filter-drawer" onClick={() => toggleDrawer("scope")}>
           Scope <span aria-hidden="true">{drawer === "scope" ? "▴" : "▾"}</span>
         </button>
         <button type="button" className={`filter-pill-btn ${drawer === "service" ? "open" : ""}`} aria-expanded={drawer === "service"} aria-controls="filter-drawer" onClick={() => toggleDrawer("service")}>
-          {serviceLabel} <span aria-hidden="true">{drawer === "service" ? "▴" : "▾"}</span>
+          Service <span aria-hidden="true">{drawer === "service" ? "▴" : "▾"}</span>
         </button>
         {tags.length > 0 && <button type="button" className="sub-filter-clear" onClick={onClear}>Clear filters</button>}
       </div>
 
       {drawer && (
         <div className="library-filter-drawer" id="filter-drawer">
-          {drawer === "scope" && scopeOptions.map((value) => pill("scope", value))}
-          {drawer === "service" && serviceGroups.map((group) => (
-            <div className="filter-group" key={group.kind}>
-              {serviceGroups.length > 1 && <span className="filter-group-label">{group.label}</span>}
-              {group.options.map((value) => pill(group.kind, value))}
-            </div>
-          ))}
+          {drawer === "scope" && CHIBI_SCOPES.map((value) => pill("scope", value))}
+          {drawer === "service" && CHIBI_SERVICES.map((value) => pill("service", value))}
         </div>
       )}
 
@@ -2150,256 +2135,6 @@ function ImageSetBoard({
   );
 }
 
-function CarouselManager() {
-  const [slides, setSlides] = useState<string[]>([]);
-  const [alts, setAlts] = useState<string[]>([]);
-  const [frames, setFrames] = useState<SlideFrame[]>([]);
-  const [previewIndex, setPreviewIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [progress, setProgress] = useState("");
-  const [error, setError] = useState("");
-  const [dirty, setDirty] = useState(false);
-
-  const loadSlides = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await apiRequest<CarouselSlide[]>("/api/carousel");
-      if (!Array.isArray(data)) throw new Error("The server returned invalid carousel data.");
-      const next = data.slice(0, MAX_SET_IMAGES);
-      setSlides(next.map((slide) => slide.data).filter(Boolean));
-      setAlts(next.map((slide) => slide.alt || ""));
-      setFrames(next.map((slide) => frameFromSlide(slide)));
-      setPreviewIndex(0);
-      setDirty(false);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadSlides();
-  }, []);
-
-  const setOrder = (next: string[], nextAlts: string[], focus: number, nextFrames: SlideFrame[] = frames) => {
-    setSlides(next);
-    setAlts(nextAlts);
-    setFrames(next.map((_, position) => nextFrames[position] ?? DEFAULT_FRAME));
-    setPreviewIndex(Math.max(0, Math.min(focus, next.length - 1)));
-    setDirty(true);
-  };
-
-  const processFiles = async (files: File[], mode: "add" | "replace") => {
-    const picked = files.filter((file) => file.type.startsWith("image/"));
-    if (!picked.length) {
-      setError("Please choose image files.");
-      return;
-    }
-    setError("");
-    setProcessing(true);
-    try {
-      if (mode === "replace") {
-        setProgress("Processing replacement…");
-        const data = await compressImage(picked[0]);
-        const next = [...slides];
-        next[previewIndex] = data;
-        const nextFrames = [...frames];
-        nextFrames[previewIndex] = DEFAULT_FRAME;
-        setOrder(next, alts, previewIndex, nextFrames);
-        return;
-      }
-      const room = MAX_SET_IMAGES - slides.length;
-      if (room <= 0) {
-        setError(`The featured carousel can have at most ${MAX_SET_IMAGES} photos.`);
-        return;
-      }
-      const added: string[] = [];
-      for (let index = 0; index < Math.min(picked.length, room); index++) {
-        setProgress(`Processing ${index + 1} of ${Math.min(picked.length, room)}…`);
-        added.push(await compressImage(picked[index]));
-      }
-      if (picked.length > room) {
-        setError(`Kept the first ${room} photo${room === 1 ? "" : "s"}. A carousel set can have at most ${MAX_SET_IMAGES}.`);
-      }
-      setOrder([...slides, ...added], [...alts, ...added.map(() => "")], slides.length, [...frames, ...added.map(() => DEFAULT_FRAME)]);
-    } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : String(uploadError));
-    } finally {
-      setProgress("");
-      setProcessing(false);
-    }
-  };
-
-  const removeAt = (index: number) => {
-    if (slides.length <= 1) {
-      setError("Keep at least one photo in the carousel.");
-      return;
-    }
-    setOrder(slides.filter((_, position) => position !== index), alts.filter((_, position) => position !== index), index, frames.filter((_, position) => position !== index));
-  };
-
-  const move = (index: number, delta: number) => {
-    const target = index + delta;
-    if (target < 0 || target >= slides.length) return;
-    const next = [...slides];
-    const nextAlts = [...alts];
-    [next[index], next[target]] = [next[target], next[index]];
-    [nextAlts[index], nextAlts[target]] = [nextAlts[target], nextAlts[index]];
-    const nextFrames = [...frames];
-    [nextFrames[index], nextFrames[target]] = [nextFrames[target], nextFrames[index]];
-    setOrder(next, nextAlts, target, nextFrames);
-  };
-
-  const reorder = (from: number, to: number) => {
-    const next = [...slides];
-    const nextAlts = [...alts];
-    const [moved] = next.splice(from, 1);
-    const [movedAlt] = nextAlts.splice(from, 1);
-    const nextFrames = [...frames];
-    const [movedFrame] = nextFrames.splice(from, 1);
-    next.splice(to, 0, moved);
-    nextAlts.splice(to, 0, movedAlt);
-    nextFrames.splice(to, 0, movedFrame);
-    setOrder(next, nextAlts, to, nextFrames);
-  };
-
-  const updateFrame = (index: number, frame: SlideFrame) => {
-    setFrames((current) => {
-      const next = slides.map((_, position) => current[position] ?? DEFAULT_FRAME);
-      next[index] = {
-        x: clampNumber(frame.x, 0, 100, DEFAULT_FRAME.x),
-        y: clampNumber(frame.y, 0, 100, DEFAULT_FRAME.y),
-        zoom: clampNumber(frame.zoom, MIN_ZOOM, MAX_ZOOM, DEFAULT_FRAME.zoom),
-      };
-      return next;
-    });
-    setDirty(true);
-  };
-
-  const setSize = slides.reduce((total, src) => total + dataUrlBytes(src), 0);
-  const overBudget = setSize > MAX_ENTRY_BYTES;
-
-  const save = async () => {
-    if (slides.length < 1 || slides.length > MAX_SET_IMAGES) {
-      setError(`The featured carousel needs between 1 and ${MAX_SET_IMAGES} photos.`);
-      return;
-    }
-    if (overBudget) {
-      setError(`These images total ${formatMB(setSize)}, over the ${ENTRY_LIMIT_LABEL} limit.`);
-      return;
-    }
-    setSaving(true);
-    setError("");
-    try {
-      await apiRequest<{ success: boolean }>("/api/carousel", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slides: slides.map((data, index) => {
-            const frame = frames[index] ?? DEFAULT_FRAME;
-            return { data, alt: alts[index] || `Featured artwork ${index + 1}`, focusX: frame.x, focusY: frame.y, zoom: frame.zoom };
-          }),
-        }),
-      });
-      setDirty(false);
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : String(saveError));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const addLabel = processing
-    ? progress || "Processing…"
-    : loading
-      ? "Loading slides…"
-      : slides.length >= MAX_SET_IMAGES
-        ? "Maximum of 5 photos"
-        : slides.length ? "Add carousel photo" : "Choose carousel photos";
-
-  return (
-    <div className="carousel-manager">
-      <div className="panel-head">
-        <div>
-          <p>FEATURED HERO</p>
-          <h2>Carousel images</h2>
-        </div>
-        <button type="button" className="admin-plus" disabled={saving || processing || loading || !dirty} onClick={() => void save()}>
-          {saving ? "Saving…" : "Save carousel"}
-        </button>
-      </div>
-      <p className="carousel-manager-copy">These photos appear on the home hero. They are managed separately from the gallery feed (1 to 5 photos). Drag a thumbnail to reorder.</p>
-      {loading && <p className="empty-row">Loading carousel from D1…</p>}
-      {error && <p className="empty-row" role="alert">{error}</p>}
-      {!loading && (
-        <>
-          <ImageSetBoard
-            images={slides}
-            previewIndex={previewIndex}
-            onPreview={setPreviewIndex}
-            onAdd={(files) => void processFiles(files, "add")}
-            onReplace={(file) => void processFiles([file], "replace")}
-            onRemove={removeAt}
-            onMove={move}
-            onReorder={reorder}
-            processing={processing}
-            loadingSet={loading}
-            progress={progress}
-            overBudget={overBudget}
-            setSize={setSize}
-            coverLabel="First"
-            addLabel={addLabel}
-            variant="carousel"
-            frames={frames}
-            onFrameChange={updateFrame}
-          />
-          {slides.length > 0 && (
-            <fieldset className="carousel-frame-controls">
-              <legend>Framing for slide {previewIndex + 1}</legend>
-              <p>Click or drag on the preview to choose the focus point, or fine-tune below. The home hero uses exactly this framing.</p>
-              <label>
-                <span>Horizontal focus <b>{Math.round((frames[previewIndex] ?? DEFAULT_FRAME).x)}%</b></span>
-                <input type="range" min={0} max={100} step={1} value={(frames[previewIndex] ?? DEFAULT_FRAME).x}
-                  onChange={(event) => updateFrame(previewIndex, { ...(frames[previewIndex] ?? DEFAULT_FRAME), x: Number(event.target.value) })} />
-              </label>
-              <label>
-                <span>Vertical focus <b>{Math.round((frames[previewIndex] ?? DEFAULT_FRAME).y)}%</b></span>
-                <input type="range" min={0} max={100} step={1} value={(frames[previewIndex] ?? DEFAULT_FRAME).y}
-                  onChange={(event) => updateFrame(previewIndex, { ...(frames[previewIndex] ?? DEFAULT_FRAME), y: Number(event.target.value) })} />
-              </label>
-              <label>
-                <span>Zoom <b>{(frames[previewIndex] ?? DEFAULT_FRAME).zoom.toFixed(2)}×</b></span>
-                <input type="range" min={MIN_ZOOM} max={MAX_ZOOM} step={0.05} value={(frames[previewIndex] ?? DEFAULT_FRAME).zoom}
-                  onChange={(event) => updateFrame(previewIndex, { ...(frames[previewIndex] ?? DEFAULT_FRAME), zoom: Number(event.target.value) })} />
-              </label>
-              <button type="button" className="carousel-frame-reset" onClick={() => updateFrame(previewIndex, DEFAULT_FRAME)}>Reset framing</button>
-            </fieldset>
-          )}
-          {slides.length > 0 && (
-            <label className="carousel-alt-field">
-              Alt text for this slide
-              <input
-                value={alts[previewIndex] || ""}
-                onChange={(event) => {
-                  const next = [...alts];
-                  next[previewIndex] = event.target.value;
-                  setAlts(next);
-                  setDirty(true);
-                }}
-                placeholder={`Featured artwork ${previewIndex + 1}`}
-              />
-            </label>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
 function PublishManager() {
   const emptyDraft = () => ({
     title: "",
@@ -2419,7 +2154,6 @@ function PublishManager() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminLibraryItem | null>(null);
-  const [artStyleFilter, setArtStyleFilter] = useState("");
   const [tags, setTags] = useState<ActiveTag[]>([]);
   const [draft, setDraft] = useState(emptyDraft());
   const [previewIndex, setPreviewIndex] = useState(0);
@@ -2450,9 +2184,8 @@ function PublishManager() {
     void loadItems();
   }, []);
 
-  const visible = useMemo(() => items.filter((item) => matchesFilters(item, artStyleFilter, tags)), [items, artStyleFilter, tags]);
+  const visible = useMemo(() => items.filter((item) => matchesFilters(item, tags)), [items, tags]);
 
-  const changeArtStyleFilter = (value: string) => { setArtStyleFilter(value); setTags([]); };
   const toggleTag = (tag: ActiveTag) => setTags((current) =>
     current.some((existing) => existing.kind === tag.kind && existing.value === tag.value)
       ? current.filter((existing) => !(existing.kind === tag.kind && existing.value === tag.value))
@@ -2558,14 +2291,6 @@ function PublishManager() {
     setPreviewIndex(to);
   };
 
-  const changeDraftStyle = (style: string) => setDraft((prev) => ({
-    ...prev,
-    artStyle: style,
-    scope: SCOPES_BY_STYLE[style][0],
-    subCategory: style === "Chibi" ? "Sticker set" : "",
-    colorFinish: style === "Semi-Realistic" ? "Rendered" : "",
-  }));
-
   const openAdd = () => {
     setEditingId(null);
     setDraft(emptyDraft()); // Date Published defaults to today each time the form opens
@@ -2589,15 +2314,15 @@ function PublishManager() {
   };
 
   const startEdit = (item: AdminLibraryItem) => {
-    const style = itemArtStyle(item) || "Chibi";
+    const style = "Chibi";
     setDraft({
       ...emptyDraft(),
       title: item.title,
       description: item.description || "",
       artStyle: style,
-      subCategory: itemService(item) || (style === "Chibi" ? "Sticker set" : ""),
-      scope: item.scope || SCOPES_BY_STYLE[style][0],
-      colorFinish: item.colorFinish || (style === "Semi-Realistic" ? "Rendered" : ""),
+      subCategory: itemService(item) || "Sticker set",
+      scope: item.scope || CHIBI_SCOPES[0],
+      colorFinish: "",
       images: [],
       tools: item.tools || "", format: item.format || "",
       publishedDate: toInputDate(item.publishedAt)
@@ -2659,9 +2384,9 @@ function PublishManager() {
       return;
     }
 
-    const style = draft.artStyle;
+    const style = "Chibi";
     const service = style === "Chibi" ? draft.subCategory : "";
-    const colorFinish = style === "Semi-Realistic" ? draft.colorFinish : "";
+    const colorFinish = "";
     const scope = style ? draft.scope : "";
     const publishedAt = formatPublishedDate(draft.publishedDate || todayInput());
     const common = { id: editingId ?? Date.now(), title: draft.title, description: draft.description, artStyle: style, scope, service, colorFinish };
@@ -2703,7 +2428,6 @@ function PublishManager() {
 
   return (
     <div className="admin-panel media-manager">
-      <CarouselManager />
       <div className="panel-head">
         <div>
           <p>PUBLISHED LIBRARY</p>
@@ -2714,7 +2438,7 @@ function PublishManager() {
         </button>
       </div>
 
-      <LibraryFilterBar artStyle={artStyleFilter} tags={tags} onArtStyle={changeArtStyleFilter} onToggleTag={toggleTag} onClear={() => setTags([])} />
+      <LibraryFilterBar tags={tags} onToggleTag={toggleTag} onClear={() => setTags([])} />
 
       <div className="media-list">
         {loading && <p className="empty-row">Loading from D1…</p>}
@@ -2792,35 +2516,17 @@ function PublishManager() {
                 <textarea required rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Write a brief description..." />
               </AdminField>
 
-              <AdminField label="Art Style">
-                <select value={draft.artStyle} onChange={(e) => changeDraftStyle(e.target.value)}>
-                  {ART_STYLES.map((style) => <option key={style} value={style}>{style}</option>)}
+              <AdminField label="Scope">
+                <select value={draft.scope} onChange={(e) => setDraft({ ...draft, scope: e.target.value })}>
+                  {CHIBI_SCOPES.map((scope) => <option key={scope} value={scope}>{scope}</option>)}
                 </select>
               </AdminField>
 
-              {draft.artStyle && (
-                <AdminField label="Scope">
-                  <select value={draft.scope} onChange={(e) => setDraft({ ...draft, scope: e.target.value })}>
-                    {SCOPES_BY_STYLE[draft.artStyle].map((scope) => <option key={scope} value={scope}>{scope}</option>)}
-                  </select>
-                </AdminField>
-              )}
-
-              {draft.artStyle === "Chibi" && (
-                <AdminField label="Service">
-                  <select value={draft.subCategory} onChange={(e) => setDraft({ ...draft, subCategory: e.target.value })}>
-                    {CHIBI_SERVICES.map((service) => <option key={service} value={service}>{service === "YCH" ? "YCH (Your Character Here)" : service}</option>)}
-                  </select>
-                </AdminField>
-              )}
-
-              {draft.artStyle === "Semi-Realistic" && (
-                <AdminField label="Color Finish">
-                  <select value={draft.colorFinish} onChange={(e) => setDraft({ ...draft, colorFinish: e.target.value })}>
-                    {COLOR_FINISHES.map((finish) => <option key={finish} value={finish}>{finish === "Plain" ? "Plain Color" : finish}</option>)}
-                  </select>
-                </AdminField>
-              )}
+              <AdminField label="Service">
+                <select value={draft.subCategory} onChange={(e) => setDraft({ ...draft, subCategory: e.target.value })}>
+                  {CHIBI_SERVICES.map((service) => <option key={service} value={service}>{service === "YCH" ? "YCH (Your Character Here)" : service}</option>)}
+                </select>
+              </AdminField>
 
               <AdminField label="Tools" hint="Type your own or pick a preset">
                 <input list="gallery-tools-list" autoComplete="off" value={draft.tools} onChange={(e) => setDraft({ ...draft, tools: e.target.value })} placeholder="e.g. Clip Studio Paint" />
@@ -2974,7 +2680,7 @@ function HistoryManager({ onRestore }: { onRestore: (request: CommissionRequest)
       {itemToDelete && (
         <div className="modal-backdrop" onMouseDown={() => setItemToDelete(null)}>
           <div className="dialog-modal" style={{ maxWidth: "420px", padding: "30px", textAlign: "center" }} onMouseDown={(e) => e.stopPropagation()}>
-            <h3 style={{ fontFamily: "DM Serif Display", fontSize: "24px", marginBottom: "12px" }}>Permanently Delete Record?</h3>
+            <h3 style={{ fontFamily: "Fredoka", fontSize: "24px", marginBottom: "12px" }}>Permanently Delete Record?</h3>
             <p style={{ color: "var(--muted)", fontSize: "14px", marginBottom: "24px" }}>
               Are you sure you want to permanently delete <strong>{itemToDelete.name}</strong>'s history record? This action cannot be undone.
             </p>
@@ -3110,8 +2816,6 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState<string>("all");
-  const [filterStyle, setFilterStyle] = useState<string>("all");
-  const [filterSlotStatus, setFilterSlotStatus] = useState<string>("all");
   
   const stages = ["Review", "Sketch", "Lineart", "Color", "Render", "Approved"];
   
@@ -3180,13 +2884,6 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
 
   const upcoming = [...requests].filter((r) => r.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
-  const semiRealisticRequests = requests
-    .filter(r => r.type.startsWith("Semi-Realistic"))
-    .sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
-
-  const activeSemiIds = new Set(semiRealisticRequests.slice(0, 3).map(r => r.id));
-  const reservedSemiIds = new Set(semiRealisticRequests.slice(3, 5).map(r => r.id));
-
   const filteredRequests = requests.filter((request) => {
     if (searchQuery.trim() && !request.name.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;
@@ -3194,26 +2891,13 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
     if (filterPriority === "priority" && !request.priority) return false;
     if (filterPriority === "normal" && request.priority) return false;
 
-    if (filterStyle !== "all" && !request.type.startsWith(filterStyle)) return false;
-
-    if (filterSlotStatus !== "all") {
-      const isSemi = request.type.startsWith("Semi-Realistic");
-      if (filterSlotStatus === "active") {
-        if (!isSemi || !activeSemiIds.has(request.id)) return false;
-      } else if (filterSlotStatus === "reserved") {
-        if (!isSemi || !reservedSemiIds.has(request.id)) return false;
-      } else if (filterSlotStatus === "unoccupied") {
-        if (isSemi && (activeSemiIds.has(request.id) || reservedSemiIds.has(request.id))) return false;
-      }
-    }
-
     return true;
   });
 
   return (
     <main className="admin-shell">
       <aside className="admin-nav">
-        <button className="admin-brand" onClick={() => go("home")}><img src={logo} alt="" /><img src={brandName} alt="Inkyuu" /></button>
+        <button className="admin-brand" onClick={() => go("home")}><img src={logo} alt="Kyuuji" /></button>
         <nav>{adminLinks.map(([id, icon, label]) => <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}><Icon name={icon as IconName} />{label}</button>)}</nav>
         <button className="back-site" onClick={() => go("home")}><Icon name="arrow" /> Back to website</button>
         <button className="logout-btn" onClick={onLogout}><Icon name="logout" /> Log out</button>
@@ -3259,7 +2943,7 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
               <span>Saved automatically · {filteredRequests.length} of {requests.length} records</span>
             </div>
             
-            <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr", gap: "10px", padding: "16px 0", borderBottom: "1px solid var(--line)", alignItems: "center" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: "10px", padding: "16px 0", borderBottom: "1px solid var(--line)", alignItems: "center" }}>
               <div style={{ display: "flex", gap: "6px" }}>
                 <input 
                   type="text" 
@@ -3276,21 +2960,6 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
                   <option value="normal">Normal Only</option>
                 </select>
               </div>
-              <div>
-                <select value={filterStyle} onChange={(e) => setFilterStyle(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid var(--line)", background: "var(--cream)", fontSize: "12px", borderRadius: "4px" }}>
-                  <option value="all">All Art Styles</option>
-                  <option value="Chibi">Chibi</option>
-                  <option value="Semi-Realistic">Semi-Realistic</option>
-                </select>
-              </div>
-              <div>
-                <select value={filterSlotStatus} onChange={(e) => setFilterSlotStatus(e.target.value)} style={{ width: "100%", padding: "8px", border: "1px solid var(--line)", background: "var(--cream)", fontSize: "12px", borderRadius: "4px" }}>
-                  <option value="all">All Slot Status</option>
-                  <option value="active">Active Slots (Semi)</option>
-                  <option value="reserved">Reserved Slots (Semi)</option>
-                  <option value="unoccupied">Unoccupied / Chibi</option>
-                </select>
-              </div>
             </div>
 
             <div className="database-table">
@@ -3299,8 +2968,6 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
               </div>
               {filteredRequests.map((request) => {
                 const progressPercent = request.stage === 5 ? 100 : Math.min(100, Math.round((request.stage / 5) * 100));
-                const isSemi = request.type.startsWith("Semi-Realistic");
-                const badgeText = isSemi && activeSemiIds.has(request.id) ? " [Active Slot]" : isSemi && reservedSemiIds.has(request.id) ? " [Reserved Slot]" : "";
                 
                 return (
                   <div 
@@ -3315,7 +2982,7 @@ function Admin({ go, onLogout }: { go: (page: Page) => void; onLogout: () => voi
                       <strong>{request.name} {request.priority && <span style={{ color: "var(--orange)", fontSize: "10px" }}>(Priority)</span>}</strong>
                       <small>{request.email}</small>
                     </button>
-                    <span>{request.type}{badgeText} · {request.characters} char.</span>
+                    <span>{request.type} · {request.characters} char.</span>
                     <time>{request.dueDate || "None"}</time>
                     <select value={request.stage} onChange={(e) => updateStage(request.id, Number(e.target.value))}>
                       {stages.map((stage, index) => <option value={index} key={stage}>{stage}</option>)}
@@ -3395,8 +3062,7 @@ function Login({ onLogin, go }: { onLogin: () => void; go: (page: Page) => void 
       </button>
       <div className="login-card">
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
-          <img src={logo} alt="" style={{ width: "72px", height: "auto", display: "block", margin: "0 auto" }} />
-          <img className="login-wordmark" src={brandName} alt="Inkyuu" style={{ display: "block", margin: "-7px auto 0" }} />
+          <img src={logo} alt="Kyuuji" style={{ width: "150px", height: "auto", display: "block", margin: "0 auto", mixBlendMode: "multiply" }} />
         </div>
         <p>Studio Admin Access</p>
         <form onSubmit={handleLogin}>
@@ -3452,47 +3118,134 @@ function Login({ onLogin, go }: { onLogin: () => void; go: (page: Page) => void 
   );
 }
 
-function Footer({ go }: { go: (page: Page) => void }) {
+// Add your TikTok / Discord links here. All five icons always show in the footer; an icon with an
+// empty link is shown but not clickable until you fill it in.
+const SOCIAL_LINKS = {
+  email: "mailto:kyuukyuuji@gmail.com",
+  instagram: "https://www.instagram.com/jeii_ji",
+  facebook: "https://www.facebook.com/christinejoy.morata02/",
+  tiktok: "https://www.tiktok.com/@kyuukyuuji",
+  discord: "https://discord.com/users/780783345486659586",
+};
+
+type SocialKey = "facebook" | "instagram" | "tiktok" | "discord" | "mail";
+
+// Brand glyphs are drawn on a 24x24 canvas. Gradient ids come from useId so every copy of the icon
+// (footer + mobile drawer) owns its own gradient; a shared id inside a display:none drawer is what
+// used to make the Instagram badge render flat/wrong.
+function SocialIcon({ name }: { name: SocialKey }) {
+  const uid = useId().replace(/:/g, "");
+  switch (name) {
+    case "facebook":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="12" fill="#1877f2" />
+          <path fill="#fff" d="M16.671 15.469 17.203 12h-3.328V9.75c0-.949.465-1.875 1.956-1.875h1.513V4.922s-1.374-.235-2.686-.235c-2.741 0-4.533 1.662-4.533 4.669V12H7.078v3.469h3.047v8.385a12.118 12.118 0 0 0 3.75 0v-8.385h2.796Z" />
+        </svg>
+      );
+    case "instagram":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <defs>
+            <radialGradient id={`ig-${uid}`} cx="0.3" cy="1.07" r="1.5" fx="0.3" fy="1.07">
+              <stop offset="0" stopColor="#fdf497" />
+              <stop offset="0.05" stopColor="#fdf497" />
+              <stop offset="0.45" stopColor="#fd5949" />
+              <stop offset="0.6" stopColor="#d6249f" />
+              <stop offset="0.9" stopColor="#285aeb" />
+            </radialGradient>
+          </defs>
+          <rect width="24" height="24" rx="6" fill={`url(#ig-${uid})`} />
+          <rect x="5" y="5" width="14" height="14" rx="4.2" fill="none" stroke="#fff" strokeWidth="1.7" />
+          <circle cx="12" cy="12" r="3.3" fill="none" stroke="#fff" strokeWidth="1.7" />
+          <circle cx="16.3" cy="7.7" r="1.05" fill="#fff" />
+        </svg>
+      );
+    case "tiktok":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="12" fill="#000" />
+          <g transform="translate(6.3 5.7) scale(.5)">
+            <path fill="#25f4ee" transform="translate(-1.1 .9)" d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07Z" />
+            <path fill="#fe2c55" transform="translate(1.1 -.9)" d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07Z" />
+            <path fill="#fff" d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07Z" />
+          </g>
+        </svg>
+      );
+    case "discord":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="12" fill="#5865f2" />
+          <g transform="translate(4.6 5.2) scale(.6)">
+            <path fill="#fff" d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .078-.01c3.927 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .079.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418Zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.946 2.418-2.157 2.418Z" />
+          </g>
+        </svg>
+      );
+    default:
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="1.5" y="4.5" width="21" height="15" rx="2.2" fill="#fdf2e2" />
+          <path d="m2.4 6.2 9.6 7.1 9.6-7.1M2.4 18l6.6-6.1M21.6 18l-6.6-6.1" fill="none" stroke="#373737" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+  }
+}
+
+function SocialLinks() {
+  const entries: { key: SocialKey; href: string; label: string }[] = [
+    { key: "facebook", href: SOCIAL_LINKS.facebook, label: "Facebook" },
+    { key: "instagram", href: SOCIAL_LINKS.instagram, label: "Instagram" },
+    { key: "tiktok", href: SOCIAL_LINKS.tiktok, label: "TikTok" },
+    { key: "discord", href: SOCIAL_LINKS.discord, label: "Discord" },
+    { key: "mail", href: SOCIAL_LINKS.email, label: "Email" },
+  ];
   return (
-    <footer>
-      <div className="wrap footer-bottom">
+    <>
+      {entries.map((entry) => entry.href ? (
+        <a key={entry.key} className="social-badge" href={entry.href} target={entry.key === "mail" ? undefined : "_blank"} rel="noreferrer" aria-label={entry.key === "mail" ? "Email" : `${entry.label} (opens in a new tab)`}>
+          <SocialIcon name={entry.key} />
+        </a>
+      ) : (
+        <span key={entry.key} className="social-badge is-pending" role="img" aria-label={`${entry.label} (link coming soon)`} title={`${entry.label} – coming soon`}>
+          <SocialIcon name={entry.key} />
+        </span>
+      ))}
+    </>
+  );
+}
+
+// The footer is the last element of the page. On the homepage the "Ready to bring your idea to life?"
+// call-to-action lives inside it (same dark block), so nothing sits below the footer.
+function Footer({ go, showCta }: { go: (page: Page) => void; showCta: boolean }) {
+  return (
+    <footer className="site-footer">
+      {showCta && (
+        <div className="footer-cta">
+          <h2>Ready to bring your idea to life?</h2>
+          <p>Tell me what you’re imagining and receive a personalized quote.</p>
+          <button type="button" className="btn-pill btn-light" onClick={() => go("commission")}>Commission Now</button>
+        </div>
+      )}
+      <div className="footer-bottom">
         <div className="footer-bottom-group">
-          <span>© 2026 Inkyuu. All rights reserved.</span>
-          <span className="dot-sep">•</span>
+          <span>© 2026 Kyuuji. All Rights Reserved.</span>
           <button type="button" className="footer-link-btn" onClick={() => go("guide")}>Terms and Conditions</button>
         </div>
-
-        <div className="footer-bottom-group">
-          <span className="footer-section-label">Contacts |</span>
-          <a href="mailto:kyuukyuuji@gmail.com">Email</a>
-          <span className="dot-sep">•</span>
-          <a href="https://www.instagram.com/jeii_ji" target="_blank" rel="noreferrer">
-            Instagram<span className="sr-only"> (opens in a new tab)</span>
-          </a>
-          <span className="dot-sep">•</span>
-          <a href="https://www.facebook.com/christinejoy.morata02/" target="_blank" rel="noreferrer">
-            Facebook<span className="sr-only"> (opens in a new tab)</span>
-          </a>
+        <div className="footer-socials">
+          <span className="footer-socials-label">Socials</span>
+          <span className="sep" aria-hidden="true">|</span>
+          <div className="footer-socials-icons"><SocialLinks /></div>
         </div>
       </div>
     </footer>
   );
 }
 
-export default function App() {
+
+function AppInner() {
   const getPage = (): Page => {
     const hash = window.location.hash.replace("#", "").split("?")[0] as Page;
-    return ["home", "gallery", "guide", "commission", "admin"].includes(hash) ? hash : "home";
-  };
-  const getGallerySelection = (): GallerySelection | null => {
-    const query = new URLSearchParams(window.location.hash.split("?")[1] || "");
-    const category = query.get("category");
-    const facet = query.get("facet");
-    const value = query.get("value");
-    if ((category !== "Chibi" && category !== "Semi-Realistic") || !value) return null;
-    const validFacets = category === "Chibi" ? ["Scope", "Services"] : ["Scope", "Color Finish"];
-    if (!facet || !validFacets.includes(facet)) return null;
-    return { category, facet: facet as GallerySelection["facet"], value };
+    return ["home", "about", "gallery", "guide", "commission", "admin"].includes(hash) ? hash : "home";
   };
   const [page, setPage] = useState<Page>(getPage);
   const [isAdminAuth, setIsAdminAuth] = useState(false);
@@ -3518,8 +3271,8 @@ export default function App() {
 
   useEffect(() => {
     const onSignedOut = () => setIsAdminAuth(false);
-    window.addEventListener("inkyuu:signed-out", onSignedOut);
-    return () => window.removeEventListener("inkyuu:signed-out", onSignedOut);
+    window.addEventListener("kyuuji:signed-out", onSignedOut);
+    return () => window.removeEventListener("kyuuji:signed-out", onSignedOut);
   }, []);
 
   const logout = async () => {
@@ -3538,12 +3291,36 @@ export default function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
+  // Scroll-triggered reveals. New elements (such as gallery tiles that arrive after the API answers)
+  // are picked up by the MutationObserver, and --i staggers neighbours.
   useEffect(() => {
-    const elements = document.querySelectorAll("main > section, .featured-card, .medium-card, .gallery-card, .policy-section, .policy-cta, .form-section");
-    elements.forEach((element) => element.classList.add("scroll-reveal"));
-    const observer = new IntersectionObserver((entries) => entries.forEach((entry) => { if (entry.isIntersecting) { entry.target.classList.add("revealed"); observer.unobserve(entry.target); } }), { threshold: .08 });
-    elements.forEach((element) => observer.observe(element));
-    return () => observer.disconnect();
+    const SELECTOR = "main > section, .policy-section, .policy-cta, [data-reveal]";    const seen = new WeakSet<Element>();
+    const observer = new IntersectionObserver((entries) => entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      const element = entry.target as HTMLElement;
+      element.classList.add("revealed");
+      window.setTimeout(() => element.classList.add("reveal-done"), 1400);
+      observer.unobserve(element);
+    }), { threshold: 0.08, rootMargin: "0px 0px -6% 0px" });
+
+    const add = (element: Element) => {
+      if (seen.has(element)) return;
+      seen.add(element);
+      element.classList.add("scroll-reveal");
+      observer.observe(element);
+    };
+    const scan = (root: Element | Document) => {
+      if (root instanceof Element && root.matches(SELECTOR)) add(root);
+      root.querySelectorAll(SELECTOR).forEach(add);
+    };
+    scan(document);
+
+    const mutations = new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach((node) => {
+      if (node instanceof Element) scan(node);
+    })));
+    mutations.observe(document.body, { childList: true, subtree: true });
+
+    return () => { observer.disconnect(); mutations.disconnect(); };
   }, [page]);
 
   const firstRender = useRef(true);
@@ -3552,14 +3329,13 @@ export default function App() {
     document.getElementById("main-content")?.focus({ preventScroll: true });
   }, [page]);
 
-  const go = (next: Page, selection?: GallerySelection) => {
-    const query = selection ? `?category=${encodeURIComponent(selection.category)}&facet=${encodeURIComponent(selection.facet)}&value=${encodeURIComponent(selection.value)}` : "";
-    window.location.hash = `${next}`;    
+  const go = (next: Page) => {
+    window.location.hash = `${next}`;
     setPage(next);
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
   };
-  const content = { home: <Home go={go} />, guide: <Guide go={go} />, commission: <Commission go={go} />, admin: <Admin go={go} onLogout={logout} /> };
+  const content = { home: <Home />, about: <About go={go} />, guide: <Guide go={go} />, commission: <Commission go={go} />, admin: <Admin go={go} onLogout={logout} /> };
   
   if (page === "admin") {
     if (!authChecked) {
@@ -3580,8 +3356,12 @@ export default function App() {
       <div className="site-shell app-theme">
         <Navbar page={page} go={go} />
         {content[page]}
-        <Footer go={go} />
+        <Footer go={go} showCta={page === "home"} />
       </div>
     </CurrencyProvider>
   );
+}
+
+export default function App() {
+  return <AppInner />;
 }
