@@ -493,7 +493,7 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
       <div className="nav-inner">
         <div className="nav-left">
           <button type="button" className="menu-button" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} aria-controls="primary-nav" onClick={() => setOpen(!open)}>
-            <Icon name={open ? "close" : "menu"} />
+            <Icon name={open ? "close" : "menu"} size={32} />
           </button>
           <button type="button" className="brand" onClick={() => { go("home"); setOpen(false); }} aria-label="Kyuuji home">
             <img src={logo} alt="Kyuuji" />
