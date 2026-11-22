@@ -1099,7 +1099,7 @@ function CustomSelect({ value, onChange, options, placeholder, ariaLabel, invali
 const DUE_DATE_REQUIRED = false;
 const MAX_REFERENCES = 10;
 const MAX_REFERENCES_BYTES = 1_900_000; // the worker rejects reference sets larger than this
-const SOCIAL_APPS = ["Instagram", "Facebook", "TikTok", "Discord", "X (Twitter)"];
+const SOCIAL_APPS = ["Instagram", "Facebook", "TikTok", "Discord"];
 const YCH_THEMES: [string, string][] = [["Cozy Tea Time", "tea"], ["Pocket Mascot", "scout"], ["Cheerful Orange", "orange"]];
 const STEP_TITLES = ["Terms of Service Agreement & Confirmation", "General Information", "Commission Order Details", "Review & Checkout"];
 const TOTAL_STEPS = 4;
