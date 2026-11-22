@@ -698,7 +698,7 @@ function About({ go }: { go: (page: Page) => void }) {
           <h1>Hi, I'm Kyuu. I draw feelings you can keep.</h1>
           <p>I'm a digital illustrator who loves expressive faces, cozy color stories, and the magic of turning your favorite idea into something unmistakably yours.</p>
           <div className="hero-actions">
-            <Btn onClick={() => go("commission")}>Commission now <Icon name="arrow" /></Btn>
+            <button type="button" className="btn-pill btn-dark" onClick={() => go("commission")}>Commission Now</button>
             <Btn kind="outline" onClick={openGallery}>View the gallery</Btn>
           </div>
         </div>
@@ -977,7 +977,7 @@ function CustomSelect({ value, onChange, options, placeholder, ariaLabel, invali
 const DUE_DATE_REQUIRED = false;
 const MAX_REFERENCES = 10;
 const MAX_REFERENCES_BYTES = 1_900_000; // the worker rejects reference sets larger than this
-const SOCIAL_APPS = ["Instagram", "Facebook", "TikTok", "Discord"];
+const SOCIAL_APPS = ["Instagram", "Facebook", "TikTok", "Discord", "X (Twitter)"];
 const YCH_THEMES: [string, string][] = [["Cozy Tea Time", "tea"], ["Pocket Mascot", "scout"], ["Cheerful Orange", "orange"]];
 const STEP_TITLES = ["Terms of Service Agreement & Confirmation", "General Information", "Commission Order Details", "Review & Checkout"];
 const TOTAL_STEPS = 4;

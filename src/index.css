@@ -108,6 +108,7 @@ h1 em,  h2 em { color: var(--orange); }
 .about-hero h1 { font-size: clamp(60px, 7vw, 88px); line-height: .96; margin: 15px 0 25px; }
 .about-hero > div:first-child > p:not(.kicker) { color: var(--muted); line-height: 1.8; max-width: 520px; }
 .about-hero .btn { margin-top: 20px; }
+.about-hero .btn-pill { margin-top: 20px; }
 .about-portrait { position: relative; }
 .about-portrait .art-visual { aspect-ratio: .86; }
 .story-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 100px; padding-block: 100px; border-top: 1px solid var(--line); }
