@@ -1445,6 +1445,7 @@ function Commission({ go }: { go: (page: Page) => void }) {
                               options={SOCIAL_APPS.map((app) => ({ value: app, label: app }))} />
                           </div>
                         } />
+                      <p style={{ fontSize: "12.5px", color: "var(--muted)" }}>By providing a social media app or messaging handle, the client acknowledges and agrees that the artist will contact and reach out to them through that platform.</p>
                       <FieldError id="socialHandle-error" message={shown("socialHandle")} />
                       <FieldError id="socialApp-error" message={shown("socialApp")} />
                     </div>
@@ -1639,41 +1640,8 @@ function Commission({ go }: { go: (page: Page) => void }) {
 
 
 
-const POLICY_SECTIONS = [
-  { id: "policy-rules", numeral: "I", title: "Rules & Regulations" },
-  { id: "policy-copyrights", numeral: "II", title: "Copyrights" },
-  { id: "policy-contract", numeral: "III", title: "Contract & Workflow Terms" },
-  { id: "policy-communication", numeral: "IV", title: "Communication & Client Responsiveness" },
-  { id: "policy-files", numeral: "V", title: "File Storage & Delivery Maintenance" },
-];
-
 function Guide({ go }: { go: (page: Page) => void }) {
-  const [activeSection, setActiveSection] = useState(POLICY_SECTIONS[0].id);
   const calm = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  useEffect(() => {
-    const update = () => {
-      let current = POLICY_SECTIONS[0].id;
-      for (const section of POLICY_SECTIONS) {
-        const element = document.getElementById(section.id);
-        if (element && element.getBoundingClientRect().top <= 160) current = section.id;
-      }
-      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) current = POLICY_SECTIONS[POLICY_SECTIONS.length - 1].id;
-      setActiveSection(current);
-    };
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-    };
-  }, []);
-
-  const jumpTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: calm() ? "auto" : "smooth", block: "start" });
-    setActiveSection(id);
-  };
 
   return (
     <main id="main-content" tabIndex={-1} className="page-main guide-page">
@@ -1691,41 +1659,61 @@ function Guide({ go }: { go: (page: Page) => void }) {
       </header>
 
       <div className="wrap policy-layout">
-        <aside className="policy-toc">
-          <nav aria-label="On this page">
-            <p className="policy-toc-title">On this page</p>
-            <ol>
-              {POLICY_SECTIONS.map((section) => (
-                <li key={section.id}>
-                  <button type="button" aria-current={activeSection === section.id ? "true" : undefined} onClick={() => jumpTo(section.id)}>
-                    <span>{section.numeral}.</span><span>{section.title}</span>
-                  </button>
-                </li>
-              ))}
-            </ol>
-          </nav>
-        </aside>
-
         <div className="policy-content">
-          <article id="policy-rules" className="policy-section" aria-labelledby="policy-rules-heading">
-            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">I</span><h2 id="policy-rules-heading">Rules & Regulations</h2></header>
+          {/* ===================== SERVICE ===================== */}
+          <div id="policy-service" className="policy-group">
+            <h2>Service</h2>
+          </div>
+
+          <article id="policy-turnaround" className="policy-section" aria-labelledby="policy-turnaround-heading">
+            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">I</span><h3 id="policy-turnaround-heading">Turnaround Time</h3></header>
+            <div className="policy-section-body">
+              <section className="policy-clause policy-clause-plain">
+                <div className="policy-clause-body">
+                  <p>Actual drawing takes an average of four (4) hours, though the overall commission process may take at most one (1) week (7 days) due to transaction and processing steps. Delivery may also be delayed if unexpected issues arise.</p>
+                </div>
+              </section>
+            </div>
+          </article>
+
+          <article id="policy-payment-channels" className="policy-section" aria-labelledby="policy-payment-channels-heading">
+            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">II</span><h3 id="policy-payment-channels-heading">Payment Channels</h3></header>
+            <div className="policy-section-body">
+              <section className="policy-clause policy-clause-plain">
+                <div className="policy-clause-body">
+                  <p>Available online banks and payment options will be listed here and only disclosed to the client during a payment request: GCash, GoTyme, and PayPal.</p>
+                </div>
+              </section>
+            </div>
+          </article>
+
+          {/* ================= RULES & REGULATIONS ================= */}
+          <div id="policy-rules" className="policy-group">
+            <h2>Rules & Regulations</h2>
+          </div>
+
+          <article id="policy-contents" className="policy-section" aria-labelledby="policy-contents-heading">
+            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">I</span><h3 id="policy-contents-heading">Contents</h3></header>
             <div className="policy-section-body">
               <section className="policy-clause">
-                <h3>A. NSFW Contents</h3>
+                <h4>A. NSFW Contents</h4>
                 <div className="policy-clause-body">
                   <p><strong>Not Safe For Work content is NOT allowed,</strong> may the project be in PUBLIC or in PRIVATE. Any commission request that is judged to be NSFW or suggestive will not be accepted and will be rejected immediately.</p>
                   <p>The following will automatically be tagged as NSFW: <em>pornography, nudity, heavy gore, depiction of bodily fluids (e.g., semen), violence, suggestive content, controversial content.</em></p>
                 </div>
               </section>
               <section className="policy-clause">
-                <h3>B. Themes</h3>
+                <h4>B. Themes</h4>
                 <div className="policy-clause-body">
                   <table className="policy-table policy-theme-table">
-                    <thead><tr><th scope="col">Will Draw:</th><th scope="col">Won't Draw:</th></tr></thead>
-                    <tbody><tr>
-                      <td data-label="Will Draw:"><ul className="policy-theme-list"><li>OC</li><li>Fictional Characters</li><li>Character Ships</li><li>Nonsexual Nudity</li></ul></td>
-                      <td data-label="Won't Draw:"><ul className="policy-theme-list"><li>NSFW</li><li>Real People without their consent</li><li>Changing a canon character's design (e.g., race, major features)</li><li>Mecha, Cars, etc.</li></ul></td>
-                    </tr></tbody>
+                    <thead><tr><th scope="col">Will Draw</th><th scope="col">Won't Draw</th></tr></thead>
+                    <tbody>
+                      <tr><td data-label="Will Draw">ANGST, Fluff, etc.</td><td data-label="Won't Draw">NSFW</td></tr>
+                      <tr><td data-label="Will Draw">OC</td><td data-label="Won't Draw">Real People without their consent</td></tr>
+                      <tr><td data-label="Will Draw">Fictional Characters (Any Specie)</td><td data-label="Won't Draw">Ships amongst/with canon characters</td></tr>
+                      <tr><td data-label="Will Draw">Character Ships</td><td data-label="Won't Draw">Changing a canon character's design (e.g., race, major features)</td></tr>
+                      <tr><td data-label="Will Draw">Nonsexual Nudity</td><td data-label="Won't Draw">Mecha, cars, etc.</td></tr>
+                    </tbody>
                   </table>
                 </div>
               </section>
@@ -1733,28 +1721,28 @@ function Guide({ go }: { go: (page: Page) => void }) {
           </article>
 
           <article id="policy-copyrights" className="policy-section" aria-labelledby="policy-copyrights-heading">
-            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">II</span><h2 id="policy-copyrights-heading">Copyrights</h2></header>
+            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">II</span><h3 id="policy-copyrights-heading">Copyrights</h3></header>
             <div className="policy-section-body">
               <section className="policy-clause">
-                <h3>A. Artist Rights</h3>
+                <h4>A. Artist Rights</h4>
                 <div className="policy-clause-body">
-                  <p><strong>Pursuant to Republic Act No. 8293 (The Intellectual Property Code of the Philippines), the copyright of the artwork inherently and permanently belongs to the artist.</strong> The artist retains all rights regarding the reproduction, distribution, and public display of the artwork for promotional, portfolio, and social media purposes.</p>
+                  <p>Pursuant to Republic Act No. 8293 (The Intellectual Property Code of the Philippines), the copyright of the artwork inherently and permanently belongs to the artist. The artist retains all rights regarding the reproduction, distribution, and public display of the artwork for promotional, portfolio, and social media purposes.</p>
                 </div>
               </section>
               <section className="policy-clause">
-                <h3>B. Client Rights</h3>
+                <h4>B. Client Rights</h4>
                 <div className="policy-clause-body">
                   <p>Upon final payment, the client is granted a license to use the artwork for expected purposes. The artist must be clearly and visibly credited whenever the artwork is used or displayed publicly. The client may not alter, edit, or claim the artwork as their own creation.</p>
                 </div>
               </section>
               <section className="policy-clause">
-                <h3>C. AI & Blockchain Prohibitions</h3>
+                <h4>C. AI & Blockchain Prohibitions</h4>
                 <div className="policy-clause-body">
                   <p>Under no circumstances is the artwork permitted for use in Artificial Intelligence (AI) training databases, machine learning datasets, or any blockchain/NFT platforms. Any such utilization constitutes a direct violation of these terms and copyright law.</p>
                 </div>
               </section>
               <section className="policy-clause">
-                <h3>D. Transfer of Ownership</h3>
+                <h4>D. Transfer of Ownership</h4>
                 <div className="policy-clause-body">
                   <p>Full copyright ownership remains with the artist unless a separate, formal agreement is signed/explicitly said by both parties to assign the copyright to the client or an organization. Copyright buyout fees will apply for such transfers.</p>
                 </div>
@@ -1763,89 +1751,88 @@ function Guide({ go }: { go: (page: Page) => void }) {
           </article>
 
           <article id="policy-contract" className="policy-section" aria-labelledby="policy-contract-heading">
-            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">III</span><h2 id="policy-contract-heading">Contract & Workflow Terms</h2></header>
+            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">III</span><h3 id="policy-contract-heading">Contract & Workflow Terms</h3></header>
             <div className="policy-section-body">
               <p className="policy-intro">By securing a commission slot, both the artist and the client agree to the following parameters regarding the execution, payment, and legal boundaries of the commission.</p>
               <section className="policy-clause">
-                <h3>A. Revisions</h3>
+                <h4>A. Revisions</h4>
                 <div className="policy-clause-body">
                   <p>Once the final artwork is finished and presented for final approval, any requests for major modifications or revisions will incur mandatory additional charges depending on the weight of the adjustment. Work on these final alterations will only commence after the client has paid the required revision fee.</p>
                 </div>
               </section>
               <section className="policy-clause">
-                <h3>B. Deadlines</h3>
+                <h4>B. Deadlines</h4>
                 <div className="policy-clause-body">
-                  <p>Clients requiring an expected delivery can opt to designate their commission as a PRIORITY. Priority pieces are fast-tracked ahead of the standard production queue to ensure significantly quicker completion, which will incur an additional charge equivalent to 10% of the project's total price.</p>
+                  <p>Clients who need their project by a specific date can designate their commission as PRIORITY by including a deadline upon submission. Priority commissions are fast-tracked ahead of the standard production queue for significantly faster delivery. Depending on the turnaround time, this service incurs an additional fee: commissions due within 14 days of submission carry an 18% surcharge, while those with deadlines beyond 14 days incur a 10% fee.</p>
                 </div>
               </section>
               <section className="policy-clause">
-                <h3>C. Payment Terms</h3>
+                <h4>C. Payment Terms</h4>
                 <div className="policy-clause-body">
                   <p>To ensure a secure and collaborative workflow, payments are broken down into milestone installations. No upfront cost is required to begin the initial drafting phase, but progress is strictly tied to the following payment schedule:</p>
-                <table className="policy-table">
-                  <thead><tr><th scope="col">Milestone</th><th scope="col">Payment schedule</th></tr></thead>
-                  <tbody>
-                    <tr><th scope="row">Initial Phase</th><td data-label="Payment schedule">The project will be initiated and developed up to the midpoint milestone without an upfront cost.</td></tr>
-                    <tr><th scope="row">Mid-Project Downpayment</th><td data-label="Payment schedule">Upon reaching the midpoint milestone (the finalization of the approved sketch), a mandatory 20% downpayment of the total project fee will be requested.</td></tr>
-                    <tr><th scope="row">Final Settlement</th><td data-label="Payment schedule">The remaining balance must be paid in full within three (3) calendar days after the artwork is finished and presented. High-resolution—without any obstructive watermark—final deliverables will only be released once the full payment has cleared.</td></tr>
-                  </tbody>
-                </table>
+                  <table className="policy-table">
+                    <tbody>
+                      <tr><th scope="row">Initial Phase</th><td>The project will be initiated and developed up to the midpoint milestone without an upfront cost.</td></tr>
+                      <tr><th scope="row">Mid-Project Downpayment</th><td>Upon reaching the midpoint milestone (the finalization of the approved sketch), a mandatory 20% downpayment of the total project fee will be requested.</td></tr>
+                      <tr><th scope="row">Final Settlement</th><td>The remaining balance must be paid in full within three (3) calendar days after the artwork is finished and presented. High-resolution—without any obstructive watermark—final deliverables will only be released once the full payment has cleared.</td></tr>
+                    </tbody>
+                  </table>
                 </div>
               </section>
               <section className="policy-clause">
-                <h3>D. Cancellation & Refund Policy</h3>
+                <h4>D. Cancellation & Refund Policy</h4>
                 <div className="policy-clause-body">
                   <p>Clients may change their minds or cancel the project within a specific window. However, because time and labor are invested into the project as it progresses, the refund policy changes depending on when the cancellation is requested:</p>
-                <ul>
-                  <li>Standard Grace Period: The client is entitled to a 100% full cancellation and refund within one (1) week (7 days) of the initial project booking.</li>
-                  <li>Mid-Project & Mid-Production: If no cancellation is requested within the first week, production automatically proceeds. If the client persists in canceling the project after the 1-week grace period has passed, the project will enter immediate termination. In this event, the client will only be refunded 12% of their total downpayment amount, and they will be given the latest work-in-progress export of the drawing as-is.</li>
-                </ul>
+                  <ul>
+                    <li><strong>Standard Grace Period</strong><span>The client is entitled to a 100% full cancellation within the same day of the initial project booking.</span></li>
+                    <li><strong>Mid-Project & Mid-Production</strong><span>If no cancellation is requested within the same day, production automatically proceeds. If the client persists in canceling the project after the 1-day grace period has passed, the project will enter immediate termination. In this event, the client will only be refunded 12% of their total downpayment amount, and they will be given the latest work-in-progress export of the drawing as-is.</span></li>
+                  </ul>
                 </div>
               </section>
               <section className="policy-clause">
-                <h3>E. Termination Policy</h3>
+                <h4>E. Termination Policy</h4>
                 <div className="policy-clause-body">
-                  <p>The artist reserves the right to suspend work or permanently terminate the contract if the client breaches communication or payment deadlines. Forfeiting a slot due to non-payment will result in the cancellation of the project.</p>
-                <ul>
-                  <li>Failure to Provide Downpayment: If the client refuses or fails to settle the 20% mid-project downpayment within one (1) week (7 days) of the initial payment request, production will be immediately halted, the commission will be terminated, and the slot will be forfeited.</li>
-                  <li>Failure to Settle Final Balance: Failure to pay the remaining balance within the designated 3-day post-completion window will result in the immediate withholding of the final artwork, termination of future services, and potential blacklisting from subsequent commission openings.</li>
-                </ul>
+                  <p>The artist reserves the right to suspend work or permanently terminate the contract if the client breaches communication or payment deadlines.</p>
+                  <ul>
+                    <li><strong>Failure to Provide Downpayment</strong><span>If the client refuses or fails to settle the 20% mid-project downpayment within two (2) days of the initial payment request, production will be immediately halted, the commission will be terminated.</span></li>
+                    <li><strong>Failure to Settle Final Balance</strong><span>Failure to pay the remaining balance within the designated 3-day post-completion window will result in the immediate withholding of the final artwork, termination of future services, and potential blacklisting from subsequent commission openings.</span></li>
+                  </ul>
                 </div>
               </section>
             </div>
           </article>
 
           <article id="policy-communication" className="policy-section" aria-labelledby="policy-communication-heading">
-            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">IV</span><h2 id="policy-communication-heading">Communication & Client Responsiveness</h2></header>
+            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">IV</span><h3 id="policy-communication-heading">Communication & Client Responsiveness</h3></header>
             <div className="policy-section-body">
               <section className="policy-clause">
-                <h3>A. Response Window</h3>
+                <h4>A. Response Window</h4>
                 <div className="policy-clause-body">
                   <p>Clients are expected to respond to milestone updates, feedback requests, or approvals within three (3) calendar days.</p>
                 </div>
               </section>
               <section className="policy-clause">
-                <h3>B. Inactivity Closure</h3>
+                <h4>B. Inactivity Closure</h4>
                 <div className="policy-clause-body">
-                  <p>If a client fails to communicate or respond for more than fourteen (14) consecutive days without prior notice, the project will be considered abandoned. The contract will be terminated, the 20% downpayment (if paid) will be forfeited as a cancellation fee, and the slot will be reopened to the public.</p>
+                  <p>If a client fails to communicate or respond for more than fourteen (14) consecutive days without prior notice, the project will be considered abandoned. The contract will be terminated, the 20% downpayment (if paid) will be forfeited as a cancellation fee.</p>
                 </div>
               </section>
               <section className="policy-clause">
-                <h3>C. Force Majeure</h3>
+                <h4>C. Force Majeure</h4>
                 <div className="policy-clause-body">
                   <p>The artist is not held liable for delays caused by emergency situations, illness, power outages, natural disasters, or technical failures. In the event of such a delay, the client will be notified immediately, and a revised timeline will be established.</p>
-                <p>If an operational delay occurs and the artist fails to respond to client inquiries or provide milestone updates for more than fourteen (14) consecutive days without prior notice, the client is granted the right to choose one of the following options:</p>
-                <ul>
-                  <li><strong>Immediate Project Cancellation:</strong> The client may cancel the contract and receive a 12% refund of the settled downpayment, along with the latest work-in-progress export of the artwork as-is.</li>
-                  <li><strong>Timeline Extension:</strong> The client may choose to maintain the commission slot under a newly negotiated, mutually agreed-upon delivery deadline.</li>
-                </ul>
+                  <p>If an operational delay occurs and the artist fails to respond to client inquiries or provide milestone updates for more than fourteen (14) consecutive days without prior notice, the client is granted the right to choose one of the following options:</p>
+                  <ul>
+                    <li><strong>Immediate Project Cancellation:</strong> The client may cancel the contract and receive a 12% refund of the settled downpayment, along with the latest work-in-progress export of the artwork as-is.</li>
+                    <li><strong>Timeline Extension:</strong> The client may choose to maintain the commission slot under a newly negotiated, mutually agreed-upon delivery deadline.</li>
+                  </ul>
                 </div>
               </section>
             </div>
           </article>
 
           <article id="policy-files" className="policy-section" aria-labelledby="policy-files-heading">
-            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">V</span><h2 id="policy-files-heading">File Storage & Delivery Maintenance</h2></header>
+            <header className="policy-section-head"><span className="policy-index" aria-hidden="true">V</span><h3 id="policy-files-heading">File Storage & Delivery Maintenance</h3></header>
             <div className="policy-section-body">
               <section className="policy-clause policy-clause-plain">
                 <div className="policy-clause-body">
