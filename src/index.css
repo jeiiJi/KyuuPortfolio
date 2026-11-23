@@ -889,7 +889,7 @@ body { background: var(--bg); color: var(--main); font-family: var(--font-body);
 .gallery-tile:hover .gallery-real-image { transform: scale(1.04); }
 .gallery-tile .art-visual { aspect-ratio: 1.08; min-height: 0; }
 .gallery-masonry-col:nth-child(odd) .gallery-tile:nth-child(odd) .art-visual { aspect-ratio: .82; }
-.gallery-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; padding: clamp(10px, 2vw, 18px); color: var(--bg); background: linear-gradient(to top, rgb(71 48 45 / .9) 0%, rgb(71 48 45 / .5) 42%, transparent 75%); opacity: 0; transition: opacity .4s ease; }
+.gallery-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; padding: clamp(10px, 2vw, 18px); color: var(--main); background: linear-gradient( to top, color-mix(in srgb, var(--paper) 92%, transparent) 0%, color-mix(in srgb, var(--paper) 55%, transparent) 42%, transparent 75% ); opacity: 0; transition: opacity .4s ease; }
 .gallery-overlay > * { translate: 0 12px; transition: translate .45s var(--ease-out); }
 .gallery-tile:hover .gallery-overlay, .gallery-tile:focus-visible .gallery-overlay { opacity: 1; }
 .gallery-tile:hover .gallery-overlay > *, .gallery-tile:focus-visible .gallery-overlay > * { translate: 0 0; }
