@@ -3238,8 +3238,8 @@ const SOCIAL_LINKS = {
   email: "mailto:kyuukyuuji@gmail.com",
   instagram: "https://www.instagram.com/jeii_ji",
   facebook: "https://www.facebook.com/christinejoy.morata02/",
-  tiktok: "",
-  discord: "",
+  tiktok: "https://www.tiktok.com/@kyuukyuuji",
+  discord: "https://discord.com/users/780783345486659586",
 };
 
 type SocialKey = "facebook" | "instagram" | "tiktok" | "discord" | "mail";

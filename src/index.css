@@ -629,6 +629,7 @@ h1 em,  h2 em { color: var(--orange-display); }
 .policy-clause-plain .policy-clause-body { width: 100%; max-width: none; }
 .policy-clause-plain .policy-clause-body p, 
 .policy-clause-plain .policy-clause-body ul { max-width: none; width: 100%; }
+.guide-page .policy-cta-actions .btn-primary, .guide-page .policy-cta-actions .btn-primary:hover, .guide-page .policy-cta-actions .btn-primary:focus-visible { color: var(--paper, var(--bg)); }
 @media (min-width: 901px) {
   .policy-clause { grid-template-columns: minmax(170px, 220px) minmax(0, 1fr); gap: 8px clamp(20px, 3vw, 40px); }
   .policy-clause-plain { grid-template-columns: minmax(0, 1fr); }
