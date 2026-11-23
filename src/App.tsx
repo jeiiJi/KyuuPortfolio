@@ -4,10 +4,9 @@ import logo from "./assets/kyuu-logo.png";
 import titleHero from "./assets/title-hero.png";
 import chibiHero from "./assets/chibi-hero.png";
 import placeholder from "./assets/placeholder.svg";
-import artistPhoto from "./assets/artist-photo.png";
 const API_URL = "";
 
-type Page = "home" | "about" | "guide" | "commission" | "admin";
+type Page = "home" | "guide" | "commission" | "admin";
 type CommissionRequest = {
   id: number; name: string; email: string; social: string; type: string; finish: string;
   characters: number; background: string; commercial: boolean; priority: boolean;
@@ -509,9 +508,6 @@ function Navbar({ page, go }: { page: Page; go: (page: Page) => void }) {
             Home
           </button>
           <button type="button" onClick={() => scrollToSection("home-gallery-section")}>Gallery</button>
-          <button type="button" className={page === "about" ? "active" : ""} aria-current={page === "about" ? "page" : undefined} onClick={() => { go("about"); setOpen(false); }}>
-            About
-          </button>
 
           <div className="drawer-footer-panel">
             <div className="drawer-currency">
@@ -696,52 +692,6 @@ function Home() {
   );
 }
 
-
-// The old home-page "About" strip, now a standalone page reached from the navbar.
-function About({ go }: { go: (page: Page) => void }) {
-  const openGallery = () => {
-    go("home");
-    window.setTimeout(() => document.getElementById("home-gallery-section")?.scrollIntoView({ behavior: "smooth" }), 120);
-  };
-
-  return (
-    <main id="main-content" tabIndex={-1} className="page-main about-page">
-      <section className="wrap about-hero">
-        <div>
-          <p className="kicker">About Me</p>
-          <h1>Hi, I'm Kyuu. I draw feelings you can keep.</h1>
-          <p>I'm a digital illustrator who loves expressive faces, cozy color stories, and the magic of turning your favorite idea into something unmistakably yours.</p>
-          <div className="hero-actions">
-            <button type="button" className="btn-pill btn-dark" onClick={() => go("commission")}>Commission Now</button>
-            <Btn kind="outline" onClick={openGallery}>View the gallery</Btn>
-          </div>
-        </div>
-        <div className="about-portrait portrait-card">
-          <img src={artistPhoto} alt="Portrait of Kyuu, the artist" className="about-photo" />
-          <span className="seal">ID<br />Artist</span>
-        </div>
-      </section>
-
-      <section className="wrap about-terms">
-        <p className="kicker">Working together</p>
-        <div className="quick-terms">
-          <div>
-            <span>01</span>
-            <p><strong>Kind collaboration</strong>Clear communication from sketch to final.</p>
-          </div>
-          <div>
-            <span>02</span>
-            <p><strong>Made for you</strong> Personal use is included; commercial use is quoted.</p>
-          </div>
-          <div>
-            <span>03</span>
-            <p><strong>High-res files</strong> Delivered ready for print, web, or licensing.</p>
-          </div>
-        </div>
-      </section>
-    </main>
-  );
-}
 
 type GalleryItem =
   | {
@@ -3347,7 +3297,7 @@ function Footer({ go, showCta }: { go: (page: Page) => void; showCta: boolean })
 function AppInner() {
   const getPage = (): Page => {
     const hash = window.location.hash.replace("#", "").split("?")[0] as Page;
-    return ["home", "about", "gallery", "guide", "commission", "admin"].includes(hash) ? hash : "home";
+    return ["home", "gallery", "guide", "commission", "admin"].includes(hash) ? hash : "home";
   };
   const [page, setPage] = useState<Page>(getPage);
   const [isAdminAuth, setIsAdminAuth] = useState(false);
@@ -3437,7 +3387,7 @@ function AppInner() {
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
   };
-  const content = { home: <Home />, about: <About go={go} />, guide: <Guide go={go} />, commission: <Commission go={go} />, admin: <Admin go={go} onLogout={logout} /> };
+  const content = { home: <Home />, guide: <Guide go={go} />, commission: <Commission go={go} />, admin: <Admin go={go} onLogout={logout} /> };
   
   if (page === "admin") {
     if (!authChecked) {
