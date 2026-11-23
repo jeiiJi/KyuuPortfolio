@@ -4,6 +4,7 @@ import logo from "./assets/kyuu-logo.png";
 import titleHero from "./assets/title-hero.png";
 import chibiHero from "./assets/chibi-hero.png";
 import placeholder from "./assets/placeholder.svg";
+import artistPhoto from "./assets/artist-photo.png";
 const API_URL = "";
 
 type Page = "home" | "about" | "guide" | "commission" | "admin";
@@ -716,7 +717,7 @@ function About({ go }: { go: (page: Page) => void }) {
           </div>
         </div>
         <div className="about-portrait portrait-card">
-          <ArtVisual art="artist" label="Illustrated portrait of the artist" />
+          <img src={artistPhoto} alt="Portrait of Kyuu, the artist" className="about-photo" />
           <span className="seal">ID<br />Artist</span>
         </div>
       </section>
